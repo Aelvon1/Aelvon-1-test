@@ -50,8 +50,11 @@ export interface SequencerListener {
   onStepFinished(index: number): void;
   onBlocked(partId: string, blockage: Blockage, reinsert: boolean): void;
   onToolChange(toolId: string | null): void;
-  /** Demande de cadrage des pièces d'une étape (si le réglage est actif). */
-  onFrameRequest(partIds: string[]): void;
+  /**
+   * Demande de cadrage des pièces d'une étape (si le réglage est actif). `reinsert` : remontage
+   * (les pièces rejoignent leur place dans l'objet, qui doit aussi être cadrée).
+   */
+  onFrameRequest(partIds: string[], reinsert: boolean): void;
 }
 
 export interface SequencerOptions {
@@ -290,7 +293,11 @@ export class Sequencer {
       this.o.listener.onStepStarted(run.stepIndex);
       if (this.o.autoFrame()) {
         const step = this.o.graph.steps[run.stepIndex];
-        if (step) this.o.listener.onFrameRequest(step.focus.length ? [...step.focus] : [...step.parts]);
+        if (step)
+          this.o.listener.onFrameRequest(
+            step.focus.length ? [...step.focus] : [...step.parts],
+            run.direction === -1,
+          );
       }
     }
     this.startLayer();

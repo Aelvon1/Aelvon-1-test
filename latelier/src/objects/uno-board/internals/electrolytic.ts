@@ -236,7 +236,8 @@ export function electrolyticInternalParts(ref: 'PC1' | 'PC2'): PartDef<UnoParams
     tool: 'tweezers',
     motion: 'unwind',
     axis: [0, 1, 0],
-    distance: 0.008,
+    // Levée finale courte : la bande déroulée reste près du tapis (placement « stay »).
+    distance: 0.003,
     duration: 5.5,
     destructive: true,
     after: 'stay',

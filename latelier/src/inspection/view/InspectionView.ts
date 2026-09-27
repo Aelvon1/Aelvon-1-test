@@ -73,6 +73,22 @@ export function objectLocalBounds(assembly: Assembly, target: THREE.Box3): THREE
   return target;
 }
 
+/**
+ * Bornes du CORPS de l'objet dans son propre repère : pièces de premier niveau sans retrait
+ * (carter, circuit imprimé, boîtier…) et leurs sous-pièces. Repli : bornes de l'objet entier.
+ */
+export function objectBodyBounds(assembly: Assembly, target: THREE.Box3): THREE.Box3 {
+  target.makeEmpty();
+  assembly.root.updateWorldMatrix(true, true);
+  _inv.copy(assembly.root.matrixWorld).invert();
+  for (const part of assembly.order) {
+    if (part.parentId !== null || part.def.removal || part.subtreeBox.isEmpty()) continue;
+    _m.multiplyMatrices(_inv, part.node.matrixWorld);
+    target.union(_local.copy(part.subtreeBox).applyMatrix4(_m));
+  }
+  return target.isEmpty() ? objectLocalBounds(assembly, target) : target;
+}
+
 export class InspectionView {
   readonly camera: InspectionCamera;
   readonly picker: Picker;
@@ -159,7 +175,11 @@ export class InspectionView {
       this.camera.notifySceneChanged();
     };
     // Bornes au repos dans le repère de l'objet (position de coupe 0..1).
-    this.section.setObject(assembly.root, objectLocalBounds(assembly, new THREE.Box3()));
+    this.section.setObject(
+      assembly.root,
+      objectLocalBounds(assembly, new THREE.Box3()),
+      objectBodyBounds(assembly, new THREE.Box3()),
+    );
     session.restBounds.getBoundingSphere(this.bounds);
     this.camera.objectCenter.copy(this.bounds.center);
     this.camera.objectRadius = this.bounds.radius;

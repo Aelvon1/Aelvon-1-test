@@ -3,8 +3,11 @@
  *
  * - L'objet est rattaché à un `ClippingGroup` (nœud de découpe de three/webgpu, compatible
  *   WebGPU et repli WebGL2) : activer la coupe active le groupe et son unique plan.
- * - Axe x/y/z dans le repère de l'objet, position 0..1 sur ses bornes au repos. Côté conservé :
- *   coordonnées inférieures à la coupe (on regarde la coupe depuis +axe), `flip` inverse.
+ * - Axe x/y/z dans le repère de l'objet, position 0..1 sur les bornes au repos de son CORPS
+ *   (pièces de base : carter, circuit…), pas sur celles de l'objet entier : un câble qui dépasse
+ *   ne tire pas le plan hors du corps (à 50 %, la coupe traverse le carter en son milieu). Côté
+ *   conservé : coordonnées inférieures à la coupe (on regarde la coupe depuis +axe), `flip`
+ *   inverse.
  * - Un plan translucide à bord lumineux matérialise la coupe (hors du groupe : jamais découpé).
  */
 import * as THREE from 'three/webgpu';
@@ -58,6 +61,8 @@ export class Section {
   private readonly helper: THREE.Mesh;
   private readonly helperUniforms: SectionPlaneUniforms;
   private readonly localBounds = new THREE.Box3();
+  /** Bornes (repère de l'objet) sur lesquelles se place le plan : corps de l'objet. */
+  private readonly cutBounds = new THREE.Box3();
   private root: THREE.Object3D | null = null;
   private state: SectionState = { enabled: false, axis: 'x', position: 0.5, flip: false };
   private fade = 0;
@@ -83,11 +88,21 @@ export class Section {
     return this.state.enabled;
   }
 
-  /** Objet coupé : racine et bornes au repos dans son propre repère. */
-  setObject(root: THREE.Object3D | null, localBounds: THREE.Box3 | null): void {
+  /**
+   * Objet coupé : racine et bornes au repos dans son propre repère (`localBounds` : objet entier,
+   * pour les requêtes de sélection ; `cutBounds` : corps de l'objet, où se place le plan — par
+   * défaut l'objet entier).
+   */
+  setObject(
+    root: THREE.Object3D | null,
+    localBounds: THREE.Box3 | null,
+    cutBounds?: THREE.Box3 | null,
+  ): void {
     this.root = root;
     if (localBounds) this.localBounds.copy(localBounds);
     else this.localBounds.makeEmpty();
+    if (cutBounds && !cutBounds.isEmpty()) this.cutBounds.copy(cutBounds);
+    else this.cutBounds.copy(this.localBounds);
     this.update(0);
   }
 
@@ -109,18 +124,18 @@ export class Section {
     }
     root.updateWorldMatrix(true, false);
     const { axis, position, flip } = this.state;
-    sectionPointLocal(this.localBounds, axis, position, _p).applyMatrix4(root.matrixWorld);
+    sectionPointLocal(this.cutBounds, axis, position, _p).applyMatrix4(root.matrixWorld);
     root.getWorldQuaternion(_q);
     sectionNormalLocal(axis, flip, _n).applyQuaternion(_q).normalize();
     this.plane.setFromNormalAndCoplanarPoint(_n, _p);
     this.worldBounds.copy(this.localBounds).applyMatrix4(root.matrixWorld).expandByScalar(0.002);
-    // Plan visuel : rectangle des bornes dans le plan de coupe, marge de 8 %.
-    this.localBounds.getSize(_size);
+    // Plan visuel : rectangle des bornes du corps dans le plan de coupe, marge de 8 %.
+    this.cutBounds.getSize(_size);
     const w = (axis === 'x' ? _size.z : _size.x) * 1.08;
     const h = (axis === 'y' ? _size.z : _size.y) * 1.08;
     this.helperUniforms.size.value.set(w, h);
     this.helperUniforms.strength.value = this.fade;
-    sectionPointLocal(this.localBounds, axis, position, _center);
+    sectionPointLocal(this.cutBounds, axis, position, _center);
     // Orientation locale du rectangle (normale +Z de PlaneGeometry tournée vers l'axe de coupe).
     const local = _helperMatrix;
     if (axis === 'x') local.makeRotationY(Math.PI / 2);

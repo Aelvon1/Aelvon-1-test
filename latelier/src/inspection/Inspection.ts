@@ -91,7 +91,9 @@ interface Session {
 
 const _box = new THREE.Box3();
 const _box2 = new THREE.Box3();
+const _box3 = new THREE.Box3();
 const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 
 export class Inspection {
@@ -115,7 +117,8 @@ export class Inspection {
    * Cadrage demandé par le séquenceur (pas à pas avec `settings.autoFrameSteps`). La vue peut
    * remplacer ce comportement ; par défaut, la caméra temporaire cadre les pièces et leur course.
    */
-  onFrameRequest: ((partIds: string[]) => void) | null = (ids) => this.frameParts(ids, true);
+  onFrameRequest: ((partIds: string[], reinsert: boolean) => void) | null = (ids, reinsert) =>
+    this.frameParts(ids, true, reinsert);
 
   constructor(
     protected readonly ctx: AppContext,
@@ -354,7 +357,7 @@ export class Inspection {
         onStepFinished: (index) => ctx.bus.emit('inspection:stepFinished', { index }),
         onBlocked: (partId, blockage, reinsert) => this.reportBlocked(partId, blockage, reinsert),
         onToolChange: (toolId) => patchInspection(ctx.store, { activeToolId: toolId }),
-        onFrameRequest: (ids) => this.onFrameRequest?.(ids),
+        onFrameRequest: (ids, reinsert) => this.onFrameRequest?.(ids, reinsert),
       },
     });
     const restBounds = assembly.objectBounds(new THREE.Box3());
@@ -799,8 +802,14 @@ export class Inspection {
 
   // --- Cadrage ----------------------------------------------------------------------------
 
-  /** Cadre des pièces ; `withTravel` inclut leur course de retrait (pas à pas). */
-  private frameParts(ids: readonly string[], withTravel: boolean): void {
+  /**
+   * Cadre des pièces ; `withTravel` inclut leur course de retrait (pas à pas). `reinsert`
+   * (remontage) : la place de chaque pièce dans son parent (pose de repos, parent tel qu'il est
+   * maintenant) et l'entrée de sa course sont cadrées avec sa position actuelle (rangée sur le
+   * tapis) — sinon la caméra resterait sur l'emplacement de rangement, vide une fois la pièce
+   * remontée.
+   */
+  private frameParts(ids: readonly string[], withTravel: boolean, reinsert = false): void {
     const a = this.assembly;
     const s = this.session;
     if (!a || !s) return;
@@ -811,7 +820,44 @@ export class Inspection {
       _box2.union(_box);
       const part = a.parts.get(id);
       const removal = part?.def.removal;
-      if (withTravel && removal && part) {
+      if (withTravel && reinsert && part) {
+        // Place de repos dans le parent courant, et entrée de la course de retrait.
+        const parentNode = part.node.parent;
+        _m.compose(part.restPosition, part.restQuaternion, part.restScale);
+        if (parentNode) {
+          parentNode.updateWorldMatrix(true, false);
+          _m.premultiply(parentNode.matrixWorld);
+        }
+        const local = part.subtreeBox.isEmpty() ? part.localBox : part.subtreeBox;
+        if (!local.isEmpty()) {
+          _box3.copy(local).applyMatrix4(_m);
+          _box2.union(_box3);
+          if (removal && parentNode) {
+            _v.set(removal.axis[0], removal.axis[1], removal.axis[2]).normalize();
+            _v.applyQuaternion(parentNode.getWorldQuaternion(new THREE.Quaternion()));
+            _box2.union(_box3.translate(_v.multiplyScalar(removal.distance)));
+          }
+        }
+      } else if (withTravel && removal && part) {
+        // Écartement des instances (tôles, billes) : toute son étendue est cadrée (repère du
+        // nœud de la pièce, comme dans `PoseComposer`), avant la course de retrait.
+        const spread = removal.spread;
+        const count = part.instanced?.count ?? 0;
+        if (spread && count > 1) {
+          part.node.updateWorldMatrix(true, false);
+          if (spread.mode === 'linear') {
+            _v2.setFromMatrixPosition(part.node.matrixWorld);
+            _v.set(spread.step[0], spread.step[1], spread.step[2])
+              .multiplyScalar(count - 1)
+              .applyMatrix4(part.node.matrixWorld)
+              .sub(_v2);
+            _box2.union(_box3.copy(_box).translate(_v));
+          } else {
+            _box2.union(
+              _box3.copy(_box).expandByScalar(spread.distance * part.node.matrixWorld.getMaxScaleOnAxis()),
+            );
+          }
+        }
         const parent = part.node.parent;
         _v.set(removal.axis[0], removal.axis[1], removal.axis[2]).normalize();
         if (parent) _v.applyQuaternion(parent.getWorldQuaternion(new THREE.Quaternion()));
