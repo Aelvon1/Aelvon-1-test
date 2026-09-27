@@ -107,7 +107,12 @@ export class BasicCamera implements InspectionCameraController {
     this.isActive = true;
     this.controls.enabled = true;
     this.controls.minDistance = view.minDistance;
-    this.flyTo(view.target, view.target.clone().addScaledVector(this.home.direction, view.distance), 0.8, true);
+    this.flyTo(
+      view.target,
+      view.target.clone().addScaledVector(this.home.direction, view.distance),
+      0.8,
+      true,
+    );
   }
 
   deactivate(): void {
@@ -131,12 +136,21 @@ export class BasicCamera implements InspectionCameraController {
     this.flyTo(h.target, h.target.clone().addScaledVector(h.direction, h.distance), 0.7, false);
   }
 
-  private flyTo(target: THREE.Vector3, position: THREE.Vector3, duration: number, fromCurrentView: boolean): void {
+  private flyTo(
+    target: THREE.Vector3,
+    position: THREE.Vector3,
+    duration: number,
+    fromCurrentView: boolean,
+  ): void {
     // Cible de départ : point regardé actuellement (transition depuis la caméra de l'établi).
     const fromTarget = fromCurrentView
       ? this.camera.position
           .clone()
-          .add(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(this.camera.position.distanceTo(target)))
+          .add(
+            this.camera
+              .getWorldDirection(new THREE.Vector3())
+              .multiplyScalar(this.camera.position.distanceTo(target)),
+          )
       : this.controls.target.clone();
     this.flight = {
       fromTarget,
@@ -226,7 +240,10 @@ export class BasicCamera implements InspectionCameraController {
     const root = this.pick?.targets();
     if (!root) return null;
     const rect = this.canvas.getBoundingClientRect();
-    this.pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    this.pointer.set(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const hits = this.raycaster.intersectObject(root, true);
     const hit = hits.find((h) => h.object.visible && isVisibleChain(h.object));

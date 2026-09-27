@@ -60,11 +60,25 @@ export const cardboard: Generator = ({ width, height, params, seed }) => {
     const y = rand() * height;
     const a = rand() * Math.PI;
     const l = (0.02 + rand() * 0.08) * width;
-    drawLine(scuffs, width, height, x, y, x + Math.cos(a) * l, y + Math.sin(a) * l, 1 + rand() * 2, 0.5 + rand() * 0.5);
+    drawLine(
+      scuffs,
+      width,
+      height,
+      x,
+      y,
+      x + Math.cos(a) * l,
+      y + Math.sin(a) * l,
+      1 + rand() * 2,
+      0.5 + rand() * 0.5,
+    );
   }
 
   const out = new Uint8ClampedArray(width * height * 4);
-  const light: RGB = [Math.min(255, base[0] * 1.2 + 20), Math.min(255, base[1] * 1.2 + 18), Math.min(255, base[2] * 1.15 + 12)];
+  const light: RGB = [
+    Math.min(255, base[0] * 1.2 + 20),
+    Math.min(255, base[1] * 1.2 + 18),
+    Math.min(255, base[2] * 1.15 + 12),
+  ];
   const dark: RGB = [base[0] * 0.62, base[1] * 0.55, base[2] * 0.48];
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {

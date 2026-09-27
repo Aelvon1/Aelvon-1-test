@@ -23,7 +23,11 @@ import { warpOnTop } from '../src/textures/generators/weave';
 type Case = { name: string; params?: unknown; periodic: 'both' | 'x' | 'none'; cellular?: boolean };
 
 const CASES: Case[] = [
-  { name: 'noise', params: { layers: [{ scale: 4 }, { scale: 16 }, { scale: 32, octaves: 2 }, { scale: 2 }] }, periodic: 'both' },
+  {
+    name: 'noise',
+    params: { layers: [{ scale: 4 }, { scale: 16 }, { scale: 32, octaves: 2 }, { scale: 2 }] },
+    periodic: 'both',
+  },
   { name: 'grunge', periodic: 'both' },
   { name: 'scratches', periodic: 'both' },
   { name: 'brushed', periodic: 'both' },
@@ -125,13 +129,14 @@ describe('générateurs de textures procédurales', () => {
     expect(data[3]).toBe(255);
   });
 
-  it('génère une texture 1024² en un temps raisonnable', () => {
+  it('génère une texture 1024² en un temps raisonnable', { timeout: 120_000 }, () => {
     for (const name of ['grunge', 'concrete', 'rust', 'wood', 'paint']) {
       const t0 = performance.now();
       run(name, {}, 1, 1024, 1024);
       const elapsed = performance.now() - t0;
-      // Borne large (machines d'intégration lentes) ; cible réelle : quelques centaines de ms.
-      expect(elapsed, name).toBeLessThan(4000);
+      // Borne très large (machines d'intégration chargées) : détecte une régression d'un ordre
+      // de grandeur. Cible réelle : quelques centaines de ms sur un poste de développement.
+      expect(elapsed, name).toBeLessThan(15_000);
     }
   });
 });

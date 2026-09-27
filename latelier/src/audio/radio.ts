@@ -3,6 +3,8 @@
  * puis dégradée comme une réception en ondes moyennes sur un petit haut-parleur : bande
  * passante étroite, saturation, souffle, parasites, évanouissements lents et, parfois, un
  * sifflement d'interférence. Les morceaux s'enchaînent avec un court blanc (grésillement).
+ * Approximation : la réception AM est imitée par filtrage/saturation/bruit, sans modulation ni
+ * démodulation réelles.
  */
 import { adsr, percussive, smoothParam } from './envelope';
 import type { Voice } from './kit';

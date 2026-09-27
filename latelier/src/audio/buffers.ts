@@ -12,7 +12,11 @@ export function whiteNoise(length: number, rng: Rng): Float32Array {
   return out;
 }
 
-/** Bruit rose (−3 dB/octave), filtre de Paul Kellet, crête ≈ 1. */
+/**
+ * Bruit rose (−3 dB/octave), crête ≈ 1.
+ * Approximation : filtre de Paul Kellet (somme de filtres à un pôle), pente exacte à ±0,05 dB
+ * près dans la bande audible.
+ */
 export function pinkNoise(length: number, rng: Rng): Float32Array {
   const out = new Float32Array(length);
   let b0 = 0;
@@ -132,7 +136,11 @@ export function renderImpacts(sampleRate: number, spec: ImpactTextureSpec, rng: 
   return out;
 }
 
-/** Goutte sur une toiture (tôle + voligeage), entendue de l'intérieur : « toc » sourd + souffle bref. */
+/**
+ * Goutte sur une toiture (tôle + voligeage), entendue de l'intérieur : « toc » sourd + souffle bref.
+ * Approximation : modèle phénoménologique (sinus amorti à hauteur descendante + clic filtré),
+ * pas une simulation physique de l'impact ni du rayonnement de la tôle.
+ */
 function writeRoofDrop(out: Float32Array, start: number, sr: number, size: number, rng: Rng): void {
   const n = out.length;
   const amp = 0.15 + size * 0.85;
@@ -233,6 +241,8 @@ export function renderCrackle(sampleRate: number, seconds: number, density: numb
 /**
  * Réponse impulsionnelle stéréo de l'atelier (≈ 20 m², béton, étagères encombrées) :
  * premières réflexions discrètes puis queue diffuse dont les aigus s'éteignent plus vite.
+ * Approximation : réponse synthétique (délais de réflexions plausibles pour une pièce de
+ * 5 × 4 × 2,7 m, décroissance exponentielle), non calculée à partir de la géométrie réelle.
  */
 export function renderRoomImpulse(sampleRate: number, rt60: number, rng: Rng): [Float32Array, Float32Array] {
   const seconds = Math.min(2, rt60 * 1.1);
@@ -273,14 +283,7 @@ export function renderRoomImpulse(sampleRate: number, rt60: number, rng: Rng): [
 
 /** Tampons partagés par toutes les voix (bruits, textures d'impacts, parasites). */
 export type SharedSampleId =
-  | 'white'
-  | 'pink'
-  | 'brown'
-  | 'roofImpactsA'
-  | 'roofImpactsB'
-  | 'glassImpacts'
-  | 'sizzlePops'
-  | 'crackle';
+  'white' | 'pink' | 'brown' | 'roofImpactsA' | 'roofImpactsB' | 'glassImpacts' | 'sizzlePops' | 'crackle';
 
 export const SHARED_SAMPLE_IDS: readonly SharedSampleId[] = [
   'white',

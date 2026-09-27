@@ -46,7 +46,11 @@ type Quality = 0 | 1 | 2 | 3;
 const requests = new Map<string, ReturnType<typeof artworkRequest>>();
 
 /** Texture d'illustration d'une face (même clé que celle attendue par `prepare`). */
-export function artworkTexture(ctx: Pick<MaterialFactoryContext, 'textures'>, face: Face, quality: Quality): THREE.Texture {
+export function artworkTexture(
+  ctx: Pick<MaterialFactoryContext, 'textures'>,
+  face: Face,
+  quality: Quality,
+): THREE.Texture {
   const key = `${face}.${quality}`;
   let req = requests.get(key);
   if (!req) {
@@ -64,7 +68,14 @@ export const MASK_OVER_COPPER = 0x14818d;
  * Normale (repère vue) d'une surface plane horizontale en relief : hauteur = canal `channel`
  * × `reliefMm`, face orientée vers `up` (+1 dessus, −1 dessous).
  */
-function reliefNormal(tex: THREE.Texture, face: Face, quality: Quality, channel: 'g' | 'b', reliefMm: number, up: 1 | -1) {
+function reliefNormal(
+  tex: THREE.Texture,
+  face: Face,
+  quality: Quality,
+  channel: 'g' | 'b',
+  reliefMm: number,
+  up: 1 | -1,
+) {
   const { width, height } = artworkSize(quality, face);
   const e = 1.5;
   const du = e / width;
@@ -157,7 +168,9 @@ const coreMaterial: MaterialFactory = () => {
   // Fils de chaîne vus en long entre les ellipses + fines stries de filaments.
   const warp = smoothstep(0.42, 0.3, abs(v.sub(0.5))).mul(0.45);
   const strands = sin(v.mul(80)).mul(0.5).add(0.5).mul(0.12);
-  const interPly = smoothstep(0.08, 0.0, v).add(smoothstep(0.92, 1.0, v)).mul(0.5);
+  const interPly = smoothstep(0.08, 0.0, v)
+    .add(smoothstep(0.92, 1.0, v))
+    .mul(0.5);
   const edgeCol = mix(mix(resin, glass, weft.add(warp).add(strands).clamp(0, 1)), resin.mul(0.7), interPly);
   // Faces : tissage toile (pas 0,58 × 0,79 mm), dessus/dessous alternés.
   const wx = sin(p.x.mul((2 * Math.PI) / 0.58));

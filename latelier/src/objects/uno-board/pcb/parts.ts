@@ -33,7 +33,9 @@ const sheetY: Record<'silk' | 'mask' | 'copper', Record<Face, number>> = {
 };
 
 function sheet(ctx: Ctx, layer: 'silk' | 'mask' | 'copper', face: Face): THREE.Mesh {
-  const g = ctx.geometry.get(`pcb.sheet.${layer}.${face}`, () => sheetGeometry(sheetY[layer][face], face === 'bottom'));
+  const g = ctx.geometry.get(`pcb.sheet.${layer}.${face}`, () =>
+    sheetGeometry(sheetY[layer][face], face === 'bottom'),
+  );
   const mesh = new THREE.Mesh(g, own(ctx, `pcb.${layer}.${face}.q${ctx.quality}`));
   mesh.name = `feuille ${layer} ${face}`;
   return mesh;
@@ -131,7 +133,8 @@ export function pcbParts(): Part[] {
       },
       info: {
         role: 'Support mécanique et isolant électrique entre les deux couches de cuivre ; percée pour les composants traversants, les vias et la fixation.',
-        material: 'Stratifié verre-époxy FR4 : 8 plis de tissu de verre 7628 imprégnés de résine époxy ignifugée (Tg ≈ 135 °C, typique)',
+        material:
+          'Stratifié verre-époxy FR4 : 8 plis de tissu de verre 7628 imprégnés de résine époxy ignifugée (Tg ≈ 135 °C, typique)',
         dimensions: '68,58 × 53,34 × 1,51 mm ; 4 trous de fixation Ø 3,2 mm',
         tip: 'Sur la tranche, on voit les torons de verre coupés. Une surchauffe (fer trop longtemps) fait cloquer et blanchir le stratifié : c’est la délamination.',
         extra: [
@@ -155,8 +158,15 @@ export function pcbParts(): Part[] {
         info: layerInfo.silk(fn),
         explode: { direction: [0, 1, 0], distance: top ? 0.029 : 0, stage: 2 },
         removal: top
-          ? peel(['#component'], [0, 1, 0], 'Opération pédagogique : gratter l’encre de sérigraphie au scalpel.')
-          : slide(['#component'], 'Opération pédagogique : détacher la sérigraphie de la face inférieure et la dégager.'),
+          ? peel(
+              ['#component'],
+              [0, 1, 0],
+              'Opération pédagogique : gratter l’encre de sérigraphie au scalpel.',
+            )
+          : slide(
+              ['#component'],
+              'Opération pédagogique : détacher la sérigraphie de la face inférieure et la dégager.',
+            ),
         knolling: { layout: 'stack' },
       },
       {
@@ -167,7 +177,11 @@ export function pcbParts(): Part[] {
         info: layerInfo.mask(fn),
         explode: { direction: [0, 1, 0], distance: top ? 0.025 : 0.004, stage: 2 },
         removal: top
-          ? peel([`pcb.silk.${face}`], [0, 1, 0], 'Opération pédagogique : décaper le vernis épargne (grattage au scalpel ou décapant).')
+          ? peel(
+              [`pcb.silk.${face}`],
+              [0, 1, 0],
+              'Opération pédagogique : décaper le vernis épargne (grattage au scalpel ou décapant).',
+            )
           : slide([`pcb.silk.${face}`], 'Opération pédagogique : décaper le vernis de la face inférieure.'),
       },
       {
@@ -184,7 +198,8 @@ export function pcbParts(): Part[] {
             ? 'Face composants : pistes de signal, pistes d’alimentation élargies, pastilles CMS et traversantes, plan de masse avec dégagements.'
             : 'Face soudure : pistes de liaison, pastilles des traversants et plan de masse relié au dessus par les vias.',
           material: 'Cuivre électrolytique laminé ; pastilles et vias étamés HASL (étain sans plomb)',
-          dimensions: 'Cuivre 35 µm (1 oz/ft²) ; pistes de 0,2 mm (signaux) à 0,8 mm (entrée jack) ; isolement ≥ 0,15 mm',
+          dimensions:
+            'Cuivre 35 µm (1 oz/ft²) ; pistes de 0,2 mm (signaux) à 0,8 mm (entrée jack) ; isolement ≥ 0,15 mm',
           tip: 'Les pastilles gardent un peu d’étain après dessoudage : c’est l’étamage HASL, bombé, qui facilite le remontage.',
         },
         explode: { direction: [0, 1, 0], distance: top ? 0.021 : 0.008, stage: 2 },
@@ -195,9 +210,13 @@ export function pcbParts(): Part[] {
               axis: [0, 1, 0],
               distance: 0.03,
               destructive: true,
-              gesture: 'Opération pédagogique : en réalité le cuivre est dissous (gravure au perchlorure de fer) ; ici la couche est soulevée pour montrer le dessin des pistes.',
+              gesture:
+                'Opération pédagogique : en réalité le cuivre est dissous (gravure au perchlorure de fer) ; ici la couche est soulevée pour montrer le dessin des pistes.',
             }
-          : slide([`pcb.mask.${face}`], 'Opération pédagogique : la couche de cuivre inférieure est dégagée pour montrer ses pistes.'),
+          : slide(
+              [`pcb.mask.${face}`],
+              'Opération pédagogique : la couche de cuivre inférieure est dégagée pour montrer ses pistes.',
+            ),
       },
     );
   }
@@ -218,7 +237,9 @@ export function pcbParts(): Part[] {
         instanced: im,
         instanceLabel: (i) => {
           const h = holes[i];
-          return h ? `Fût Ø ${h.d.toFixed(2).replace('.', ',')} mm (${h.d <= 0.4 ? 'via' : 'trou traversant'})` : 'Fût';
+          return h
+            ? `Fût Ø ${h.d.toFixed(2).replace('.', ',')} mm (${h.d <= 0.4 ? 'via' : 'trou traversant'})`
+            : 'Fût';
         },
       };
     },

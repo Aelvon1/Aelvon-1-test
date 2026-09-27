@@ -64,7 +64,12 @@ function rectOps(
   const c = Math.cos(-rot);
   const s = Math.sin(-rot);
   const rect: DrawOp = { op: 'rect', x: -w / 2, y: -h / 2, w, h, ...style };
-  return [{ op: 'save' }, { op: 'transform', a: c, b: s, c: -s, d: c, e: X(x), f: Y(y) }, rect, { op: 'restore' }];
+  return [
+    { op: 'save' },
+    { op: 'transform', a: c, b: s, c: -s, d: c, e: X(x), f: Y(y) },
+    rect,
+    { op: 'restore' },
+  ];
 }
 
 function padOps(p: PlacedPad, expand: number, color: string): DrawOp[] {
@@ -76,7 +81,14 @@ function padOps(p: PlacedPad, expand: number, color: string): DrawOp[] {
 function polyOps(points: readonly number[], width: number, color: string): DrawOp {
   const pts: number[] = [];
   for (let i = 0; i + 1 < points.length; i += 2) pts.push(X(points[i]!), Y(points[i + 1]!));
-  return { op: 'polyline', points: pts, stroke: color, lineWidth: width, lineCap: 'round', lineJoin: 'round' };
+  return {
+    op: 'polyline',
+    points: pts,
+    stroke: color,
+    lineWidth: width,
+    lineCap: 'round',
+    lineJoin: 'round',
+  };
 }
 
 function pathD(poly: readonly Pt[]): string {
@@ -89,7 +101,13 @@ function textOps(
   x: number,
   y: number,
   size: number,
-  opts: { rot?: number; align?: 'left' | 'center' | 'right'; bold?: boolean; mirror?: boolean; color?: string },
+  opts: {
+    rot?: number;
+    align?: 'left' | 'center' | 'right';
+    bold?: boolean;
+    mirror?: boolean;
+    color?: string;
+  },
 ): DrawOp[] {
   const phi = (-(opts.rot ?? 0) * Math.PI) / 180;
   const k = 1 / TEXT_SCALE;
@@ -143,7 +161,8 @@ export function copperOps(routing: Routing, face: Face): DrawOp[] {
   for (const v of routing.vias)
     if (v.net !== GND)
       ops.push({ op: 'circle', x: X(v.x), y: Y(v.y), r: DRC.viaDiameter / 2 + POUR_CLEARANCE, fill: WHITE });
-  for (const h of MOUNTING_HOLES) ops.push({ op: 'circle', x: X(h.x), y: Y(h.y), r: MOUNTING_KEEPOUT, fill: WHITE });
+  for (const h of MOUNTING_HOLES)
+    ops.push({ op: 'circle', x: X(h.x), y: Y(h.y), r: MOUNTING_KEEPOUT, fill: WHITE });
   // 3. Aplatissement (fond noir opaque sous les bords adoucis).
   ops.push({ op: 'composite', mode: 'destination-over' }, { op: 'fill', color: BLACK });
   ops.push({ op: 'composite', mode: 'source-over' });
@@ -158,20 +177,13 @@ export function copperOps(routing: Routing, face: Face): DrawOp[] {
     }
   }
   for (const p of pads) ops.push(...padOps(p, 0, WHITE));
-  for (const v of routing.vias) ops.push({ op: 'circle', x: X(v.x), y: Y(v.y), r: DRC.viaDiameter / 2, fill: WHITE });
-  // Pont RESET-EN : fine piste entre les deux demi-pastilles (normalement fermé).
-  if (face === 'top') {
-    const sj = COMPONENTS.find((c) => c.ref === 'SJ1');
-    if (sj) {
-      const a = toBoard(sj, -0.45, 0);
-      const b = toBoard(sj, 0.45, 0);
-      ops.push(polyOps([a.x, a.y, b.x, b.y], 0.2, WHITE));
-    }
-  }
+  for (const v of routing.vias)
+    ops.push({ op: 'circle', x: X(v.x), y: Y(v.y), r: DRC.viaDiameter / 2, fill: WHITE });
   // 5. Trous (perçages) : aucun cuivre.
   for (const p of pads)
     if (p.drill !== undefined) ops.push({ op: 'circle', x: X(p.x), y: Y(p.y), r: p.drill / 2, fill: BLACK });
-  for (const v of routing.vias) ops.push({ op: 'circle', x: X(v.x), y: Y(v.y), r: DRC.viaDrill / 2, fill: BLACK });
+  for (const v of routing.vias)
+    ops.push({ op: 'circle', x: X(v.x), y: Y(v.y), r: DRC.viaDrill / 2, fill: BLACK });
   for (const h of MOUNTING_HOLES) ops.push({ op: 'circle', x: X(h.x), y: Y(h.y), r: h.d / 2, fill: BLACK });
   return ops;
 }
@@ -182,10 +194,17 @@ export function openingOps(routing: Routing, face: Face, expand = MASK_EXPANSION
   for (const p of padsOnFace(routing.pads, face)) ops.push(...padOps(p, expand, WHITE));
   for (const v of routing.vias)
     ops.push({ op: 'circle', x: X(v.x), y: Y(v.y), r: DRC.viaDiameter / 2 + expand, fill: WHITE });
-  for (const h of MOUNTING_HOLES) ops.push({ op: 'circle', x: X(h.x), y: Y(h.y), r: h.d / 2 + 0.2 + expand, fill: WHITE });
+  for (const h of MOUNTING_HOLES)
+    ops.push({ op: 'circle', x: X(h.x), y: Y(h.y), r: h.d / 2 + 0.2 + expand, fill: WHITE });
   if (face === 'top') {
     const sj = COMPONENTS.find((c) => c.ref === 'SJ1');
-    if (sj) ops.push(...rectOps(sj.x, sj.y, 1.5 + 2 * expand, 1.2 + 2 * expand, (sj.rot * Math.PI) / 180, { fill: WHITE, radius: 0.1 }));
+    if (sj)
+      ops.push(
+        ...rectOps(sj.x, sj.y, 1.5 + 2 * expand, 1.2 + 2 * expand, (sj.rot * Math.PI) / 180, {
+          fill: WHITE,
+          radius: 0.1,
+        }),
+      );
   }
   return ops;
 }
@@ -218,7 +237,14 @@ function componentSilkOps(): DrawOp[] {
       } else if (c.footprint === 'DIP28') {
         // Contour du support avec l'encoche (repère de la broche 1) côté gauche.
         const r = 1.0;
-        const pts: [number, number][] = [[x0, r], [x0, y1], [x1, y1], [x1, y0], [x0, y0], [x0, -r]];
+        const pts: [number, number][] = [
+          [x0, r],
+          [x0, y1],
+          [x1, y1],
+          [x1, y0],
+          [x0, y0],
+          [x0, -r],
+        ];
         for (let k = 0; k <= 12; k++) {
           const a = -Math.PI / 2 + (k * Math.PI) / 12;
           pts.push([x0 + Math.cos(a) * r, Math.sin(a) * r]);
@@ -231,7 +257,9 @@ function componentSilkOps(): DrawOp[] {
         ops.push(polyOps(flat, SILK_LINE, WHITE));
       } else {
         const center = toBoard(c, (x0 + x1) / 2, (y0 + y1) / 2);
-        ops.push(...rectOps(center.x, center.y, x1 - x0, y1 - y0, rot, { stroke: WHITE, lineWidth: SILK_LINE }));
+        ops.push(
+          ...rectOps(center.x, center.y, x1 - x0, y1 - y0, rot, { stroke: WHITE, lineWidth: SILK_LINE }),
+        );
       }
     }
     if (fp.marker) {
@@ -275,15 +303,6 @@ export function silkOps(routing: Routing, face: Face): DrawOp[] {
   const ops: DrawOp[] = [];
   if (face === 'top') ops.push(...componentSilkOps());
   ops.push(...silkTextOps(SILK_TEXTS, face));
-  if (face === 'top') {
-    // Cadre de la zone du 328P (repère visuel de l'implantation) et flèche « broche 1 » des ICSP.
-    for (const ref of ['ICSP', 'ICSP1']) {
-      const c = COMPONENTS.find((k) => k.ref === ref);
-      if (!c) continue;
-      const a = toBoard(c, -2.64, 3.91);
-      ops.push({ op: 'polyline', points: [X(a.x) - 0.6, Y(a.y) - 0.6, X(a.x), Y(a.y), X(a.x) - 0.6, Y(a.y) + 0.0], stroke: WHITE, lineWidth: SILK_LINE });
-    }
-  }
   ops.push({ op: 'composite', mode: 'destination-out' });
   ops.push(...openingOps(routing, face, 0.12));
   ops.push({ op: 'composite', mode: 'destination-over' }, { op: 'fill', color: BLACK });

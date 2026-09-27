@@ -38,6 +38,16 @@ export interface LoftOptions {
    * texture de marquage).
    */
   sideUV?: P2;
+  /**
+   * Dimensions (m) de la zone couverte par la texture sur le dessus (centrée) ; défaut : la
+   * section haute. Permet de caler un marquage de taille physique connue.
+   */
+  uvSize?: P2;
+  /**
+   * Contour personnalisé d'une section (même nombre de points pour toutes les sections, sens
+   * trigonométrique vu de dessus, étoilé depuis le centre) ; défaut : rectangle arrondi.
+   */
+  ring?: (w: number, d: number, r: number) => P2[];
 }
 
 /** Points d'un rectangle arrondi (sens trigonométrique vu de dessus, dans le plan XZ). */
@@ -76,11 +86,15 @@ function makeGeometry(pos: number[], nor: number[], uv: number[], index: number[
  * Corps « lofté » : sections successives (de bas en haut) reliées par des flancs lisses,
  * fermé par des faces planes en haut et en bas.
  */
-export function loftRoundedRect(sections: readonly LoftSection[], options: LoftOptions = {}): THREE.BufferGeometry {
+export function loftRoundedRect(
+  sections: readonly LoftSection[],
+  options: LoftOptions = {},
+): THREE.BufferGeometry {
   const segs = options.cornerSegments ?? 4;
   const sideUV = options.sideUV ?? [0.002, 0.002];
+  const ringOf = options.ring ?? ((w: number, d: number, r: number) => roundedRectRing(w, d, r, segs));
   const rings = sections.map((s) =>
-    roundedRectRing(s.w, s.d, s.r, segs).map(([x, z]) => [x + (s.ox ?? 0), s.y, z + (s.oz ?? 0)] as const),
+    ringOf(s.w, s.d, s.r).map(([x, z]) => [x + (s.ox ?? 0), s.y, z + (s.oz ?? 0)] as const),
   );
   const m = rings[0]!.length;
   const parts: THREE.BufferGeometry[] = [];
@@ -90,7 +104,12 @@ export function loftRoundedRect(sections: readonly LoftSection[], options: LoftO
     const pos: number[] = [];
     const uv: number[] = [];
     const index: number[] = [];
-    for (const ring of rings) for (const [x, y, z] of ring) pos.push(x, y, z), uv.push(sideUV[0], sideUV[1]);
+    for (const ring of rings) {
+      for (const [x, y, z] of ring) {
+        pos.push(x, y, z);
+        uv.push(sideUV[0], sideUV[1]);
+      }
+    }
     for (let k = 0; k + 1 < rings.length; k++) {
       for (let i = 0; i < m; i++) {
         const a = k * m + i;
@@ -106,6 +125,8 @@ export function loftRoundedRect(sections: readonly LoftSection[], options: LoftO
     parts.push(side);
   }
   const cap = (ring: readonly (readonly [number, number, number])[], up: boolean, s: LoftSection) => {
+    const uw = options.uvSize?.[0] ?? s.w;
+    const ud = options.uvSize?.[1] ?? s.d;
     const pos: number[] = [];
     const nor: number[] = [];
     const uv: number[] = [];
@@ -119,7 +140,7 @@ export function loftRoundedRect(sections: readonly LoftSection[], options: LoftO
     for (const [x, y, z] of ring) {
       pos.push(x, y, z);
       nor.push(0, up ? 1 : -1, 0);
-      if (up) uv.push((x - cx) / s.w + 0.5, (z - cz) / s.d + 0.5);
+      if (up) uv.push((x - cx) / uw + 0.5, (z - cz) / ud + 0.5);
       else uv.push(sideUV[0], sideUV[1]);
     }
     for (let i = 0; i < m; i++) {
@@ -179,11 +200,22 @@ export function roundedBox(
   w: number,
   d: number,
   h: number,
-  opts: { r?: number; rt?: number; rb?: number; draft?: number; y0?: number; segs?: number; sideUV?: P2 } = {},
+  opts: {
+    r?: number;
+    rt?: number;
+    rb?: number;
+    draft?: number;
+    y0?: number;
+    segs?: number;
+    steps?: number;
+    sideUV?: P2;
+    uvSize?: P2;
+  } = {},
 ): THREE.BufferGeometry {
   return loftRoundedRect(roundedBoxSections(w, d, h, opts), {
     cornerSegments: opts.segs ?? 3,
     ...(opts.sideUV ? { sideUV: opts.sideUV } : {}),
+    ...(opts.uvSize ? { uvSize: opts.uvSize } : {}),
   });
 }
 
@@ -356,7 +388,11 @@ function orientOutward(g: THREE.BufferGeometry, path: readonly P2[]): void {
  * Révolution d'un profil (r, y) autour de Y. Profil de bas en haut ; la surface est orientée
  * vers l'extérieur si le profil tourne dans le sens (r croissant en montant côté extérieur).
  */
-export function lathe(profile: readonly P2[], segments: number, opts: { flip?: boolean; uvU?: boolean } = {}): THREE.BufferGeometry {
+export function lathe(
+  profile: readonly P2[],
+  segments: number,
+  opts: { flip?: boolean; uvU?: boolean } = {},
+): THREE.BufferGeometry {
   const pos: number[] = [];
   const uv: number[] = [];
   const index: number[] = [];
@@ -464,7 +500,17 @@ const _p = new THREE.Vector3();
 const _e = new THREE.Euler();
 
 /** Matrice de placement : position (m), rotation Euler XYZ (rad), échelle. */
-export function mat(x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1): THREE.Matrix4 {
+export function mat(
+  x: number,
+  y: number,
+  z: number,
+  rx = 0,
+  ry = 0,
+  rz = 0,
+  sx = 1,
+  sy = 1,
+  sz = 1,
+): THREE.Matrix4 {
   _e.set(rx, ry, rz);
   _q.setFromEuler(_e);
   _p.set(x, y, z);
@@ -509,10 +555,59 @@ export function meshOrInstanced(
 }
 
 /** Fusionne des géométries transformées (copies) en une seule. */
-export function mergeTransformed(items: readonly { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[]): THREE.BufferGeometry {
+export function mergeTransformed(
+  items: readonly { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[],
+): THREE.BufferGeometry {
   const copies = items.map((it) => it.geometry.clone().applyMatrix4(it.matrix));
   const merged = mergeGeometries(copies, false);
   for (const c of copies) c.dispose();
   if (!merged) throw new Error('mergeTransformed : fusion impossible.');
   return merged;
+}
+
+/**
+ * Recalcule les UV d'une géométrie : faces orientées vers le haut → projection planaire sur une
+ * zone (w × d, m) centrée en (cx, cz) ; autres faces → UV constant (zone vierge de la texture).
+ * Géométrie non indexée ou indexée acceptée (les sommets partagés prennent la projection haute).
+ */
+export function remapTopUV(
+  g: THREE.BufferGeometry,
+  w: number,
+  d: number,
+  cx = 0,
+  cz = 0,
+  sideUV: P2 = [0.002, 0.002],
+): THREE.BufferGeometry {
+  const pos = g.getAttribute('position');
+  const nor = g.getAttribute('normal');
+  const uvs = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    if (nor.getY(i) > 0.9) {
+      uvs[i * 2] = (pos.getX(i) - cx) / w + 0.5;
+      uvs[i * 2 + 1] = (pos.getZ(i) - cz) / d + 0.5;
+    } else {
+      uvs[i * 2] = sideUV[0];
+      uvs[i * 2 + 1] = sideUV[1];
+    }
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  return g;
+}
+
+/** Disque plat horizontal (normale +Y) de rayon r à la hauteur y, UV planaires sur un carré de côté `uvSize`. */
+export function flatDisk(r: number, y: number, uvSize: number, segments = 48): THREE.BufferGeometry {
+  const pos: number[] = [0, y, 0];
+  const nor: number[] = [0, 1, 0];
+  const uv: number[] = [0.5, 0.5];
+  const index: number[] = [];
+  for (let s = 0; s < segments; s++) {
+    const a = (s / segments) * Math.PI * 2;
+    const x = Math.cos(a) * r;
+    const z = -Math.sin(a) * r;
+    pos.push(x, y, z);
+    nor.push(0, 1, 0);
+    uv.push(x / uvSize + 0.5, z / uvSize + 0.5);
+  }
+  for (let s = 0; s < segments; s++) index.push(0, 1 + s, 1 + ((s + 1) % segments));
+  return makeGeometry(pos, nor, uv, index);
 }

@@ -3,15 +3,19 @@
  * fois par contexte, et « voix » éphémères qui libèrent (déconnectent) tous leurs nœuds dès que
  * leur dernière source s'est tue.
  */
-import { brownNoise, makeSeamless, pinkNoise, renderCrackle, renderImpacts, whiteNoise } from './buffers';
+import { generateSharedSamples, type SharedSampleId } from './buffers';
 import { applyEnvelope, type EnvelopeSegment } from './envelope';
-import { mulberry32, type Rng } from './math';
+import type { Rng } from './math';
 
 export type NoiseColor = 'white' | 'pink' | 'brown';
 
-/** Tampons partagés (générés à la demande, une fois par contexte). */
-export type SharedBufferId =
-  NoiseColor | 'roofImpactsA' | 'roofImpactsB' | 'glassImpacts' | 'sizzlePops' | 'crackle';
+/** Tampons partagés (générés une fois par contexte). */
+export type SharedBufferId = SharedSampleId;
+
+/** Échantillons pré-générés hors du fil principal (worker), cédés au kit à la demande. */
+export interface SampleProvider {
+  take(id: SharedSampleId): { data: Float32Array; sampleRate: number } | null;
+}
 
 export class SynthKit {
   private readonly buffers = new Map<SharedBufferId, AudioBuffer>();
@@ -21,13 +25,21 @@ export class SynthKit {
   constructor(
     readonly ctx: BaseAudioContext,
     readonly rng: Rng,
+    private readonly provider: SampleProvider | null = null,
   ) {}
 
-  /** Tampon partagé (mono, bouclable sans couture). */
+  /**
+   * Tampon partagé (mono, bouclable sans couture) : échantillons pré-générés par le worker
+   * s'ils sont prêts (rééchantillonnés à la lecture si la fréquence diffère), sinon générés
+   * ici (repli).
+   */
   buffer(id: SharedBufferId): AudioBuffer {
     let buffer = this.buffers.get(id);
     if (!buffer) {
-      buffer = this.createBuffer(id);
+      const pre = this.provider?.take(id);
+      buffer = pre
+        ? this.fromSamples(pre.data, [pre.data], pre.sampleRate)
+        : this.fromSamples(generateSharedSamples(id, this.ctx.sampleRate));
       this.buffers.set(id, buffer);
     }
     return buffer;
@@ -49,9 +61,13 @@ export class SynthKit {
     return wave;
   }
 
-  /** Crée un tampon mono à partir d'échantillons. */
-  fromSamples(samples: Float32Array, channels: Float32Array[] = [samples]): AudioBuffer {
-    const buffer = this.ctx.createBuffer(channels.length, samples.length, this.ctx.sampleRate);
+  /** Crée un tampon à partir d'échantillons (un canal par tableau). */
+  fromSamples(
+    samples: Float32Array,
+    channels: Float32Array[] = [samples],
+    sampleRate = this.ctx.sampleRate,
+  ): AudioBuffer {
+    const buffer = this.ctx.createBuffer(channels.length, samples.length, sampleRate);
     channels.forEach((data, c) => buffer.getChannelData(c).set(data));
     return buffer;
   }
@@ -76,52 +92,6 @@ export class SynthKit {
   /** Nouvelle voix éphémère dont la sortie est reliée à `destination`. */
   voice(destination: AudioNode, gain = 1): Voice {
     return new Voice(this, destination, gain);
-  }
-
-  private createBuffer(id: SharedBufferId): AudioBuffer {
-    const sr = this.ctx.sampleRate;
-    // Graines fixes : les textures sont identiques d'une session à l'autre (reproductibilité).
-    const seeds: Record<SharedBufferId, number> = {
-      white: 11,
-      pink: 12,
-      brown: 13,
-      roofImpactsA: 21,
-      roofImpactsB: 22,
-      glassImpacts: 23,
-      sizzlePops: 24,
-      crackle: 25,
-    };
-    const rng = mulberry32(seeds[id]);
-    const fade = Math.floor(0.05 * sr);
-    let samples: Float32Array;
-    switch (id) {
-      case 'white':
-        samples = whiteNoise(Math.floor(2.3 * sr), rng);
-        break;
-      case 'pink':
-        samples = makeSeamless(pinkNoise(Math.floor(3.1 * sr) + fade, rng), fade);
-        break;
-      case 'brown':
-        samples = makeSeamless(brownNoise(Math.floor(3.7 * sr) + fade, rng), fade);
-        break;
-      // Durées premières entre elles : les motifs des couches ne se répètent pas ensemble.
-      case 'roofImpactsA':
-        samples = renderImpacts(sr, { style: 'roof', rate: 34, seconds: 5.3 }, rng);
-        break;
-      case 'roofImpactsB':
-        samples = renderImpacts(sr, { style: 'roof', rate: 28, seconds: 6.1 }, rng);
-        break;
-      case 'glassImpacts':
-        samples = renderImpacts(sr, { style: 'glass', rate: 22, seconds: 4.7 }, rng);
-        break;
-      case 'sizzlePops':
-        samples = renderImpacts(sr, { style: 'sizzle', rate: 260, seconds: 2.9 }, rng);
-        break;
-      case 'crackle':
-        samples = renderCrackle(sr, 3.3, 9, rng);
-        break;
-    }
-    return this.fromSamples(samples);
   }
 }
 

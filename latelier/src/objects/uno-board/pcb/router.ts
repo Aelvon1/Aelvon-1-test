@@ -258,8 +258,11 @@ export class GridRouter {
     });
   }
 
-  private saved: { soft: [Int32Array, Int32Array]; hard: [Int32Array, Int32Array]; nets: [string, number][] } | null =
-    null;
+  private saved: {
+    soft: [Int32Array, Int32Array];
+    hard: [Int32Array, Int32Array];
+    nets: [string, number][];
+  } | null = null;
 
   /** Mémorise l'état de la grille (ex. contour + pastilles) pour y revenir sans tout recalculer. */
   snapshot(): void {
@@ -374,6 +377,7 @@ export class GridRouter {
     const n = this.nx * this.ny;
     this.tree.fill(0);
     const extra = Math.max(0, (width - this.cfg.traceWidth) / 2);
+    // Pistes larges : disque de cellules à vérifier autour de l'axe (arrondi au plus près).
     const disk = diskOffsets(extra / this.pitch, this.nx);
     const viaDisk = diskOffsets(
       Math.max(0, this.cfg.viaDiameter / 2 - this.cfg.traceWidth / 2) / this.pitch,
@@ -589,11 +593,9 @@ export class GridRouter {
       for (let k = 0; k + 1 < simple.length; k++) {
         const a = simple[k]!;
         const b = simple[k + 1]!;
-        this.addCopper(
-          netName,
-          { kind: 'segment', x0: a.x, y0: a.y, x1: b.x, y1: b.y, r: width / 2 },
-          [run.layer],
-        );
+        this.addCopper(netName, { kind: 'segment', x0: a.x, y0: a.y, x1: b.x, y1: b.y, r: width / 2 }, [
+          run.layer,
+        ]);
       }
     }
   }
@@ -605,7 +607,14 @@ export class GridRouter {
       for (let k = 0; k + 3 < pts.length; k += 2) {
         this.addCopper(
           result.net,
-          { kind: 'segment', x0: pts[k]!, y0: pts[k + 1]!, x1: pts[k + 2]!, y1: pts[k + 3]!, r: result.width / 2 },
+          {
+            kind: 'segment',
+            x0: pts[k]!,
+            y0: pts[k + 1]!,
+            x1: pts[k + 2]!,
+            y1: pts[k + 3]!,
+            r: result.width / 2,
+          },
           [seg.layer],
         );
       }
@@ -644,7 +653,11 @@ export class GridRouter {
     let ok = true;
     const soft = this.soft[layer];
     const hard = this.hard[layer];
-    const margin = Math.max(this.pitch * 0.5, (width - this.cfg.traceWidth) / 2);
+    // Les cellules testées couvrent la ligne (¾ de pas) plus l'excès de largeur sur la référence.
+    const margin = Math.max(
+      this.pitch * 0.75,
+      width / 2 + this.cfg.clearance - this.softRadius + this.pitch * 0.75,
+    );
     this.forCells({ kind: 'segment', x0, y0, x1, y1, r: 0 }, margin, (c) => {
       if (soft[c] !== FREE && soft[c] !== net) ok = false;
       if (hard[c] !== FREE && hard[c] !== net) ok = false;
@@ -696,7 +709,11 @@ export function pointInPolygon(x: number, y: number, poly: readonly (readonly [n
 }
 
 /** Distance d'un point au contour d'un polygone. */
-export function distanceToPolygon(x: number, y: number, poly: readonly (readonly [number, number])[]): number {
+export function distanceToPolygon(
+  x: number,
+  y: number,
+  poly: readonly (readonly [number, number])[],
+): number {
   let d = Infinity;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i]!;

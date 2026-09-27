@@ -3,7 +3,7 @@
  * résines, couches de circuit imprimé (vernis épargne, sérigraphie, âme FR4), composites tissés
  * (fibre de verre, carbone), papier, silicium de puce.
  */
-import type * as THREE from 'three/webgpu';
+import * as THREE from 'three/webgpu';
 import {
   abs,
   cameraPosition,
@@ -65,7 +65,11 @@ export interface PlasticOptions extends MappingOptions, CommonOptions {
 }
 
 export function createPlastic(env: MaterialEnv, o: PlasticOptions): THREE.MeshPhysicalNodeMaterial {
-  const kit = new SurfaceKit(env, { space: o.space ?? 'local', scale: o.scale ?? 25, sharpness: o.sharpness });
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'local',
+    scale: o.scale ?? 25,
+    sharpness: o.sharpness,
+  });
   const m = physical(o.name, {
     color: o.color,
     roughness: o.roughness ?? 0.5,
@@ -84,7 +88,12 @@ export function createPlastic(env: MaterialEnv, o: PlasticOptions): THREE.MeshPh
   const cavity = cavityMask(radius);
   const relief = o.relief ?? 6e-6;
 
-  let color: Vec3Node = materialColor.mul(noise.r.sub(0.5).mul(o.tint ?? 0.08).add(1));
+  let color: Vec3Node = materialColor.mul(
+    noise.r
+      .sub(0.5)
+      .mul(o.tint ?? 0.08)
+      .add(1),
+  );
   let roughness: FloatNode = materialRoughness.add(noise.g.sub(0.5).mul(0.06));
   let height: FloatNode = float(0);
   const texture = o.texture ?? 'molded';
@@ -92,8 +101,9 @@ export function createPlastic(env: MaterialEnv, o: PlasticOptions): THREE.MeshPh
     height = noise.b.mul(relief);
     roughness = roughness.add(noise.b.sub(0.5).mul(0.08));
   } else if (texture === 'wrinkled') {
-    const wrinkles = kit.sample('brushed', 0.15);
-    height = wrinkles.r.mul(relief * 4).add(noise.b.mul(relief * 0.5));
+    // Plis de rétreint : stries larges et douces (texture `brushed` très agrandie).
+    const wrinkles = kit.sample('brushed', 0.05);
+    height = wrinkles.r.mul(relief * 1.5).add(wrinkles.a.mul(relief)).add(noise.b.mul(relief * 0.4));
     roughness = roughness.sub(wrinkles.r.sub(0.5).mul(0.1));
   }
 
@@ -101,7 +111,9 @@ export function createPlastic(env: MaterialEnv, o: PlasticOptions): THREE.MeshPh
   const worn = wearMask(edges, o.wear ?? 0.2, grunge.a).mul(0.7);
   color = mix(color, color.mul(1.35).add(0.035), worn);
   roughness = mix(roughness, roughness.mul(0.75), worn);
-  const scratchMask = saturate(scratch.r.mul((o.scratches ?? 0.2) * 1.2).add(scratch.g.mul(o.scratches ?? 0.2)));
+  const scratchMask = saturate(
+    scratch.r.mul((o.scratches ?? 0.2) * 1.2).add(scratch.g.mul(o.scratches ?? 0.2)),
+  );
   color = color.add(scratchMask.mul(0.025));
   roughness = roughness.add(scratchMask.mul(0.12));
   height = height.sub(scratch.b.mul(relief * 0.5 * (o.scratches ?? 0.2)));
@@ -140,13 +152,15 @@ export function createRubber(
 
 /** Isolant silicone : satiné, souple, lustre doux. */
 export function createSilicone(env: MaterialEnv, color: THREE.ColorRepresentation, name?: string) {
+  // Lustre teinté (et non blanc) : un lustre blanc délave les couleurs vives en pastel.
+  const sheenColor = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.35);
   return createPlastic(env, {
     name,
     color,
-    roughness: 0.52,
+    roughness: 0.5,
     texture: 'smooth',
-    sheen: 0.45,
-    sheenColor: 0xffffff,
+    sheen: 0.35,
+    sheenColor,
     sheenRoughness: 0.45,
     wear: 0.1,
     dirt: 0.15,
@@ -218,8 +232,15 @@ export interface SolderMaskOptions extends MappingOptions, CommonOptions {
  * Vernis épargne semi-brillant : couche transparente (clearcoat) à peau d'orange sur une teinte
  * légèrement nuagée ; traces de doigts visibles dans le reflet.
  */
-export function createSolderMask(env: MaterialEnv, o: SolderMaskOptions = {}): THREE.MeshPhysicalNodeMaterial {
-  const kit = new SurfaceKit(env, { space: o.space ?? 'local', scale: o.scale ?? 40, sharpness: o.sharpness });
+export function createSolderMask(
+  env: MaterialEnv,
+  o: SolderMaskOptions = {},
+): THREE.MeshPhysicalNodeMaterial {
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'local',
+    scale: o.scale ?? 40,
+    sharpness: o.sharpness,
+  });
   const m = physical(o.name, {
     color: o.color ?? 0x0f6a73,
     roughness: o.roughness ?? 0.42,
@@ -240,7 +261,10 @@ export function createSolderMask(env: MaterialEnv, o: SolderMaskOptions = {}): T
 }
 
 /** Encre de sérigraphie : légèrement en relief, grain d'impression, bords irréguliers. */
-export function createSilkscreen(env: MaterialEnv, o: { color?: THREE.ColorRepresentation; name?: string } = {}) {
+export function createSilkscreen(
+  env: MaterialEnv,
+  o: { color?: THREE.ColorRepresentation; name?: string } = {},
+) {
   return createPlastic(env, {
     name: o.name,
     color: o.color ?? 0xf2f2ee,
@@ -275,7 +299,10 @@ export interface WovenCompositeOptions extends MappingOptions, CommonOptions {
  *   fonction de l'alignement de la direction de vue sur l'axe X de l'objet (pas de vraie BRDF
  *   anisotrope par mèche).
  */
-export function createWovenComposite(env: MaterialEnv, o: WovenCompositeOptions): THREE.MeshPhysicalNodeMaterial {
+export function createWovenComposite(
+  env: MaterialEnv,
+  o: WovenCompositeOptions,
+): THREE.MeshPhysicalNodeMaterial {
   const carbon = o.kind === 'carbon';
   const kit = new SurfaceKit(env, {
     space: o.space ?? 'local',
@@ -340,7 +367,11 @@ export interface PaperOptions extends MappingOptions, CommonOptions {
 
 /** Papier (étiquette, isolant d'encoche) : fibres, légère ondulation, salissures. */
 export function createPaper(env: MaterialEnv, o: PaperOptions): THREE.MeshPhysicalNodeMaterial {
-  const kit = new SurfaceKit(env, { space: o.space ?? 'local', scale: o.scale ?? 25, sharpness: o.sharpness });
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'local',
+    scale: o.scale ?? 25,
+    sharpness: o.sharpness,
+  });
   const m = physical(o.name, {
     color: o.color,
     roughness: o.roughness ?? 0.85,
@@ -372,7 +403,10 @@ export function createPaper(env: MaterialEnv, o: PaperOptions): THREE.MeshPhysic
  * et maillage d'interconnexions suggéré par des stries croisées très fines, visibles au zoom.
  * Approximation : le motif de circuit est un tramage générique (pas un dessin de puce réel).
  */
-export function createSiliconDie(env: MaterialEnv, o: { name?: string } = {}): THREE.MeshPhysicalNodeMaterial {
+export function createSiliconDie(
+  env: MaterialEnv,
+  o: { name?: string } = {},
+): THREE.MeshPhysicalNodeMaterial {
   const kit = new SurfaceKit(env, { space: 'local', scale: 300, sharpness: 12 });
   const m = physical(o.name, {
     color: 0x55586a,
@@ -411,7 +445,11 @@ export interface ResinOptions extends MappingOptions, CommonOptions {
  * teintée par atténuation, surface brillante légèrement bosselée (coulures figées).
  */
 export function createResin(env: MaterialEnv, o: ResinOptions): THREE.MeshPhysicalNodeMaterial {
-  const kit = new SurfaceKit(env, { space: o.space ?? 'local', scale: o.scale ?? 60, sharpness: o.sharpness });
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'local',
+    scale: o.scale ?? 60,
+    sharpness: o.sharpness,
+  });
   const thickness = o.thickness ?? 0.0005;
   const m = physical(o.name, {
     color: o.color,

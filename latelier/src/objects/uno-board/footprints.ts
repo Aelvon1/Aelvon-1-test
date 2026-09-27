@@ -118,12 +118,45 @@ function qfn32Pads(): PadDef[] {
     // Amorces décalées (courte / longue) pour éloigner les points de départ du routage.
     const length = k % 2 === 0 ? 0.55 : 1.15;
     if (side === 0)
-      pads.push({ num: String(i + 1), x: -c, y: t, w: L, h: W, shape: 'rect', fanout: { dx: -1, dy: 0, length } });
+      pads.push({
+        num: String(i + 1),
+        x: -c,
+        y: t,
+        w: L,
+        h: W,
+        shape: 'rect',
+        fanout: { dx: -1, dy: 0, length },
+      });
     else if (side === 1)
-      pads.push({ num: String(i + 1), x: -t, y: -c, w: W, h: L, shape: 'rect', fanout: { dx: 0, dy: -1, length } });
+      pads.push({
+        num: String(i + 1),
+        x: -t,
+        y: -c,
+        w: W,
+        h: L,
+        shape: 'rect',
+        fanout: { dx: 0, dy: -1, length },
+      });
     else if (side === 2)
-      pads.push({ num: String(i + 1), x: c, y: -t, w: L, h: W, shape: 'rect', fanout: { dx: 1, dy: 0, length } });
-    else pads.push({ num: String(i + 1), x: t, y: c, w: W, h: L, shape: 'rect', fanout: { dx: 0, dy: 1, length } });
+      pads.push({
+        num: String(i + 1),
+        x: c,
+        y: -t,
+        w: L,
+        h: W,
+        shape: 'rect',
+        fanout: { dx: 1, dy: 0, length },
+      });
+    else
+      pads.push({
+        num: String(i + 1),
+        x: t,
+        y: c,
+        w: W,
+        h: L,
+        shape: 'rect',
+        fanout: { dx: 0, dy: 1, length },
+      });
   }
   pads.push({ num: '33', x: 0, y: 0, w: 3.3, h: 3.3, shape: 'rect' });
   return pads;
@@ -172,7 +205,15 @@ function dip28Pads(): PadDef[] {
       drill: 0.9,
     });
   for (let i = 0; i < 14; i++)
-    pads.push({ num: String(i + 15), x: 16.51 - i * PITCH, y: 3.81, w: 1.6, h: 1.6, shape: 'round', drill: 0.9 });
+    pads.push({
+      num: String(i + 15),
+      x: 16.51 - i * PITCH,
+      y: 3.81,
+      w: 1.6,
+      h: 1.6,
+      shape: 'round',
+      drill: 0.9,
+    });
   return pads;
 }
 

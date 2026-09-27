@@ -24,7 +24,7 @@ import {
   type BuildServices,
 } from '../objects/buildSupport';
 import { partQuantity, resolveObject, type ResolvedObject } from '../objects/resolve';
-import type { ObjectDef, ObjectParams, PartDef, PartHooks } from '../objects/types';
+import type { ObjectDef, ObjectParams, PartBuild, PartDef, PartHooks } from '../objects/types';
 
 type AnyDef = ObjectDef<ObjectParams>;
 type AnyPart = PartDef<ObjectParams>;
@@ -114,6 +114,8 @@ export class Assembly {
   readonly services: BuildServices;
   private disposed = false;
   private registeredMaterials: string[] = [];
+  /** Pièces dont la construction a échoué (remplacées par un nœud vide). */
+  readonly buildErrors: string[] = [];
   private built = false;
 
   constructor(
@@ -208,10 +210,19 @@ export class Assembly {
     let anchor: THREE.Vector3 | null = null;
     let instanceLabel: ((index: number) => string) | null = null;
     let instancedList: THREE.InstancedMesh[] = [];
+    let built: PartBuild | null = null;
     if (def.build) {
-      const built = normalizeBuild(
-        def.build(createBuildContext(def, params, this.services, this.geometryCache, this.shared)),
-      );
+      try {
+        built = normalizeBuild(
+          def.build(createBuildContext(def, params, this.services, this.geometryCache, this.shared)),
+        );
+      } catch (error) {
+        // Une pièce en échec ne bloque pas l'ouverture : nœud vide, erreur signalée.
+        console.error(`[Assembly] Construction de « ${def.id} » impossible :`, error);
+        this.buildErrors.push(def.id);
+      }
+    }
+    if (built) {
       node = built.object;
       hooks = built.hooks ?? null;
       anchor = built.anchor ? new THREE.Vector3(built.anchor[0], built.anchor[1], built.anchor[2]) : null;
@@ -337,7 +348,9 @@ export class Assembly {
           const list: THREE.Matrix4[] = [];
           for (let i = 0; i < count; i++) {
             mesh.getMatrixAt(i, im);
-            list.push(new THREE.Matrix4().copy(frames[i]!).invert().multiply(inst.meshLocal[k]!).multiply(im));
+            list.push(
+              new THREE.Matrix4().copy(frames[i]!).invert().multiply(inst.meshLocal[k]!).multiply(im),
+            );
           }
           inst.rel.push(list);
         });

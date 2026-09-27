@@ -273,6 +273,7 @@ export class Player {
     gi.bobEnabled = settings.headBob;
     gi.time = this.time;
     this.gait.update(gi);
+    // Approximation : pas non spatialisés (joués au centre de l'auditeur, comme ses propres pieds).
     if (this.gait.stepped && this.grounded) {
       this.ctx.audio.play(this.surface === 'rug' ? 'step.rug' : 'step.concrete', {
         volume: this.gait.stepStrength * (this.surface === 'rug' ? 0.8 : 1),

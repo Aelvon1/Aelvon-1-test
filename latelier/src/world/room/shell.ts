@@ -45,8 +45,22 @@ function buildFloor(b: DecorBuild): void {
     }
   }
   // Fond des joints (mastic sombre) visible entre les arêtes arrondies des dalles.
-  addBox(b.batch, 'rubber.black', [SHELL.slabJointX - 0.004, -0.04, ROOM.minZ - 0.25], [SHELL.slabJointX + 0.004, -0.0035, ROOM.maxZ + 0.25], 0, { castShadow: false });
-  addBox(b.batch, 'rubber.black', [ROOM.minX - 0.25, -0.04, SHELL.slabJointZ - 0.004], [ROOM.maxX + 0.25, -0.0035, SHELL.slabJointZ + 0.004], 0, { castShadow: false });
+  addBox(
+    b.batch,
+    'rubber.black',
+    [SHELL.slabJointX - 0.004, -0.04, ROOM.minZ - 0.25],
+    [SHELL.slabJointX + 0.004, -0.0035, ROOM.maxZ + 0.25],
+    0,
+    { castShadow: false },
+  );
+  addBox(
+    b.batch,
+    'rubber.black',
+    [ROOM.minX - 0.25, -0.04, SHELL.slabJointZ - 0.004],
+    [ROOM.maxX + 0.25, -0.0035, SHELL.slabJointZ + 0.004],
+    0,
+    { castShadow: false },
+  );
   b.colliders.push({ kind: 'box', center: [0, -0.1, 0], halfExtents: [3, 0.1, 3], name: 'sol' });
 }
 
@@ -85,17 +99,49 @@ function buildWalls(b: DecorBuild): void {
 }
 
 function buildCeiling(b: DecorBuild): void {
-  addBox(b.batch, 'world.ceiling', [ROOM.minX - 0.2, ROOM.height, ROOM.minZ - 0.2], [ROOM.maxX + 0.2, ROOM.height + 0.05, ROOM.maxZ + 0.2], 0);
+  addBox(
+    b.batch,
+    'world.ceiling',
+    [ROOM.minX - 0.2, ROOM.height, ROOM.minZ - 0.2],
+    [ROOM.maxX + 0.2, ROOM.height + 0.05, ROOM.maxZ + 0.2],
+    0,
+  );
   const hw = SHELL.joistWidth / 2;
   for (const x of SHELL.joistXs) {
-    addBox(b.batch, 'world.joist', [x - hw, SHELL.joistBottom, ROOM.minZ + SHELL.ledgerThickness], [x + hw, ROOM.height, ROOM.maxZ - SHELL.ledgerThickness], 0.008, {}, 2);
+    addBox(
+      b.batch,
+      'world.joist',
+      [x - hw, SHELL.joistBottom, ROOM.minZ + SHELL.ledgerThickness],
+      [x + hw, ROOM.height, ROOM.maxZ - SHELL.ledgerThickness],
+      0.008,
+      {},
+      2,
+    );
   }
   // Lisses d'appui (nord et sud).
-  addBox(b.batch, 'world.joist', [ROOM.minX, SHELL.ledgerBottom, ROOM.minZ], [ROOM.maxX, ROOM.height, ROOM.minZ + SHELL.ledgerThickness], 0.008);
-  addBox(b.batch, 'world.joist', [ROOM.minX, SHELL.ledgerBottom, ROOM.maxZ - SHELL.ledgerThickness], [ROOM.maxX, ROOM.height, ROOM.maxZ], 0.008);
+  addBox(
+    b.batch,
+    'world.joist',
+    [ROOM.minX, SHELL.ledgerBottom, ROOM.minZ],
+    [ROOM.maxX, ROOM.height, ROOM.minZ + SHELL.ledgerThickness],
+    0.008,
+  );
+  addBox(
+    b.batch,
+    'world.joist',
+    [ROOM.minX, SHELL.ledgerBottom, ROOM.maxZ - SHELL.ledgerThickness],
+    [ROOM.maxX, ROOM.height, ROOM.maxZ],
+    0.008,
+  );
   // Couvre-joints des panneaux.
   for (const z of SHELL.battenZs) {
-    addBox(b.batch, 'world.joist', [ROOM.minX, ROOM.height - 0.012, z - 0.022], [ROOM.maxX, ROOM.height, z + 0.022], 0.004);
+    addBox(
+      b.batch,
+      'world.joist',
+      [ROOM.minX, ROOM.height - 0.012, z - 0.022],
+      [ROOM.maxX, ROOM.height, z + 0.022],
+      0.004,
+    );
   }
 }
 
@@ -157,7 +203,13 @@ function buildWindowFrame(b: DecorBuild): GlassRect {
   addBox(b.batch, cream, [ROOM.minX, y0, z0 - cw], [ROOM.minX + cd, y1 + cw, z0], 0.005);
   addBox(b.batch, cream, [ROOM.minX, y0, z1], [ROOM.minX + cd, y1 + cw, z1 + cw], 0.005);
   addBox(b.batch, cream, [ROOM.minX, y1, z0 - cw], [ROOM.minX + cd, y1 + cw, z1 + cw], 0.005);
-  addBox(b.batch, cream, [ROOM.minX, y1 + cw, z0 - cw - 0.015], [ROOM.minX + cd + 0.01, y1 + cw + 0.02, z1 + cw + 0.015], 0.006);
+  addBox(
+    b.batch,
+    cream,
+    [ROOM.minX, y1 + cw, z0 - cw - 0.015],
+    [ROOM.minX + cd + 0.01, y1 + cw + 0.02, z1 + cw + 0.015],
+    0.006,
+  );
   // Tableaux (ébrasement) en bois peint entre le dormant et le chambranle.
   addBox(b.batch, cream, [fx1, y0 + 0.0, z0 - 0.012], [ROOM.minX, y1, z0], 0.002);
   addBox(b.batch, cream, [fx1, y0 + 0.0, z1], [ROOM.minX, y1, z1 + 0.012], 0.002);
@@ -198,42 +250,92 @@ function buildDoor(b: DecorBuild): void {
   b.batch.add(teal, beveledPlate(pw, 0.78, 0.014, 0.012, 0.006), place([cx, 1.43, lz0]));
   b.batch.add(teal, beveledPlate(pw, 0.66, 0.014, 0.012, 0.006), place([cx, 0.62, lz0]));
   // Tôle de protection (bas de porte) rayée par les chaussures.
-  addBox(b.batch, 'metal.galvanized', [lx0 + 0.03, 0.03, lz0 - 0.0025], [lx1 - 0.03, 0.24, lz0 + 0.001], 0.0012);
+  addBox(
+    b.batch,
+    'metal.galvanized',
+    [lx0 + 0.03, 0.03, lz0 - 0.0025],
+    [lx1 - 0.03, 0.24, lz0 + 0.001],
+    0.0012,
+  );
   // Joint caoutchouc (visible dans le jeu entre vantail et huisserie).
   const rubber = 'rubber.black';
-  addBox(b.batch, rubber, [x0 + D.jamb, 0.01, lz0 + 0.005], [lx0, leafTop, lz1 - 0.005], 0, { castShadow: false });
-  addBox(b.batch, rubber, [lx1, 0.01, lz0 + 0.005], [x1 - D.jamb, leafTop, lz1 - 0.005], 0, { castShadow: false });
-  addBox(b.batch, rubber, [x0 + D.jamb, leafTop, lz0 + 0.005], [x1 - D.jamb, h - D.jamb, lz1 - 0.005], 0, { castShadow: false });
+  addBox(b.batch, rubber, [x0 + D.jamb, 0.01, lz0 + 0.005], [lx0, leafTop, lz1 - 0.005], 0, {
+    castShadow: false,
+  });
+  addBox(b.batch, rubber, [lx1, 0.01, lz0 + 0.005], [x1 - D.jamb, leafTop, lz1 - 0.005], 0, {
+    castShadow: false,
+  });
+  addBox(b.batch, rubber, [x0 + D.jamb, leafTop, lz0 + 0.005], [x1 - D.jamb, h - D.jamb, lz1 - 0.005], 0, {
+    castShadow: false,
+  });
   // Seuil.
-  addBox(b.batch, 'metal.galvanized', [x0, 0, zWall0 - 0.03], [x1, D.thresholdTop, zWall1], 0.002, { castShadow: false });
+  addBox(b.batch, 'metal.galvanized', [x0, 0, zWall0 - 0.03], [x1, D.thresholdTop, zWall1], 0.002, {
+    castShadow: false,
+  });
   // Poignée côté ouest : plaque, béquille, cylindre de serrure, verrou à bouton.
   const hx = D.handleX;
   const hy = D.handleY;
   const steel = 'steel.stainless';
   addBox(b.batch, steel, [hx - 0.026, hy - 0.13, lz0 - 0.008], [hx + 0.026, hy + 0.12, lz0], 0.006, {}, 2);
   {
-    const rose = cylinderBetween(new THREE.Vector3(hx, hy + 0.04, lz0 - 0.008), new THREE.Vector3(hx, hy + 0.04, lz0 - 0.03), 0.02, 16);
+    const rose = cylinderBetween(
+      new THREE.Vector3(hx, hy + 0.04, lz0 - 0.008),
+      new THREE.Vector3(hx, hy + 0.04, lz0 - 0.03),
+      0.02,
+      16,
+    );
     b.batch.add(steel, rose.geometry, rose.matrix);
-    addBox(b.batch, steel, [hx - 0.012, hy + 0.028, lz0 - 0.05], [hx + 0.125, hy + 0.05, lz0 - 0.028], 0.009, {}, 2);
-    const cyl = cylinderBetween(new THREE.Vector3(hx, hy - 0.06, lz0 - 0.008), new THREE.Vector3(hx, hy - 0.06, lz0 - 0.016), 0.014, 16);
+    addBox(
+      b.batch,
+      steel,
+      [hx - 0.012, hy + 0.028, lz0 - 0.05],
+      [hx + 0.125, hy + 0.05, lz0 - 0.028],
+      0.009,
+      {},
+      2,
+    );
+    const cyl = cylinderBetween(
+      new THREE.Vector3(hx, hy - 0.06, lz0 - 0.008),
+      new THREE.Vector3(hx, hy - 0.06, lz0 - 0.016),
+      0.014,
+      16,
+    );
     b.batch.add('brass', cyl.geometry, cyl.matrix);
-    const turn = cylinderBetween(new THREE.Vector3(hx, hy + 0.2, lz0), new THREE.Vector3(hx, hy + 0.2, lz0 - 0.012), 0.022, 16);
+    const turn = cylinderBetween(
+      new THREE.Vector3(hx, hy + 0.2, lz0),
+      new THREE.Vector3(hx, hy + 0.2, lz0 - 0.012),
+      0.022,
+      16,
+    );
     b.batch.add(steel, turn.geometry, turn.matrix);
     addBox(b.batch, steel, [hx - 0.004, hy + 0.18, lz0 - 0.03], [hx + 0.004, hy + 0.22, lz0 - 0.012], 0.003);
   }
   // Paumelles (côté est).
   for (const y of [0.28, 1.02, 1.76]) {
-    const hinge = cylinderBetween(new THREE.Vector3(lx1 + 0.002, y - 0.05, lz0 - 0.004), new THREE.Vector3(lx1 + 0.002, y + 0.05, lz0 - 0.004), 0.009, 12);
+    const hinge = cylinderBetween(
+      new THREE.Vector3(lx1 + 0.002, y - 0.05, lz0 - 0.004),
+      new THREE.Vector3(lx1 + 0.002, y + 0.05, lz0 - 0.004),
+      0.009,
+      12,
+    );
     b.batch.add('steel.zinc', hinge.geometry, hinge.matrix);
   }
   // Filet de lumière froide sous le vantail (jeu de 8 mm) + halo au sol.
-  addBox(b.batch, 'world.door.leak', [lx0, D.thresholdTop, lz0 + 0.012], [lx1, D.leafBottom, lz1 - 0.01], 0, { castShadow: false, receiveShadow: false });
-  const leakFloor = new THREE.PlaneGeometry(x1 - x0 + 0.1, 0.3);
-  b.overlays.add('world.door.leakFloor', leakFloor, place([(x0 + x1) / 2, 0.0025, ROOM.maxZ - 0.15], [-Math.PI / 2, 0, 0]), {
-    uv: 'keep',
+  addBox(b.batch, 'world.door.leak', [lx0, D.thresholdTop, lz0 + 0.012], [lx1, D.leafBottom, lz1 - 0.01], 0, {
     castShadow: false,
     receiveShadow: false,
   });
+  const leakFloor = new THREE.PlaneGeometry(x1 - x0 + 0.1, 0.3);
+  b.overlays.add(
+    'world.door.leakFloor',
+    leakFloor,
+    place([(x0 + x1) / 2, 0.0025, ROOM.maxZ - 0.15], [-Math.PI / 2, 0, 0]),
+    {
+      uv: 'keep',
+      castShadow: false,
+      receiveShadow: false,
+    },
+  );
 }
 
 function buildElectrical(b: DecorBuild): void {
@@ -253,13 +355,24 @@ function buildElectrical(b: DecorBuild): void {
         const t = k / (n + 1);
         const p = new THREE.Vector3().lerpVectors(a, c, t);
         const dir = new THREE.Vector3().subVectors(c, a).normalize();
-        const clip = cylinderBetween(p.clone().addScaledVector(dir, -0.008), p.clone().addScaledVector(dir, 0.008), r + 0.0025, 10);
+        const clip = cylinderBetween(
+          p.clone().addScaledVector(dir, -0.008),
+          p.clone().addScaledVector(dir, 0.008),
+          r + 0.0025,
+          10,
+        );
         b.batch.add(galv, clip.geometry, clip.matrix);
       }
     }
   };
   const box = (c: [number, number, number], s: [number, number, number]) =>
-    addBox(b.batch, galv, [c[0] - s[0] / 2, c[1] - s[1] / 2, c[2] - s[2] / 2], [c[0] + s[0] / 2, c[1] + s[1] / 2, c[2] + s[2] / 2], 0.006);
+    addBox(
+      b.batch,
+      galv,
+      [c[0] - s[0] / 2, c[1] - s[1] / 2, c[2] - s[2] / 2],
+      [c[0] + s[0] / 2, c[1] + s[1] / 2, c[2] + s[2] / 2],
+      0.006,
+    );
   const wz = ROOM.maxZ - 0.024;
   const nz = ROOM.minZ + 0.024;
   // Interrupteur → plafond → rosace de l'ampoule.
@@ -294,12 +407,30 @@ function buildElectrical(b: DecorBuild): void {
   // Prise double en saillie + voyant rouge.
   const [ox, oy] = E.outlet;
   const oz = ROOM.minZ;
-  addBox(b.batch, 'world.paint.creamMetal', [ox - 0.04, oy - 0.075, oz], [ox + 0.04, oy + 0.075, oz + 0.048], 0.008, {}, 2);
+  addBox(
+    b.batch,
+    'world.paint.creamMetal',
+    [ox - 0.04, oy - 0.075, oz],
+    [ox + 0.04, oy + 0.075, oz + 0.048],
+    0.008,
+    {},
+    2,
+  );
   for (const dy of [-0.035, 0.03]) {
-    const socket = cylinderBetween(new THREE.Vector3(ox, oy + dy, oz + 0.045), new THREE.Vector3(ox, oy + dy, oz + 0.05), 0.019, 20);
+    const socket = cylinderBetween(
+      new THREE.Vector3(ox, oy + dy, oz + 0.045),
+      new THREE.Vector3(ox, oy + dy, oz + 0.05),
+      0.019,
+      20,
+    );
     b.batch.add('plastic.black', socket.geometry, socket.matrix);
   }
-  const pilot = cylinderBetween(new THREE.Vector3(ox, oy + 0.064, oz + 0.046), new THREE.Vector3(ox, oy + 0.064, oz + 0.052), 0.0045, 12);
+  const pilot = cylinderBetween(
+    new THREE.Vector3(ox, oy + 0.064, oz + 0.046),
+    new THREE.Vector3(ox, oy + 0.064, oz + 0.052),
+    0.0045,
+    12,
+  );
   b.batch.add('world.pilot.red', pilot.geometry, pilot.matrix, { castShadow: false });
 }
 

@@ -40,10 +40,7 @@ import {
 } from './tools/presenter';
 
 export type SequencerCommand =
-  | { kind: 'next' }
-  | { kind: 'prev' }
-  | { kind: 'goto'; index: number }
-  | { kind: 'toggle'; partId: string };
+  { kind: 'next' } | { kind: 'prev' } | { kind: 'goto'; index: number } | { kind: 'toggle'; partId: string };
 
 /** Notifications du séquenceur vers l'orchestrateur (mise à jour du store, sons d'UI…). */
 export interface SequencerListener {
@@ -132,7 +129,18 @@ const _q = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 const _size = new THREE.Vector3();
 
-const METAL_PREFIXES = ['steel', 'alu', 'copper', 'brass', 'nickel', 'gold', 'tin', 'solder', 'metal', 'magnet'];
+const METAL_PREFIXES = [
+  'steel',
+  'alu',
+  'copper',
+  'brass',
+  'nickel',
+  'gold',
+  'tin',
+  'solder',
+  'metal',
+  'magnet',
+];
 
 export class Sequencer {
   readonly removed = new Set<string>();
@@ -211,7 +219,15 @@ export class Sequencer {
         return false;
       }
     }
-    this.startRun({ stepIndex: plan.stepIndex, layers: plan.layers, layerIndex: 0, direction: 1, speed, gestures: [], gotoTarget });
+    this.startRun({
+      stepIndex: plan.stepIndex,
+      layers: plan.layers,
+      layerIndex: 0,
+      direction: 1,
+      speed,
+      gestures: [],
+      gotoTarget,
+    });
     return true;
   }
 
@@ -225,7 +241,15 @@ export class Sequencer {
         return false;
       }
     }
-    this.startRun({ stepIndex: plan.stepIndex, layers: plan.layers, layerIndex: 0, direction: -1, speed, gestures: [], gotoTarget });
+    this.startRun({
+      stepIndex: plan.stepIndex,
+      layers: plan.layers,
+      layerIndex: 0,
+      direction: -1,
+      speed,
+      gestures: [],
+      gotoTarget,
+    });
     return true;
   }
 
@@ -344,7 +368,9 @@ export class Sequencer {
       // Couche suivante : on revérifie le graphe (sécurité en cas d'état incohérent).
       const ids = run.layers[run.layerIndex]!;
       const blocked = ids.find((id) =>
-        run.direction === 1 ? !this.o.graph.canRemove(id, this.removed).ok : !this.o.graph.canReinsert(id, this.removed).ok,
+        run.direction === 1
+          ? !this.o.graph.canRemove(id, this.removed).ok
+          : !this.o.graph.canReinsert(id, this.removed).ok,
       );
       if (!blocked) {
         this.startLayer();
@@ -430,7 +456,11 @@ export class Sequencer {
 
   /** Rayon de la sphère englobante (m) d'une pièce ou d'une de ses instances. */
   private sizeOf(part: PartRuntime): number {
-    const box = part.instanced ? part.instanced.instanceBox : part.localBox.isEmpty() ? part.subtreeBox : part.localBox;
+    const box = part.instanced
+      ? part.instanced.instanceBox
+      : part.localBox.isEmpty()
+        ? part.subtreeBox
+        : part.localBox;
     if (box.isEmpty()) return 0.01;
     box.getSize(_size).multiply(part.restWorldScale);
     return _size.length() / 2;
@@ -443,7 +473,11 @@ export class Sequencer {
   workPoint(part: PartRuntime, pose: PartPose, target: THREE.Vector3): THREE.Vector3 {
     const assembly = this.o.assembly;
     if (part.anchorExplicit && !part.instanced) return assembly.anchorWorld(part.id, target);
-    const box = part.instanced ? part.instanced.instanceBox : part.localBox.isEmpty() ? part.subtreeBox : part.localBox;
+    const box = part.instanced
+      ? part.instanced.instanceBox
+      : part.localBox.isEmpty()
+        ? part.subtreeBox
+        : part.localBox;
     if (part.instanced) assembly.instanceCenterWorld(part.id, 0, target);
     else {
       part.node.updateWorldMatrix(true, false);
@@ -451,8 +485,12 @@ export class Sequencer {
     }
     if (box.isEmpty()) return target;
     box.getSize(_size).multiply(part.restWorldScale);
-    const axisLocal = part.instanced ? pose.axisNode : _axis.copy(pose.axis).applyQuaternion(_q.copy(part.restQuaternion).invert());
-    const half = 0.5 * (Math.abs(axisLocal.x) * _size.x + Math.abs(axisLocal.y) * _size.y + Math.abs(axisLocal.z) * _size.z);
+    const axisLocal = part.instanced
+      ? pose.axisNode
+      : _axis.copy(pose.axis).applyQuaternion(_q.copy(part.restQuaternion).invert());
+    const half =
+      0.5 *
+      (Math.abs(axisLocal.x) * _size.x + Math.abs(axisLocal.y) * _size.y + Math.abs(axisLocal.z) * _size.z);
     const parent = part.node.parent;
     if (parent) parent.getWorldQuaternion(_q);
     else _q.identity();
@@ -467,7 +505,9 @@ export class Sequencer {
     const anchor = this.anchorTmp;
     this.workPoint(g.part, pose, anchor);
     for (let i = 0; i < g.count; i++) {
-      const u = g.part.instanced ? instanceProgress(elapsedMotion, g.single, i, g.stagger) : Math.min(1, elapsedMotion / Math.max(1e-6, g.single));
+      const u = g.part.instanced
+        ? instanceProgress(elapsedMotion, g.single, i, g.stagger)
+        : Math.min(1, elapsedMotion / Math.max(1e-6, g.single));
       const target = pose.instanceMotion ? pose.instanceMotion[i]! : pose.motion;
       sampleMotion(g.spec, u, g.direction, target, g.timing);
       if (i >= MAX_SOUNDING_INSTANCES && i > 0) {
@@ -478,7 +518,9 @@ export class Sequencer {
       const prev = g.lastU[i]!;
       for (const cue of g.cues) if (cue.at > prev && cue.at <= u) this.play(cue.sound, anchor);
       if (g.spec.motion === 'unscrew') {
-        const quarter = quarterTurnIndex(g.direction === 1 ? target.spin : (g.spec.turns ?? 0) * 2 * Math.PI - target.spin);
+        const quarter = quarterTurnIndex(
+          g.direction === 1 ? target.spin : (g.spec.turns ?? 0) * 2 * Math.PI - target.spin,
+        );
         if (quarter > g.quarters[i]!) {
           g.quarters[i] = quarter;
           this.play(quarterTurnSound(g.direction), anchor, 0.55);
@@ -554,7 +596,7 @@ export class Sequencer {
     pose.parkWeight = 0;
     pose.placementOpacity = 1;
     this.tweens.delete(pose.part.id);
-    this.o.composer.refreshVisibility(pose.part.id);
+    this.o.composer.refreshVisibilityDeep(pose.part.id);
     this.o.composer.markDirty();
   }
 
@@ -580,12 +622,13 @@ export class Sequencer {
       if (tw.kind === 'park') pose.parkWeight = value;
       else {
         pose.placementOpacity = value;
-        this.o.composer.refreshVisibility(id);
+        this.o.composer.refreshVisibilityDeep(id);
       }
       this.o.composer.markDirty();
       if (k >= 1) {
         this.tweens.delete(id);
-        if (tw.kind === 'park' && tw.to === 1) this.play(this.dropSound(pose.part), this.o.assembly.anchorWorld(id, _v));
+        if (tw.kind === 'park' && tw.to === 1)
+          this.play(this.dropSound(pose.part), this.o.assembly.anchorWorld(id, _v));
       }
     }
   }
@@ -632,7 +675,7 @@ export class Sequencer {
     if (placement === 'park') pose.parkWeight = 1;
     if (placement === 'hide') {
       pose.placementOpacity = 0;
-      this.o.composer.refreshVisibility(id);
+      this.o.composer.refreshVisibilityDeep(id);
     }
     this.o.composer.markDirty();
   }

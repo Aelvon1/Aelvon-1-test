@@ -2,6 +2,8 @@
  * Démarche (logique pure, testable) : cadence des pas liée à la DISTANCE parcourue (pas de pas
  * « dans le vide » contre un mur), balancement de la tête (vertical à chaque pas, latéral et
  * roulis à chaque foulée), léger souffle au repos.
+ * Approximation : trajectoire de la tête sinusoïdale (la marche réelle est légèrement
+ * asymétrique) et longueur de pas fonction affine de la vitesse.
  */
 
 /** Longueur d'un pas (m) selon la vitesse : pas plus longs en marche rapide, courts accroupi. */

@@ -66,7 +66,10 @@ export function rectCorners(p: ComponentPlacement, r: Rect): { x: number; y: num
 }
 
 /** Recouvrement de deux polygones convexes (théorème de l'axe séparateur). */
-export function convexOverlap(a: readonly { x: number; y: number }[], b: readonly { x: number; y: number }[]): boolean {
+export function convexOverlap(
+  a: readonly { x: number; y: number }[],
+  b: readonly { x: number; y: number }[],
+): boolean {
   for (const poly of [a, b]) {
     for (let i = 0; i < poly.length; i++) {
       const p = poly[i]!;

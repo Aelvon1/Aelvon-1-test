@@ -153,7 +153,12 @@ export function normalizePiece(
 }
 
 /** Projection UV « boîte » en espace monde (mètres), décalée par pièce. */
-export function applyBoxUV(geometry: THREE.BufferGeometry, scale: number, rotate: boolean, seed: number): void {
+export function applyBoxUV(
+  geometry: THREE.BufferGeometry,
+  scale: number,
+  rotate: boolean,
+  seed: number,
+): void {
   const pos = geometry.getAttribute('position');
   const nor = geometry.getAttribute('normal');
   const uv = new Float32Array(pos.count * 2);

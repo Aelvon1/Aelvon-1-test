@@ -48,7 +48,8 @@ export class DetailManager {
     private readonly idle: IdleQueue,
   ) {
     for (const part of assembly.order) {
-      if (part.def.detail) this.entries.push({ part, state: 'none', object: null, meshes: [], replaced: [], hiddenSince: 0 });
+      if (part.def.detail)
+        this.entries.push({ part, state: 'none', object: null, meshes: [], replaced: [], hiddenSince: 0 });
     }
   }
 

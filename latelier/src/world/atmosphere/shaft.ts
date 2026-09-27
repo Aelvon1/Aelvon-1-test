@@ -50,7 +50,10 @@ export function createWindowShaft(): WindowShaft {
 }
 
 /** Coordonnées du point dans l'espace du faisceau : [s, qy, qz]. */
-export function toShaftSpace(shaft: WindowShaft, p: readonly [number, number, number]): [number, number, number] {
+export function toShaftSpace(
+  shaft: WindowShaft,
+  p: readonly [number, number, number],
+): [number, number, number] {
   const [dx, dy, dz] = shaft.dir;
   const s = (p[0] - shaft.planeX) / dx;
   return [s, p[1] - s * dy, p[2] - s * dz];

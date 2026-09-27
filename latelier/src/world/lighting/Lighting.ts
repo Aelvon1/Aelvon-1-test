@@ -28,12 +28,12 @@ import type { MagnifierLamp } from '../room/MagnifierLamp';
 
 /** Intensités nominales (unités physiques three.js, calées à l'œil avec l'exposition AgX = 1). */
 export const LIGHT_LEVELS = {
-  bulb: 6.5,
-  neon: 38,
-  daylight: 2.6,
-  skyFill: 1.2,
-  lamp: 1.6,
-  environment: 0.45,
+  bulb: 3.2,
+  neon: 20,
+  daylight: 1.35,
+  skyFill: 0.9,
+  lamp: 1.4,
+  environment: 0.22,
 } as const;
 
 let ltcReady = false;
@@ -83,7 +83,7 @@ export class Lighting {
     this.lamp = options.lamp;
 
     // Ampoule.
-    this.bulb = new THREE.PointLight(0xffa458, LIGHT_LEVELS.bulb, 0, 2);
+    this.bulb = new THREE.PointLight(0xffb066, LIGHT_LEVELS.bulb, 0, 2);
     this.bulb.name = 'Ampoule tungstène';
     this.bulb.position.copy(options.bulbPosition);
     this.bulb.shadow.camera.near = 0.035;
@@ -94,7 +94,12 @@ export class Lighting {
 
     // Néon : surface émissive tournée vers le bas, légèrement plus large que le tube.
     const neonCenter = new THREE.Vector3().addVectors(options.neonStart, options.neonEnd).multiplyScalar(0.5);
-    this.neon = new THREE.RectAreaLight(0xd9ffe4, LIGHT_LEVELS.neon, options.neonStart.distanceTo(options.neonEnd), 0.05);
+    this.neon = new THREE.RectAreaLight(
+      0xd9ffe4,
+      LIGHT_LEVELS.neon,
+      options.neonStart.distanceTo(options.neonEnd),
+      0.05,
+    );
     this.neon.name = 'Néon';
     this.neon.position.copy(neonCenter).add(new THREE.Vector3(0, -0.012, 0));
     this.neon.lookAt(neonCenter.x, 0, neonCenter.z);
@@ -102,8 +107,12 @@ export class Lighting {
     // Lumière du jour : projecteur placé dehors dans l'axe du faisceau.
     const shaft = options.shaft;
     const dir = new THREE.Vector3(...shaft.dir);
-    const windowCenter = new THREE.Vector3(shaft.planeX, (shaft.y[0] + shaft.y[1]) / 2, (shaft.z[0] + shaft.z[1]) / 2);
-    this.daylight = new THREE.SpotLight(0xa9c1dc, LIGHT_LEVELS.daylight, 0, 0.19, 0.55, 0);
+    const windowCenter = new THREE.Vector3(
+      shaft.planeX,
+      (shaft.y[0] + shaft.y[1]) / 2,
+      (shaft.z[0] + shaft.z[1]) / 2,
+    );
+    this.daylight = new THREE.SpotLight(0x8fb2de, LIGHT_LEVELS.daylight, 0, 0.19, 0.55, 0);
     this.daylight.name = 'Lumière du jour';
     this.daylight.position.copy(windowCenter).addScaledVector(dir, -6);
     this.daylight.target.position.copy(windowCenter).addScaledVector(dir, 2);
@@ -114,9 +123,16 @@ export class Lighting {
     this.daylight.shadow.radius = 5;
 
     // Ciel diffus dans l'embrasure (lumière froide douce sur l'établi et le mur).
-    this.skyFill = new THREE.RectAreaLight(0x9fb6d0, LIGHT_LEVELS.skyFill, shaft.z[1] - shaft.z[0], shaft.y[1] - shaft.y[0]);
+    this.skyFill = new THREE.RectAreaLight(
+      0x9bb8e0,
+      LIGHT_LEVELS.skyFill,
+      shaft.z[1] - shaft.z[0],
+      shaft.y[1] - shaft.y[0],
+    );
     this.skyFill.name = 'Ciel (embrasure)';
-    this.skyFill.position.set(shaft.planeX - 0.08, windowCenter.y, windowCenter.z);
+    // Au nu intérieur du mur : la vitre et les petits bois sont DERRIÈRE la surface émettrice
+    // (lumière unilatérale), sinon leur reflet spéculaire voile la vue extérieure.
+    this.skyFill.position.set(shaft.planeX + 0.012, windowCenter.y, windowCenter.z);
     this.skyFill.lookAt(0, windowCenter.y - 0.3, windowCenter.z);
 
     this.group.add(this.bulb, this.neon, this.daylight, this.daylight.target, this.skyFill);

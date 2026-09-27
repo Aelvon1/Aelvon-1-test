@@ -83,7 +83,9 @@ const EPS = 1e-9;
 export type Mat3 = readonly [number, number, number, number, number, number, number, number, number];
 
 const det3 = (m: Mat3): number =>
-  m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) + m[2] * (m[3] * m[7] - m[4] * m[6]);
+  m[0] * (m[4] * m[8] - m[5] * m[7]) -
+  m[1] * (m[3] * m[8] - m[5] * m[6]) +
+  m[2] * (m[3] * m[7] - m[4] * m[6]);
 
 /** Les 24 rotations axiales (permutations signées de déterminant +1). */
 export const AXIAL_ROTATIONS: readonly Mat3[] = (() => {
@@ -130,7 +132,9 @@ export function mat3ToQuaternion(m: Mat3): [number, number, number, number] {
 /** Dimensions (x, y, z) d'une boîte de dimensions `size` après la rotation axiale `m`. */
 export function rotatedExtents(m: Mat3, size: Vec3): [number, number, number] {
   const e = (row: number) =>
-    Math.abs(m[row * 3]!) * size[0] + Math.abs(m[row * 3 + 1]!) * size[1] + Math.abs(m[row * 3 + 2]!) * size[2];
+    Math.abs(m[row * 3]!) * size[0] +
+    Math.abs(m[row * 3 + 1]!) * size[1] +
+    Math.abs(m[row * 3 + 2]!) * size[2];
   return [e(0), e(1), e(2)];
 }
 
@@ -169,7 +173,10 @@ export function chooseFlatOrientation(size: Vec3): FlatOrientation {
 // --- Disposition -------------------------------------------------------------------------
 
 const overlaps = (a: Rect, b: Rect, gap = 0): boolean =>
-  a.minX < b.maxX + gap - EPS && a.maxX > b.minX - gap + EPS && a.minZ < b.maxZ + gap - EPS && a.maxZ > b.minZ - gap + EPS;
+  a.minX < b.maxX + gap - EPS &&
+  a.maxX > b.minX - gap + EPS &&
+  a.minZ < b.maxZ + gap - EPS &&
+  a.maxZ > b.minZ - gap + EPS;
 
 const lerpRect = (a: Rect, b: Rect, s: number): Rect => ({
   minX: a.minX + (b.minX - a.minX) * s,
@@ -192,7 +199,11 @@ interface Gaps {
 }
 
 /** Grille des instances d'un élément pour une largeur disponible. */
-function instanceGrid(item: KnollingItem, width: number, gaps: Gaps): { cols: number; rows: number; w: number; d: number } {
+function instanceGrid(
+  item: KnollingItem,
+  width: number,
+  gaps: Gaps,
+): { cols: number; rows: number; w: number; d: number } {
   const [w, , d] = item.size;
   const count = Math.max(1, item.count);
   if (item.layout === 'stack' || count === 1) return { cols: 1, rows: 1, w, d };
@@ -201,7 +212,14 @@ function instanceGrid(item: KnollingItem, width: number, gaps: Gaps): { cols: nu
   return { cols, rows, w: cols * w + (cols - 1) * gaps.instance, d: rows * d + (rows - 1) * gaps.instance };
 }
 
-function slotFor(item: KnollingItem, x: number, z: number, grid: ReturnType<typeof instanceGrid>, surfaceY: number, gaps: Gaps): KnollingSlot {
+function slotFor(
+  item: KnollingItem,
+  x: number,
+  z: number,
+  grid: ReturnType<typeof instanceGrid>,
+  surfaceY: number,
+  gaps: Gaps,
+): KnollingSlot {
   const [w, h, d] = item.size;
   const count = Math.max(1, item.count);
   const instances: [number, number, number][] = [];
@@ -210,7 +228,11 @@ function slotFor(item: KnollingItem, x: number, z: number, grid: ReturnType<type
     else {
       const col = k % grid.cols;
       const row = Math.floor(k / grid.cols);
-      instances.push([x + col * (w + gaps.instance) + w / 2, surfaceY + h / 2, z + row * (d + gaps.instance) + d / 2]);
+      instances.push([
+        x + col * (w + gaps.instance) + w / 2,
+        surfaceY + h / 2,
+        z + row * (d + gaps.instance) + d / 2,
+      ]);
     }
   }
   const footprint = { minX: x, maxX: x + grid.w, minZ: z, maxZ: z + grid.d };
@@ -223,13 +245,17 @@ function slotFor(item: KnollingItem, x: number, z: number, grid: ReturnType<type
   };
 }
 
-/** Disposition en rangées dans `rect` ; retourne null si tout ne tient pas. */
+/**
+ * Disposition en rangées dans `rect` ; retourne null si tout ne tient pas. `groupRows` : chaque
+ * groupe commence une nouvelle rangée (sinon les groupes se suivent, séparés par l'écart de groupe).
+ */
 function placeRows(
   items: readonly KnollingItem[],
   rect: Rect,
   keepOut: readonly Rect[],
   surfaceY: number,
   gaps: Gaps,
+  groupRows: boolean,
 ): KnollingSlot[] | null {
   const width = rect.maxX - rect.minX;
   const slots: KnollingSlot[] = [];
@@ -239,10 +265,14 @@ function placeRows(
   let rowDepth = 0;
   for (const item of items) {
     if (group !== null && item.group !== group) {
-      // Nouveau groupe : nouvelle rangée, écart de groupe.
-      z += rowDepth + gaps.group;
-      rowX = rect.minX;
-      rowDepth = 0;
+      if (groupRows) {
+        // Nouveau groupe : nouvelle rangée, écart de groupe.
+        z += rowDepth + gaps.group;
+        rowX = rect.minX;
+        rowDepth = 0;
+      } else {
+        rowX += gaps.group - gaps.item;
+      }
     }
     group = item.group;
     const grid = instanceGrid(item, width, gaps);
@@ -286,7 +316,12 @@ const boundsOf = (slots: readonly KnollingSlot[]): Rect => {
 
 function shiftSlots(slots: KnollingSlot[], dx: number, dz: number): void {
   for (const s of slots) {
-    s.footprint = { minX: s.footprint.minX + dx, maxX: s.footprint.maxX + dx, minZ: s.footprint.minZ + dz, maxZ: s.footprint.maxZ + dz };
+    s.footprint = {
+      minX: s.footprint.minX + dx,
+      maxX: s.footprint.maxX + dx,
+      minZ: s.footprint.minZ + dz,
+      maxZ: s.footprint.maxZ + dz,
+    };
     for (const p of s.instances) {
       p[0] += dx;
       p[2] += dz;
@@ -305,13 +340,22 @@ const EXPANSION = [0, 0.12, 0.25, 0.4, 0.6, 0.8, 1] as const;
 export function layoutKnolling(items: readonly KnollingItem[], region: KnollingRegion): KnollingLayout {
   const keepOut = region.keepOut ?? [];
   const preferred = intersectRect(region.preferred, region.limit);
-  const attempts: { gaps: Gaps; s: number }[] = [];
-  for (const s of EXPANSION) attempts.push({ gaps: KNOLLING_GAPS, s });
-  // Dernier recours : espacements réduits sur le plateau entier.
-  attempts.push({ gaps: { item: KNOLLING_GAPS.item / 2, group: KNOLLING_GAPS.group / 2, instance: KNOLLING_GAPS.instance / 2 }, s: 1 });
-  for (const { gaps, s } of attempts) {
+  // Ordre des essais : rester au plus près du tapis ; à chaque élargissement, groupes en rangées
+  // séparées puis groupes à la suite ; en dernier recours, espacements réduits.
+  const attempts: { gaps: Gaps; s: number; groupRows: boolean }[] = [];
+  for (const s of EXPANSION) {
+    attempts.push({ gaps: KNOLLING_GAPS, s, groupRows: true });
+    attempts.push({ gaps: KNOLLING_GAPS, s, groupRows: false });
+  }
+  const tight = {
+    item: KNOLLING_GAPS.item / 2,
+    group: KNOLLING_GAPS.group / 2,
+    instance: KNOLLING_GAPS.instance / 2,
+  };
+  attempts.push({ gaps: tight, s: 1, groupRows: false });
+  for (const { gaps, s, groupRows } of attempts) {
     const rect = lerpRect(preferred, region.limit, s);
-    const slots = placeRows(items, rect, keepOut, region.surfaceY, gaps);
+    const slots = placeRows(items, rect, keepOut, region.surfaceY, gaps, groupRows);
     if (!slots) continue;
     if (region.center ?? keepOut.length === 0) {
       // Centrage du bloc sur le tapis, sans sortir de la zone utilisée.
@@ -337,7 +381,9 @@ export function layoutKnolling(items: readonly KnollingItem[], region: KnollingR
     }
     const cx = Math.min(x, limit.maxX - grid.w);
     const cz = Math.min(z, limit.maxZ - grid.d);
-    slots.push(slotFor(item, Math.max(limit.minX, cx), Math.max(limit.minZ, cz), grid, region.surfaceY, KNOLLING_GAPS));
+    slots.push(
+      slotFor(item, Math.max(limit.minX, cx), Math.max(limit.minZ, cz), grid, region.surfaceY, KNOLLING_GAPS),
+    );
     x += grid.w + KNOLLING_GAPS.item;
   }
   return { slots: new Map(slots.map((sl) => [sl.id, sl] as const)), fits: false, bounds: boundsOf(slots) };

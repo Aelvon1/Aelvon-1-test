@@ -57,7 +57,7 @@ export const PARTS: readonly PartDef<BoxParams>[] = [
       tip: 'Dans le plastique, un serrage excessif arrache le filet : s’arrêter dès le contact, puis un quart de tour.',
       extra: [{ label: 'Filet', value: 'Pas 0,7 mm (représentation simplifiée)' }],
     },
-    explode: { direction: [0, 1, 0], distance: 0.06 },
+    explode: { direction: [0, 1, 0], distance: 0.1 },
     removal: {
       motion: 'unscrew',
       axis: [0, 1, 0],
@@ -82,7 +82,7 @@ export const PARTS: readonly PartDef<BoxParams>[] = [
       dimensions: '80 × 80 × 5,2 mm',
       tip: 'Serrer les vis en croix pour comprimer le joint uniformément.',
     },
-    explode: { direction: [0, 1, 0], distance: 0.04 },
+    explode: { direction: [0, 1, 0], distance: 0.075 },
     removal: {
       requires: ['screws'],
       motion: 'translate',
@@ -127,7 +127,7 @@ export const PARTS: readonly PartDef<BoxParams>[] = [
       dimensions: '0,75 mm², longueur ≈ 40 mm',
       tip: 'Marron = phase, bleu = neutre : respecter le code couleur même en très basse tension facilite le dépannage.',
     },
-    explode: { direction: [0, 1, 0], distance: 0.05, spread: { mode: 'linear', step: [0.006, 0, 0] } },
+    explode: { direction: [0, 1, 0], distance: 0.045, spread: { mode: 'linear', step: [0.006, 0, 0] } },
     removal: {
       requires: ['lid'],
       motion: 'spread',
@@ -152,7 +152,7 @@ export const PARTS: readonly PartDef<BoxParams>[] = [
       reference: 'Bornier à vis 3P 4 mm² (typique)',
       tip: 'Un conducteur souple doit recevoir un embout serti avant d’être serré sous une vis.',
     },
-    explode: { direction: [-0.5, 1, -0.3], distance: 0.035 },
+    explode: { direction: [-0.6, 1, -0.4], distance: 0.035 },
     removal: {
       requires: ['lid', 'wires'],
       motion: 'unclip',
@@ -174,7 +174,7 @@ export const PARTS: readonly PartDef<BoxParams>[] = [
       material: 'Acier zingué',
       dimensions: 'Ø 2,5 × 6 mm, tête bombée Ø 4,6 mm, empreinte PH1',
     },
-    explode: { direction: [0, 1, 0], distance: 0.05 },
+    explode: { direction: [0, 1, 0], distance: 0.06 },
     removal: {
       requires: ['lid'],
       motion: 'unscrew',
@@ -200,7 +200,7 @@ export const PARTS: readonly PartDef<BoxParams>[] = [
       dimensions: '40 × 26 × 1,6 mm',
       tip: 'Pour une tension secteur, le témoin utiliserait un condensateur de chute ou une résistance de forte puissance : cette carte est prévue pour 12–24 V.',
     },
-    explode: { direction: [0.3, 1, 0.4], distance: 0.035 },
+    explode: { direction: [0.4, 1, 0.5], distance: 0.042 },
     removal: {
       requires: ['board.screws', 'wires'],
       motion: 'lift',

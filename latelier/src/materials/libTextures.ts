@@ -52,7 +52,12 @@ export const LIB_TEXTURES = {
   },
   rust: { generator: 'rust', params: {}, size: [1024, 1024], colorSpace: 'linear' },
   concrete: { generator: 'concrete', params: {}, size: [1024, 1024], colorSpace: 'linear' },
-  'wood.bench': { generator: 'wood', params: { style: 'planks', planks: 5 }, size: [1024, 1024], colorSpace: 'srgb' },
+  'wood.bench': {
+    generator: 'wood',
+    params: { style: 'planks', planks: 5 },
+    size: [1024, 1024],
+    colorSpace: 'srgb',
+  },
   'wood.plywood': { generator: 'wood', params: { style: 'plywood' }, size: [1024, 1024], colorSpace: 'srgb' },
   cardboard: { generator: 'cardboard', params: {}, size: [1024, 1024], colorSpace: 'srgb' },
   /** Taffetas fin (fibre de verre, âme FR4). */
@@ -105,7 +110,11 @@ export function libTextureSize(base: readonly [number, number], quality: 0 | 1 |
 export const libTextureKey = (name: LibTextureName): string => `lib/${name}`;
 
 /** Demande (ou retrouve) une texture de la bibliothèque. */
-export function libTexture(textures: TextureService, quality: 0 | 1 | 2 | 3, name: LibTextureName): THREE.Texture {
+export function libTexture(
+  textures: TextureService,
+  quality: 0 | 1 | 2 | 3,
+  name: LibTextureName,
+): THREE.Texture {
   const def: LibTextureDef = LIB_TEXTURES[name];
   const [width, height] = libTextureSize(def.size, quality);
   return textures.get({

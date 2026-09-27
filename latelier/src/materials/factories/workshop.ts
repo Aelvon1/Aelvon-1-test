@@ -18,7 +18,6 @@ import {
   positionWorld,
   saturate,
   select,
-  sin,
   smoothstep,
   uv,
   vec2,
@@ -64,8 +63,16 @@ export interface WoodOptions extends MappingOptions, CommonOptions {
  */
 export function createWood(env: MaterialEnv, o: WoodOptions = {}): THREE.MeshPhysicalNodeMaterial {
   const plywood = o.variant === 'plywood';
-  const kit = new SurfaceKit(env, { space: o.space ?? 'world', scale: o.scale ?? (plywood ? 1 : 1.25), sharpness: o.sharpness });
-  const m = physical(o.name, { color: o.tint ?? 0xffffff, roughness: o.roughness ?? (plywood ? 0.72 : 0.62), metalness: 0 });
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'world',
+    scale: o.scale ?? (plywood ? 1 : 1.25),
+    sharpness: o.sharpness,
+  });
+  const m = physical(o.name, {
+    color: o.tint ?? 0xffffff,
+    roughness: o.roughness ?? (plywood ? 0.72 : 0.62),
+    metalness: 0,
+  });
   const wood = kit.sample(plywood ? 'wood.plywood' : 'wood.bench');
   const grunge = kit.grunge();
   const scratch = kit.sample('scratches', 2);
@@ -117,8 +124,16 @@ export interface ConcreteOptions extends MappingOptions, CommonOptions {
  * encore brillant, auréole mate), crasse au pied des murs (repère monde).
  */
 export function createConcrete(env: MaterialEnv, o: ConcreteOptions = {}): THREE.MeshPhysicalNodeMaterial {
-  const kit = new SurfaceKit(env, { space: o.space ?? 'world', scale: o.scale ?? 0.45, sharpness: o.sharpness });
-  const m = physical(o.name, { color: o.color ?? PALETTE.concrete, roughness: o.roughness ?? 0.88, metalness: 0 });
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'world',
+    scale: o.scale ?? 0.45,
+    sharpness: o.sharpness,
+  });
+  const m = physical(o.name, {
+    color: o.color ?? PALETTE.concrete,
+    roughness: o.roughness ?? 0.88,
+    metalness: 0,
+  });
   const concrete = kit.sample('concrete');
   const fine = kit.sample('noise', 8);
   const grunge = kit.grunge();
@@ -139,11 +154,7 @@ export function createConcrete(env: MaterialEnv, o: ConcreteOptions = {}): THREE
   // Huile fraîche : lustrée au cœur, mate sur les bords.
   roughness = mix(roughness, float(0.28), smoothstep(0.45, 0.9, oil).mul(fine.r.mul(0.5).add(0.5)));
   roughness = mix(roughness, float(0.95), cracks);
-  const height = mottle
-    .mul(1.5e-4)
-    .add(grain.sub(0.5).mul(3e-4))
-    .sub(cracks.mul(6e-4))
-    .add(fine.b.mul(1e-4));
+  const height = mottle.mul(1.5e-4).add(grain.sub(0.5).mul(3e-4)).sub(cracks.mul(6e-4)).add(fine.b.mul(1e-4));
   m.colorNode = color;
   m.roughnessNode = clampRoughness(roughness);
   m.metalnessNode = materialMetalness;
@@ -164,7 +175,11 @@ export interface WallPaintOptions extends MappingOptions, CommonOptions {
 
 /** Peinture murale crème défraîchie : passes de rouleau, jaunissement, bas de mur encrassé. */
 export function createWallPaint(env: MaterialEnv, o: WallPaintOptions = {}): THREE.MeshPhysicalNodeMaterial {
-  const kit = new SurfaceKit(env, { space: o.space ?? 'world', scale: o.scale ?? 0.8, sharpness: o.sharpness });
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'world',
+    scale: o.scale ?? 0.8,
+    sharpness: o.sharpness,
+  });
   const m = physical(o.name, { color: o.color ?? 0xc9c0a6, roughness: o.roughness ?? 0.88, metalness: 0 });
   const paint = kit.sample('paint.roller');
   const grunge = kit.grunge();
@@ -174,7 +189,11 @@ export function createWallPaint(env: MaterialEnv, o: WallPaintOptions = {}): THR
   let color: Vec3Node = materialColor.mul(vec3(tone.add(1), tone.add(1), tone.mul(1.3).add(1)));
   // Jaunissement par plaques, crasse au pied du mur, taches.
   color = mix(color, color.mul(vec3(0.95, 0.9, 0.78)), smoothstep(0.4, 0.8, noise.r).mul(0.6));
-  const grime = saturate(groundGrime(0.35).mul(grunge.a.mul(0.6).add(0.4)).add(smoothstep(0.6, 0.9, grunge.r).mul(0.5)));
+  const grime = saturate(
+    groundGrime(0.35)
+      .mul(grunge.a.mul(0.6).add(0.4))
+      .add(smoothstep(0.6, 0.9, grunge.r).mul(0.5)),
+  );
   color = mix(color, color.mul(vec3(0.55, 0.5, 0.42)), grime.mul(dirtAmount));
   m.colorNode = color;
   m.roughnessNode = clampRoughness(materialRoughness.add(paint.b.sub(0.5).mul(0.08)));
@@ -216,12 +235,19 @@ export function createPegboard(env: MaterialEnv, o: PegboardOptions = {}): THREE
   const [ox, oy] = o.offset ?? [0, 0];
   const p = positionWorld;
   const plane: Vec2Node = axis === 'x' ? vec2(p.z, p.y) : axis === 'y' ? vec2(p.x, p.z) : vec2(p.x, p.y);
-  const facing = axis === 'x' ? abs(normalWorldGeometry.x) : axis === 'y' ? abs(normalWorldGeometry.y) : abs(normalWorldGeometry.z);
+  const facing =
+    axis === 'x'
+      ? abs(normalWorldGeometry.x)
+      : axis === 'y'
+        ? abs(normalWorldGeometry.y)
+        : abs(normalWorldGeometry.z);
   const cell = fract(plane.add(vec2(ox, oy)).div(pitch)).sub(0.5);
   const d = length(cell).mul(pitch);
   const onFace = smoothstep(0.6, 0.8, facing);
   const hole = smoothstep(radius + 0.0002, radius - 0.0002, d).mul(onFace);
-  const ring = smoothstep(radius * 2.2, radius, d).mul(float(1).sub(hole)).mul(onFace);
+  const ring = smoothstep(radius * 2.2, radius, d)
+    .mul(float(1).sub(hole))
+    .mul(onFace);
   const tone = paint.g.sub(0.5).mul(0.2);
   let color: Vec3Node = materialColor.mul(tone.add(1));
   color = mix(color, color.mul(0.62), ring.mul(grunge.a.mul(0.8).add(0.2)).mul(0.6));
@@ -251,7 +277,14 @@ export interface CardboardOptions extends MappingOptions, CommonOptions {
 /** Carton ondulé kraft : fibres, cannelures, arêtes écrasées et plus sombres, taches. */
 export function createCardboard(env: MaterialEnv, o: CardboardOptions = {}): THREE.MeshPhysicalNodeMaterial {
   const kit = new SurfaceKit(env, { space: o.space ?? 'world', scale: o.scale ?? 3, sharpness: o.sharpness });
-  const m = physical(o.name, { color: o.tint ?? 0xffffff, roughness: 0.9, metalness: 0, sheen: 0.2, sheenColor: 0xf0dcc0, sheenRoughness: 0.8 });
+  const m = physical(o.name, {
+    color: o.tint ?? 0xffffff,
+    roughness: 0.9,
+    metalness: 0,
+    sheen: 0.2,
+    sheenColor: 0xf0dcc0,
+    sheenRoughness: 0.8,
+  });
   const board = kit.sample('cardboard');
   const grunge = kit.grunge();
   const edges = edgeMask(0.006);
@@ -279,13 +312,14 @@ export interface FabricOptions extends MappingOptions, CommonOptions {
   roughness?: number;
   /** Taches (0..1). */
   dirt?: number;
-  /** Tapis : couleurs des bandes (motif en UV : bandes le long de v, chevrons). */
-  stripes?: readonly THREE.ColorRepresentation[];
+  /** Tapis : trois couleurs de motif (bordures, médaillon), le champ prend `color`. */
+  stripes?: readonly [THREE.ColorRepresentation, THREE.ColorRepresentation, THREE.ColorRepresentation];
 }
 
 /**
  * Tissu : tissage visible (relief, interstices), lustre des fibres (sheen), taches.
- * Tapis : bandes tissées et chevrons en coordonnées UV (0..1 sur le tapis) ; sans UV, couleur unie.
+ * Tapis (kilim) : bordures à bandes et médaillon en coordonnées UV (0..1 sur le tapis) ; sans UV,
+ * couleur unie.
  */
 export function createFabric(env: MaterialEnv, o: FabricOptions): THREE.MeshPhysicalNodeMaterial {
   const rug = o.weave === 'rug';
@@ -306,19 +340,31 @@ export function createFabric(env: MaterialEnv, o: FabricOptions): THREE.MeshPhys
   const grunge = rug ? kit.sampleAbs('grunge', 1.5) : kit.grunge();
   let base: Vec3Node = materialColor;
   if (rug) {
-    const stripes = o.stripes ?? [PALETTE.cream, PALETTE.petrol, PALETTE.burntOrange, PALETTE.olive];
-    const v = uv().y;
-    // Bandes : 14 bandes le long de v, dont une sur trois porte une couleur d'accent, chevrons.
-    const band = floor(v.mul(14).add(sin(uv().x.mul(Math.PI * 24)).mul(0.08)));
-    const zig = abs(fract(uv().x.mul(12)).sub(0.5)).mul(0.25);
-    const accent = fract(band.mul(0.618)).add(zig);
+    // Kilim : champ uni (couleur du matériau), bordures à bandes aux deux extrémités (v) et
+    // médaillon en losanges concentriques au centre ; contours légèrement crénelés (tissage).
+    const [c1, c2, c3] = o.stripes ?? [PALETTE.cream, PALETTE.petrol, PALETTE.burntOrange];
+    const p = uv();
+    const step = (x: FloatNode) => floor(x.mul(48)).div(48); // crénelage des motifs tissés
+    const ends = abs(step(p.y).sub(0.5)).mul(2); // 0 au centre, 1 aux extrémités
+    const band = fract(ends.mul(9));
     let c: Vec3Node = materialColor;
-    stripes.forEach((s, i) => {
-      const lo = i / stripes.length;
-      const hi = (i + 1) / stripes.length;
-      c = select(accent.greaterThanEqual(lo).and(accent.lessThan(hi)), rgb(s).mul(0.85), c);
-    });
-    base = select(fract(band.mul(0.5)).greaterThan(0.25), materialColor, c);
+    c = select(ends.greaterThan(0.72).and(band.lessThan(0.35)), rgb(c1 ?? PALETTE.cream), c);
+    c = select(ends.greaterThan(0.72).and(band.greaterThan(0.6)), rgb(c2 ?? PALETTE.petrol), c);
+    c = select(ends.greaterThan(0.93), rgb(c3 ?? PALETTE.burntOrange).mul(0.8), c);
+    // Médaillon : distance « losange », rangées de chevrons.
+    const diamond = abs(step(p.x).sub(0.5))
+      .mul(1.4)
+      .add(abs(step(p.y).sub(0.5)));
+    const ring = fract(diamond.mul(7));
+    const inMedallion = diamond.lessThan(0.42);
+    c = select(inMedallion.and(ring.lessThan(0.28)), rgb(c1 ?? PALETTE.cream), c);
+    c = select(
+      inMedallion.and(ring.greaterThan(0.55)).and(ring.lessThan(0.75)),
+      rgb(c2 ?? PALETTE.petrol),
+      c,
+    );
+    c = select(diamond.lessThan(0.08), rgb(c3 ?? PALETTE.burntOrange), c);
+    base = c;
   }
   const fiber = weave.b.mul(0.45).add(0.75);
   const gap = float(1).sub(weave.a);
@@ -343,14 +389,26 @@ export function createTape(
   env: MaterialEnv,
   o: { color?: THREE.ColorRepresentation; name?: string } & MappingOptions = {},
 ): THREE.MeshPhysicalNodeMaterial {
-  const kit = new SurfaceKit(env, { space: o.space ?? 'local', scale: o.scale ?? 20, sharpness: o.sharpness });
-  const m = physical(o.name, { color: o.color ?? PALETTE.tapeYellow, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.25 });
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'local',
+    scale: o.scale ?? 20,
+    sharpness: o.sharpness,
+  });
+  const m = physical(o.name, {
+    color: o.color ?? PALETTE.tapeYellow,
+    roughness: 0.42,
+    metalness: 0,
+    clearcoat: 0.3,
+    clearcoatRoughness: 0.25,
+  });
   const wrinkles = kit.sample('brushed', 0.1);
   const grunge = kit.grunge();
   const edges = edgeMask(0.001);
   const dirt = saturate(edges.mul(0.7).add(smoothstep(0.6, 0.9, grunge.r).mul(0.5))).mul(0.6);
   m.colorNode = mix(materialColor.mul(wrinkles.a.sub(0.5).mul(0.1).add(1)), rgb(PALETTE.dirt), dirt.mul(0.5));
-  m.roughnessNode = clampRoughness(smudgeRoughness(materialRoughness.add(dirt.mul(0.3)), fingerprintMask(grunge, 0.3)));
+  m.roughnessNode = clampRoughness(
+    smudgeRoughness(materialRoughness.add(dirt.mul(0.3)), fingerprintMask(grunge, 0.3)),
+  );
   m.metalnessNode = materialMetalness;
   m.normalNode = bumpNormal(wrinkles.r.mul(2e-5), 1);
   return m;
@@ -365,7 +423,14 @@ export function createAntistaticMat(
   o: { color?: THREE.ColorRepresentation; name?: string } & MappingOptions = {},
 ): THREE.MeshPhysicalNodeMaterial {
   const kit = new SurfaceKit(env, { space: o.space ?? 'world', scale: o.scale ?? 3, sharpness: o.sharpness });
-  const m = physical(o.name, { color: o.color ?? 0x2f5f45, roughness: 0.78, metalness: 0, sheen: 0.3, sheenColor: 0x9fb8a8, sheenRoughness: 0.7 });
+  const m = physical(o.name, {
+    color: o.color ?? 0x2f5f45,
+    roughness: 0.78,
+    metalness: 0,
+    sheen: 0.3,
+    sheenColor: 0x9fb8a8,
+    sheenRoughness: 0.7,
+  });
   const noise = kit.sample('noise', 12);
   const grunge = kit.grunge();
   const scratch = kit.sample('scratches');
@@ -377,7 +442,10 @@ export function createAntistaticMat(
   color = mix(color, rgb(PALETTE.dust), dustMask(grunge, 0.35).mul(0.35));
   m.colorNode = color;
   m.roughnessNode = clampRoughness(
-    smudgeRoughness(materialRoughness.add(noise.b.sub(0.5).mul(0.1)).sub(burns.mul(0.4)), fingerprintMask(grunge, 0.4)),
+    smudgeRoughness(
+      materialRoughness.add(noise.b.sub(0.5).mul(0.1)).sub(burns.mul(0.4)),
+      fingerprintMask(grunge, 0.4),
+    ),
   );
   m.metalnessNode = materialMetalness;
   m.normalNode = bumpNormal(noise.b.mul(4e-5).sub(scuffs.mul(1.5e-5)).add(burns.mul(-3e-5)), 1);

@@ -41,7 +41,10 @@ const smooth = (a: number, b: number, v: number): number => {
 };
 
 /** Soude les sommets par position ; retourne l'indice soudé de chaque sommet. */
-export function weldByPosition(position: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, tolerance: number): {
+export function weldByPosition(
+  position: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
+  tolerance: number,
+): {
   welded: Int32Array;
   count: number;
 } {
@@ -66,7 +69,10 @@ export function weldByPosition(position: THREE.BufferAttribute | THREE.Interleav
  * Fonction pure (aucune modification de la géométrie) : voir `applyEdgeWear` pour l'écriture des
  * attributs.
  */
-export function computeEdgeWear(geometry: THREE.BufferGeometry, options: EdgeWearOptions = {}): EdgeWearResult {
+export function computeEdgeWear(
+  geometry: THREE.BufferGeometry,
+  options: EdgeWearOptions = {},
+): EdgeWearResult {
   const position = geometry.getAttribute('position');
   if (!position) throw new Error('computeEdgeWear : attribut « position » manquant.');
   const minAngle = ((options.minAngle ?? 8) * Math.PI) / 180;
@@ -213,10 +219,14 @@ export interface OcclusionOptions {
  * lancers — à réserver aux pièces de décor (quelques milliers de sommets).
  * Nécessite l'attribut `normal`. La géométrie d'entrée n'est pas modifiée (BVH sur une copie).
  */
-export function computeOcclusion(geometry: THREE.BufferGeometry, options: OcclusionOptions = {}): Float32Array {
+export function computeOcclusion(
+  geometry: THREE.BufferGeometry,
+  options: OcclusionOptions = {},
+): Float32Array {
   const position = geometry.getAttribute('position');
   const normal = geometry.getAttribute('normal');
-  if (!position || !normal) throw new Error('computeOcclusion : attributs « position » et « normal » requis.');
+  if (!position || !normal)
+    throw new Error('computeOcclusion : attributs « position » et « normal » requis.');
   const samples = Math.max(1, Math.round(options.samples ?? 24));
   const radius = options.radius ?? 0.05;
   const bias = options.bias ?? 1e-4;
@@ -235,7 +245,9 @@ export function computeOcclusion(geometry: THREE.BufferGeometry, options: Occlus
   for (let i = 0; i < position.count; i++) {
     n.set(normal.getX(i), normal.getY(i), normal.getZ(i)).normalize();
     // Repère tangent arbitraire autour de la normale.
-    t1.set(Math.abs(n.x) > 0.9 ? 0 : 1, Math.abs(n.x) > 0.9 ? 1 : 0, 0).cross(n).normalize();
+    t1.set(Math.abs(n.x) > 0.9 ? 0 : 1, Math.abs(n.x) > 0.9 ? 1 : 0, 0)
+      .cross(n)
+      .normalize();
     t2.crossVectors(n, t1);
     let hits = 0;
     for (let s = 0; s < samples; s++) {
@@ -259,7 +271,10 @@ export function computeOcclusion(geometry: THREE.BufferGeometry, options: Occlus
 }
 
 /** Calcule et écrit l'attribut `occlusion` sur la géométrie (retournée). */
-export function applyOcclusion<G extends THREE.BufferGeometry>(geometry: G, options: OcclusionOptions = {}): G {
+export function applyOcclusion<G extends THREE.BufferGeometry>(
+  geometry: G,
+  options: OcclusionOptions = {},
+): G {
   geometry.setAttribute('occlusion', new THREE.BufferAttribute(computeOcclusion(geometry, options), 1));
   return geometry;
 }

@@ -161,7 +161,12 @@ export class MagnifierLamp {
 
   // --- Construction ---------------------------------------------------------------------------
 
-  private mesh(material: string, geometry: THREE.BufferGeometry, name: string, castShadow = true): THREE.Mesh {
+  private mesh(
+    material: string,
+    geometry: THREE.BufferGeometry,
+    name: string,
+    castShadow = true,
+  ): THREE.Mesh {
     const batch = new StaticBatch();
     batch.add(material, geometry, null, { edge: material.startsWith('world.lamp.housing') ? 'box' : 'none' });
     const mesh = batch.build((id) => this.b.materials.get(id), name)[0]!;
@@ -188,7 +193,12 @@ export class MagnifierLamp {
     const baseMesh = this.mesh('world.lamp.housing', base, 'Socle de la lampe');
     this.root.add(baseMesh);
     this.targets.push(baseMesh);
-    const post = cylinderBetween(new THREE.Vector3(0, 0.025, 0), new THREE.Vector3(0, SHOULDER_HEIGHT - 0.012, 0), 0.011, 16);
+    const post = cylinderBetween(
+      new THREE.Vector3(0, 0.025, 0),
+      new THREE.Vector3(0, SHOULDER_HEIGHT - 0.012, 0),
+      0.011,
+      16,
+    );
     post.geometry.applyMatrix4(post.matrix);
     this.root.add(this.mesh('steel.chrome', post.geometry, 'Fût'));
     this.yawGroup.position.set(0, SHOULDER_HEIGHT, 0);
@@ -212,7 +222,12 @@ export class MagnifierLamp {
     // Ressort d'équilibrage entre les tiges, décalé vers l'arrière.
     const spring = tubeAlong(new HelixCurve(0.0055, springTo - springFrom, 20), 0.0011, 5, 900);
     rods.add('steel.spring', spring, place([0, springFrom, -0.012]), { edge: 'none' });
-    const hook = cylinderBetween(new THREE.Vector3(0, springTo, -0.012), new THREE.Vector3(0, length - 0.03, -0.004), 0.0012, 5);
+    const hook = cylinderBetween(
+      new THREE.Vector3(0, springTo, -0.012),
+      new THREE.Vector3(0, length - 0.03, -0.004),
+      0.0012,
+      5,
+    );
     rods.add('steel.spring', hook.geometry, hook.matrix, { edge: 'none' });
     for (const mesh of rods.build((id) => this.b.materials.get(id), 'Bras')) {
       mesh.matrixAutoUpdate = true;
@@ -324,7 +339,10 @@ export class MagnifierLamp {
       new THREE.Vector3(ox - 0.08, by + 0.03, oz + 0.07),
       new THREE.Vector3(ox, oy + 0.03, oz + 0.07),
     ]);
-    this.b.batch.add('rubber.black', tubeAlong(cord, 0.0032, 6, 50), null, { edge: 'none', castShadow: false });
+    this.b.batch.add('rubber.black', tubeAlong(cord, 0.0032, 6, 50), null, {
+      edge: 'none',
+      castShadow: false,
+    });
     const plug = roundedBox(0.034, 0.04, 0.032, 0.006, 2);
     this.b.batch.add('plastic.black', plug, place([ox, oy + 0.03, oz + 0.066]), { castShadow: false });
   }

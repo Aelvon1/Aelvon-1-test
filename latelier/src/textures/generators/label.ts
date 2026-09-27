@@ -63,7 +63,8 @@ export const label: Generator = ({ width, height, params, seed }) => {
   const border = raw(params, 'border') !== false;
   const barcode = raw(params, 'barcode') === true;
   const pictoName = str(params, 'pictogram', style === 'poster' ? 'gear' : 'none');
-  const pictogram: Pictogram = pictoName === 'gear' || pictoName === 'bolt' || pictoName === 'drop' ? pictoName : 'none';
+  const pictogram: Pictogram =
+    pictoName === 'gear' || pictoName === 'bolt' || pictoName === 'drop' ? pictoName : 'none';
   const stamp = readStamp(raw(params, 'stamp'));
   const aging = Math.min(1, Math.max(0, num(params, 'aging', 0.35)));
   const rand = rng(seed, 43);
@@ -101,7 +102,8 @@ export const label: Generator = ({ width, height, params, seed }) => {
       fitText(ctx, title, width / 2, height * 0.15, width - pad * 2, u * 14, 'bold', 'sans-serif', 'center');
       ctx.fillStyle = ink;
       fitText(ctx, subtitle, width / 2, height * 0.31, width - pad * 2, u * 6.5, 'italic', 'serif', 'center');
-      if (pictogram !== 'none') drawPictogram(ctx, pictogram, width / 2, height * 0.5, Math.min(width, height) * 0.14, ink);
+      if (pictogram !== 'none')
+        drawPictogram(ctx, pictogram, width / 2, height * 0.5, Math.min(width, height) * 0.14, ink);
       let y = height * 0.7;
       for (const line of lines) {
         fitText(ctx, line, width / 2, y, width - pad * 2, u * 5, '', 'sans-serif', 'center');
@@ -125,7 +127,17 @@ export const label: Generator = ({ width, height, params, seed }) => {
       ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = ink;
       const left = hx + u * 12;
-      fitText(ctx, title, left, height * 0.38, width - left - pad, u * 14, 'bold', 'cursive, sans-serif', 'left');
+      fitText(
+        ctx,
+        title,
+        left,
+        height * 0.38,
+        width - left - pad,
+        u * 14,
+        'bold',
+        'cursive, sans-serif',
+        'left',
+      );
       let y = height * 0.62;
       for (const line of [subtitle, ...lines]) {
         fitText(ctx, line, left, y, width - left - pad, u * 8, '', 'cursive, sans-serif', 'left');
@@ -139,8 +151,29 @@ export const label: Generator = ({ width, height, params, seed }) => {
       ctx.fillRect(0, 0, band, height);
       ctx.fillStyle = ink;
       const hasSub = subtitle.length > 0;
-      fitText(ctx, title, (width + band) / 2, height * (hasSub ? 0.56 : 0.68), width - band - height * 0.3, height * (hasSub ? 0.46 : 0.56), 'bold', 'monospace', 'center');
-      if (hasSub) fitText(ctx, subtitle, (width + band) / 2, height * 0.86, width - band - height * 0.3, height * 0.2, '', 'sans-serif', 'center');
+      fitText(
+        ctx,
+        title,
+        (width + band) / 2,
+        height * (hasSub ? 0.56 : 0.68),
+        width - band - height * 0.3,
+        height * (hasSub ? 0.46 : 0.56),
+        'bold',
+        'monospace',
+        'center',
+      );
+      if (hasSub)
+        fitText(
+          ctx,
+          subtitle,
+          (width + band) / 2,
+          height * 0.86,
+          width - band - height * 0.3,
+          height * 0.2,
+          '',
+          'sans-serif',
+          'center',
+        );
       break;
     }
     case 'box': {
@@ -168,7 +201,8 @@ export const label: Generator = ({ width, height, params, seed }) => {
         y += u * 8;
       }
       if (barcode) drawBarcode(ctx, width - pad - u * 30, height - pad - u * 12, u * 30, u * 12, rand, ink);
-      if (pictogram !== 'none') drawPictogram(ctx, pictogram, width - pad - u * 8, pad + u * 8, u * 7, accent);
+      if (pictogram !== 'none')
+        drawPictogram(ctx, pictogram, width - pad - u * 8, pad + u * 8, u * 7, accent);
       break;
     }
   }
@@ -327,7 +361,15 @@ function drawPictogram(ctx: Ctx, kind: Pictogram, cx: number, cy: number, r: num
   ctx.restore();
 }
 
-function drawBarcode(ctx: Ctx, x: number, y: number, w: number, h: number, rand: () => number, ink: string): void {
+function drawBarcode(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rand: () => number,
+  ink: string,
+): void {
   ctx.save();
   ctx.fillStyle = ink;
   let cx = x;

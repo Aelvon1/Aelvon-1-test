@@ -203,7 +203,8 @@ export class PoseComposer {
       }
       const parentWorld = node.parent ? node.parent.matrixWorld : null;
       if (parentWorld) {
-        if (pose.parkWeight > 0 && pose.parkTarget) this.blendToWorld(parentWorld, pose.parkTarget, pose.parkWeight);
+        if (pose.parkWeight > 0 && pose.parkTarget)
+          this.blendToWorld(parentWorld, pose.parkTarget, pose.parkWeight);
         if (pose.knollWeight > 0 && pose.knollTarget)
           this.blendToWorld(parentWorld, pose.knollTarget, pose.knollWeight);
       }
@@ -251,7 +252,8 @@ export class PoseComposer {
         _q.premultiply(_qb).premultiply(_qa);
       }
       _s.copy(inst.frameScale[i]!);
-      if (pose.parkWeight > 0 && pose.parkInstanceTargets) this.blendInstance(pose.parkInstanceTargets[i]!, pose.parkWeight);
+      if (pose.parkWeight > 0 && pose.parkInstanceTargets)
+        this.blendInstance(pose.parkInstanceTargets[i]!, pose.parkWeight);
       if (pose.knollWeight > 0 && pose.knollInstanceTargets)
         this.blendInstance(pose.knollInstanceTargets[i]!, pose.knollWeight);
       // F' (repère de l'instance dans N) → matrices d'instance de chaque maillage.
@@ -282,7 +284,13 @@ export class PoseComposer {
   }
 
   /** Ajoute l'écartement de l'instance `i` (repère du nœud) à `out`. */
-  private addSpread(spread: InstanceSpread, i: number, pivot: THREE.Vector3, amount: number, out: THREE.Vector3): void {
+  private addSpread(
+    spread: InstanceSpread,
+    i: number,
+    pivot: THREE.Vector3,
+    amount: number,
+    out: THREE.Vector3,
+  ): void {
     if (spread.mode === 'linear') {
       out.x += spread.step[0] * i * amount;
       out.y += spread.step[1] * i * amount;
@@ -299,12 +307,24 @@ export class PoseComposer {
 
   // --- Visibilité et fondus ---------------------------------------------------------------
 
-  /** Applique la visibilité d'une pièce (masquage utilisateur, placement « hide », détail). */
+  /**
+   * Applique la visibilité d'une pièce (masquage utilisateur, placement « hide », détail). Une
+   * pièce suit le fondu de ses ancêtres cachés (elle est partie avec eux), sauf en vue rangée où
+   * chaque pièce est posée pour elle-même.
+   */
   refreshVisibility(id: string): void {
     const pose = this.poses.get(id);
     if (!pose) return;
-    const shownByKnolling = pose.knollWeight > 0;
-    const opacity = shownByKnolling ? 1 : pose.placementOpacity;
+    let opacity = 1;
+    if (pose.knollWeight <= 0) {
+      opacity = pose.placementOpacity;
+      for (let pid = pose.part.parentId; pid;) {
+        const parent = this.poses.get(pid);
+        if (!parent) break;
+        opacity = Math.min(opacity, parent.placementOpacity);
+        pid = parent.part.parentId;
+      }
+    }
     const visible = !pose.userHidden && opacity > 0.001;
     for (const mesh of pose.part.ownMeshes) mesh.visible = visible && mesh.userData.detailReplaced !== true;
     this.setFade(pose, visible && opacity < 0.999 ? opacity : null);
@@ -312,6 +332,11 @@ export class PoseComposer {
 
   refreshAllVisibility(): void {
     for (const id of this.poses.keys()) this.refreshVisibility(id);
+  }
+
+  /** Visibilité d'une pièce et de tous ses descendants. */
+  refreshVisibilityDeep(id: string): void {
+    for (const sub of this.assembly.subtreeIds(id)) this.refreshVisibility(sub);
   }
 
   /** Fondu : clones transparents des matériaux de la pièce, libérés à la fin du fondu. */

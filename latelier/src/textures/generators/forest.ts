@@ -11,7 +11,19 @@
  * density?: 1, conifers?: 0.7 (proportion) }.
  */
 import type { Generator } from './types';
-import { type RGB, clamp01, fbmField, flipRowsRGBA, mixRGB, num, parseRGB, raw, rng, smoothstep, wrapIndex } from './field';
+import {
+  type RGB,
+  clamp01,
+  fbmField,
+  flipRowsRGBA,
+  mixRGB,
+  num,
+  parseRGB,
+  raw,
+  rng,
+  smoothstep,
+  wrapIndex,
+} from './field';
 
 export const forest: Generator = ({ width, height, params, seed }) => {
   const layers = Math.max(1, Math.round(num(params, 'layers', 5)));

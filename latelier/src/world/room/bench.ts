@@ -33,17 +33,39 @@ export function buildBench(b: DecorBuild): BenchParts {
   const legZs = [z0 + 0.06, z1 - 0.06];
   for (const lx of legXs) {
     for (const lz of legZs) {
-      addBox(b.batch, frame, [lx - legW / 2, 0, lz - legW / 2], [lx + legW / 2, underTop, lz + legW / 2], 0.008, { uvRotate: true }, 2);
+      addBox(
+        b.batch,
+        frame,
+        [lx - legW / 2, 0, lz - legW / 2],
+        [lx + legW / 2, underTop, lz + legW / 2],
+        0.008,
+        { uvRotate: true },
+        2,
+      );
     }
   }
   const apronT = 0.024;
   const frontZ = legZs[1]! + legW / 2;
   const backZ = legZs[0]! - legW / 2;
   // Ceintures sous plateau.
-  addBox(b.batch, frame, [x0 + 0.04, underTop - 0.12, frontZ - apronT], [x1 - 0.04, underTop, frontZ], 0.006, {}, 2);
+  addBox(
+    b.batch,
+    frame,
+    [x0 + 0.04, underTop - 0.12, frontZ - apronT],
+    [x1 - 0.04, underTop, frontZ],
+    0.006,
+    {},
+    2,
+  );
   addBox(b.batch, frame, [x0 + 0.04, underTop - 0.12, backZ], [x1 - 0.04, underTop, backZ + apronT], 0.006);
   for (const lx of legXs) {
-    addBox(b.batch, frame, [lx - apronT / 2, underTop - 0.12, backZ + apronT], [lx + apronT / 2, underTop, frontZ - apronT], 0.005);
+    addBox(
+      b.batch,
+      frame,
+      [lx - apronT / 2, underTop - 0.12, backZ + apronT],
+      [lx + apronT / 2, underTop, frontZ - apronT],
+      0.005,
+    );
   }
   // Traverses basses + étagère en contreplaqué.
   const railY0 = 0.12;
@@ -51,9 +73,21 @@ export function buildBench(b: DecorBuild): BenchParts {
   addBox(b.batch, frame, [x0 + 0.04, railY0, frontZ - apronT], [x1 - 0.04, railY1, frontZ], 0.006);
   addBox(b.batch, frame, [x0 + 0.04, railY0, backZ], [x1 - 0.04, railY1, backZ + apronT], 0.006);
   for (const lx of legXs) {
-    addBox(b.batch, frame, [lx - apronT / 2, railY0, backZ + apronT], [lx + apronT / 2, railY1, frontZ - apronT], 0.005);
+    addBox(
+      b.batch,
+      frame,
+      [lx - apronT / 2, railY0, backZ + apronT],
+      [lx + apronT / 2, railY1, frontZ - apronT],
+      0.005,
+    );
   }
-  addBox(b.batch, 'wood.plywood', [x0 + 0.03, railY1, backZ + 0.005], [x1 - 0.03, railY1 + 0.018, frontZ - 0.005], 0.004);
+  addBox(
+    b.batch,
+    'wood.plywood',
+    [x0 + 0.03, railY1, backZ + 0.005],
+    [x1 - 0.03, railY1 + 0.018, frontZ - 0.005],
+    0.004,
+  );
   b.colliders.push({
     kind: 'box',
     center: [(x0 + x1) / 2, topY / 2, (z0 + z1) / 2],
@@ -75,9 +109,14 @@ export function buildBench(b: DecorBuild): BenchParts {
   // Tapis antistatique : plaque biseautée à coins arrondis, dessus = MAT.center.y.
   const [mw, md] = MAT.size;
   const mat = beveledPlate(mw, md, MAT.thickness, 0.014, 0.0009);
-  topBatch.add('world.mat', mat, place([MAT.center[0], MAT.center[1] - MAT.thickness / 2, MAT.center[2]], [-Math.PI / 2, 0, 0]), {
-    edge: 'none',
-  });
+  topBatch.add(
+    'world.mat',
+    mat,
+    place([MAT.center[0], MAT.center[1] - MAT.thickness / 2, MAT.center[2]], [-Math.PI / 2, 0, 0]),
+    {
+      edge: 'none',
+    },
+  );
   // Pression de mise à la terre (coin arrière droit du tapis).
   const studX = MAT.center[0] + mw / 2 - 0.035;
   const studZ = MAT.center[2] - md / 2 + 0.035;
@@ -112,7 +151,15 @@ export function buildBench(b: DecorBuild): BenchParts {
   ]);
   const coil = new CoiledCurve(carrier, 0.0042, Math.round(carrier.getLength() / 0.0065));
   b.batch.add('rubber.black', tubeAlong(coil, 0.0013, 5, 1600), null, { edge: 'none', castShadow: false });
-  addBox(b.batch, 'plastic.black', [ox - 0.018, oy - 0.055, oz + 0.05], [ox + 0.018, oy - 0.015, oz + 0.085], 0.006, { castShadow: false }, 2);
+  addBox(
+    b.batch,
+    'plastic.black',
+    [ox - 0.018, oy - 0.055, oz + 0.05],
+    [ox + 0.018, oy - 0.015, oz + 0.085],
+    0.006,
+    { castShadow: false },
+    2,
+  );
 
   // --- Panneau perforé ----------------------------------------------------------------
   const [px0, px1] = PEGBOARD.x;
@@ -120,7 +167,13 @@ export function buildBench(b: DecorBuild): BenchParts {
   const pz = PEGBOARD.z;
   addBox(b.batch, 'world.pegboard', [px0, py0, pz - 0.006], [px1, py1, pz], 0);
   for (const y of [py0 + 0.03, (py0 + py1) / 2, py1 - 0.03]) {
-    addBox(b.batch, 'world.joist', [px0 + 0.01, y - 0.02, pz - 0.015], [px1 - 0.01, y + 0.02, pz - 0.006], 0.003);
+    addBox(
+      b.batch,
+      'world.joist',
+      [px0 + 0.01, y - 0.02, pz - 0.015],
+      [px1 - 0.01, y + 0.02, pz - 0.006],
+      0.003,
+    );
   }
   const fw = 0.025;
   const fz0 = pz - 0.006;

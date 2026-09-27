@@ -79,7 +79,8 @@ describe('mouvements — monotonie', () => {
   for (const kind of KINDS) {
     it(`${kind} : la course le long de l'axe ne recule jamais`, () => {
       const list = samples(specFor(kind));
-      for (let i = 1; i < list.length; i++) expect(list[i]!.offset).toBeGreaterThanOrEqual(list[i - 1]!.offset - 1e-12);
+      for (let i = 1; i < list.length; i++)
+        expect(list[i]!.offset).toBeGreaterThanOrEqual(list[i - 1]!.offset - 1e-12);
     });
   }
 
@@ -87,7 +88,8 @@ describe('mouvements — monotonie', () => {
     const spec = specFor('unscrew');
     const { a } = motionTiming(spec);
     const list = samples(spec);
-    for (let i = 1; i < list.length; i++) expect(list[i]!.spin).toBeGreaterThanOrEqual(list[i - 1]!.spin - 1e-12);
+    for (let i = 1; i < list.length; i++)
+      expect(list[i]!.spin).toBeGreaterThanOrEqual(list[i - 1]!.spin - 1e-12);
     // Pendant le filet : offset = pas × tours effectués.
     for (let i = 0; i <= N; i++) {
       if (i / N > a) break;
@@ -99,7 +101,8 @@ describe('mouvements — monotonie', () => {
   it('spread : écartement monotone puis translation', () => {
     const spec = specFor('spread');
     const list = samples(spec);
-    for (let i = 1; i < list.length; i++) expect(list[i]!.spread).toBeGreaterThanOrEqual(list[i - 1]!.spread - 1e-12);
+    for (let i = 1; i < list.length; i++)
+      expect(list[i]!.spread).toBeGreaterThanOrEqual(list[i - 1]!.spread - 1e-12);
     const { a } = motionTiming(spec);
     expect(sampleRemoval(spec, a * 0.99, createMotionSample()).offset).toBe(0);
   });
@@ -117,7 +120,9 @@ describe('mouvements — caractère', () => {
     expect(after.offset).toBeGreaterThan(0.3 * spec.distance);
     expect((b - a) * motionDuration(spec)).toBeLessThan(0.15);
     // Tremblement latéral pendant la résistance.
-    const tremor = samples(spec).filter((_, i) => i / N < a).some((s) => Math.abs(s.lateral) > 1e-5);
+    const tremor = samples(spec)
+      .filter((_, i) => i / N < a)
+      .some((s) => Math.abs(s.lateral) > 1e-5);
     expect(tremor).toBe(true);
   });
 

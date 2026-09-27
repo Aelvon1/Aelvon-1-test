@@ -174,7 +174,8 @@ export class NeonFlicker {
     const r = this.random;
     const seq: Segment[] = [];
     const steps = 5 + Math.floor(r() * 4);
-    for (let i = 0; i < steps; i++) seq.push({ level: 0.55 + r() * 0.2, duration: 0.06 + r() * 0.08, click: false });
+    for (let i = 0; i < steps; i++)
+      seq.push({ level: 0.55 + r() * 0.2, duration: 0.06 + r() * 0.08, click: false });
     seq.push({ level: 1, duration: 0.05, click: true });
     return seq;
   }

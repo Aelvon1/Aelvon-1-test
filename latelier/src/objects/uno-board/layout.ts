@@ -787,4 +787,5 @@ export const SILK_TEXTS: readonly SilkText[] = [
 ];
 
 /** Vérifie qu'un point (mm) est dans le rectangle englobant de la carte. */
-export const insideBoardBox = (x: number, y: number): boolean => x >= 0 && x <= BOARD_W && y >= 0 && y <= BOARD_H;
+export const insideBoardBox = (x: number, y: number): boolean =>
+  x >= 0 && x <= BOARD_W && y >= 0 && y <= BOARD_H;

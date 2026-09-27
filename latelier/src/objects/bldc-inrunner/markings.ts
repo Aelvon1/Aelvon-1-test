@@ -24,7 +24,13 @@ const text = (
   x: number,
   y: number,
   size: number,
-  opts: { bold?: boolean; align?: 'left' | 'center' | 'right'; mono?: boolean; fill?: string; spacing?: number } = {},
+  opts: {
+    bold?: boolean;
+    align?: 'left' | 'center' | 'right';
+    mono?: boolean;
+    fill?: string;
+    spacing?: number;
+  } = {},
 ): DrawOp => ({
   op: 'text',
   text: t,
@@ -44,7 +50,9 @@ function emblem(cx: number, cy: number, r: number, stroke: string): DrawOp[] {
     const a = Math.PI / 6 + (k * Math.PI) / 3;
     hex.push(cx + r * Math.cos(a), cy + r * Math.sin(a));
   }
-  const ops: DrawOp[] = [{ op: 'polyline', points: hex, stroke, lineWidth: r * 0.14, closed: true, lineJoin: 'round' }];
+  const ops: DrawOp[] = [
+    { op: 'polyline', points: hex, stroke, lineWidth: r * 0.14, closed: true, lineJoin: 'round' },
+  ];
   for (let k = 0; k < 3; k++) {
     const a = -Math.PI / 2 + (k * 2 * Math.PI) / 3;
     const p = (rr: number, da: number) => `${cx + rr * Math.cos(a + da)} ${cy + rr * Math.sin(a + da)}`;
@@ -66,7 +74,11 @@ export function canLabelSize(d: BldcDims): { length: number; arc: number; halfAn
 }
 
 /** Gravure laser du carter : marque, modèle, KV et configuration RÉELS des paramètres. */
-export function canLabelTexture(textures: TextureService, d: BldcDims, quality: 0 | 1 | 2 | 3): THREE.Texture {
+export function canLabelTexture(
+  textures: TextureService,
+  d: BldcDims,
+  quality: 0 | 1 | 2 | 3,
+): THREE.Texture {
   const p = d.params;
   const { length: L, arc: H } = canLabelSize(d);
   const ppm = pxPerMm(quality);
@@ -82,7 +94,9 @@ export function canLabelTexture(textures: TextureService, d: BldcDims, quality: 
     text('VELKOR', 9.4 * k, H / 2 - 1.6 * k, 4.3 * k, { bold: true, spacing: 0.35 * k }),
     text('BRUSHLESS INRUNNER', 9.6 * k, H / 2 + 1.9 * k, 1.35 * k, { spacing: 0.22 * k }),
     text(`${p.kv} KV`, L - 1.2 * k, H / 2 - 0.9 * k, 4.6 * k, { bold: true, align: 'right' }),
-    text(`${model} · ${cfg}${p.sensors ? ' · SENSORED' : ''}`, L - 1.2 * k, H / 2 + 2.3 * k, 1.6 * k, { align: 'right' }),
+    text(`${model} · ${cfg}${p.sensors ? ' · SENSORED' : ''}`, L - 1.2 * k, H / 2 + 2.3 * k, 1.6 * k, {
+      align: 'right',
+    }),
     { op: 'rect', x: 9.6 * k, y: H / 2 + 3.6 * k, w: L - 10.8 * k, h: 0.12 * k, fill: '#ffffff' },
     text(
       `Ø ${fr(d.format.shaftD, 3)} mm · ${d.format.cells}–${d.format.cells * 2}S LiPo · ${fr(w.turns, 1)} T × ${w.strands} × Ø ${fr(w.strandD, 2)}`,
@@ -90,12 +104,20 @@ export function canLabelTexture(textures: TextureService, d: BldcDims, quality: 
       H / 2 + 5.3 * k,
       1.05 * k,
     ),
-    text(`S/N 2609-${String((p.kv * 7 + p.format.charCodeAt(1) * 13) % 10000).padStart(4, '0')}`, L - 1.2 * k, H / 2 + 5.3 * k, 0.95 * k, {
-      align: 'right',
-      mono: true,
-    }),
+    text(
+      `S/N 2609-${String((p.kv * 7 + p.format.charCodeAt(1) * 13) % 10000).padStart(4, '0')}`,
+      L - 1.2 * k,
+      H / 2 + 5.3 * k,
+      0.95 * k,
+      {
+        align: 'right',
+        mono: true,
+      },
+    ),
     // Micro-texte (lisible seulement au zoom macro).
-    text('NE PAS DÉPASSER 60 000 TR/MIN · AIMANTS NdFeB 150 °C MAX', 9.6 * k, H / 2 - 5.2 * k, 0.55 * k, { spacing: 0.05 * k }),
+    text('NE PAS DÉPASSER 60 000 TR/MIN · AIMANTS NdFeB 150 °C MAX', 9.6 * k, H / 2 - 5.2 * k, 0.55 * k, {
+      spacing: 0.05 * k,
+    }),
     text('Ⓐ Ⓑ Ⓒ  ROTATION ↻', L - 1.2 * k, H / 2 - 5.2 * k, 0.55 * k, { align: 'right' }),
   ];
   return textures.get({
@@ -113,7 +135,11 @@ export function canLabelTexture(textures: TextureService, d: BldcDims, quality: 
  * Légende gravée de la flasque arrière (vue de l'arrière : x canvas = z, y canvas = −y).
  * Repères A/B/C des languettes, flèche de rotation, « HALL » au-dessus du connecteur.
  */
-export function rearLegendTexture(textures: TextureService, d: BldcDims, quality: 0 | 1 | 2 | 3): { texture: THREE.Texture; half: number } {
+export function rearLegendTexture(
+  textures: TextureService,
+  d: BldcDims,
+  quality: 0 | 1 | 2 | 3,
+): { texture: THREE.Texture; half: number } {
   const half = d.flangeR;
   const size = pow2(2 * half * pxPerMm(quality) * 0.6, 2048);
   const k = d.s;
@@ -191,7 +217,14 @@ export function pcbTexture(
     const mid = polar((hallR + d.pcb.rOut) / 2, a + (i - 1) * 0.08);
     const [cx, cy] = map(connY, (i - 1) * d.connector.pitch * 1.3);
     pts.push(...start, ...mid, cx, cy);
-    ops.push({ op: 'polyline', points: pts, stroke: trace, lineWidth: 0.3 * k, lineCap: 'round', lineJoin: 'round' });
+    ops.push({
+      op: 'polyline',
+      points: pts,
+      stroke: trace,
+      lineWidth: 0.3 * k,
+      lineCap: 'round',
+      lineJoin: 'round',
+    });
   });
   // Pastilles des capteurs (3 broches au pas de 1,27 mm) et du connecteur (6 broches au pas de 1,5 mm).
   for (const a of d.hall.angles) {

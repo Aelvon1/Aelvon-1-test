@@ -20,7 +20,14 @@ import {
 } from '../layout';
 import { FOOTPRINTS } from '../footprints';
 import { allPads, pointConvexDistance, rectCorners, type PlacedPad } from './pads';
-import { GridRouter, pointSegmentDistance, type Layer, type RouteResult, type Shape, type Terminal } from './router';
+import {
+  GridRouter,
+  pointSegmentDistance,
+  type Layer,
+  type RouteResult,
+  type Shape,
+  type Terminal,
+} from './router';
 
 export interface Trace {
   net: string;
@@ -74,7 +81,15 @@ const PRIORITY = [
 /** Forme de cuivre d'une pastille. */
 export function padShape(p: PlacedPad): Shape {
   if (p.shape === 'round') return { kind: 'circle', x: p.x, y: p.y, r: p.w / 2 };
-  return { kind: 'rect', x: p.x, y: p.y, hw: p.w / 2, hh: p.h / 2, cos: Math.cos(p.rot), sin: Math.sin(p.rot) };
+  return {
+    kind: 'rect',
+    x: p.x,
+    y: p.y,
+    hw: p.w / 2,
+    hh: p.h / 2,
+    cos: Math.cos(p.rot),
+    sin: Math.sin(p.rot),
+  };
 }
 
 export const traceWidth = (net: string): number => NET_CLASSES[net] ?? DEFAULT_TRACE;
@@ -159,15 +174,17 @@ function* routingSteps(): Generator<number, Routing> {
 
   // Les broches à amorce (pas fin) d'abord : leur dégagement est tracé avant le reste du réseau.
   const terminalsOf = (net: string): Terminal[] =>
-    [...byNet.get(net)!].sort((a, b) => Number(!!b.fanoutEnd) - Number(!!a.fanoutEnd)).map((p) => {
-      const at = p.fanoutEnd ?? { x: p.x, y: p.y };
-      return {
-        x: at.x,
-        y: at.y,
-        layers: p.drill !== undefined ? [0, 1] : [0],
-        region: p.fanoutEnd ? { kind: 'circle', x: at.x, y: at.y, r: 0.05 } : padShape(p),
-      };
-    });
+    [...byNet.get(net)!]
+      .sort((a, b) => Number(!!b.fanoutEnd) - Number(!!a.fanoutEnd))
+      .map((p) => {
+        const at = p.fanoutEnd ?? { x: p.x, y: p.y };
+        return {
+          x: at.x,
+          y: at.y,
+          layers: p.drill !== undefined ? [0, 1] : [0],
+          region: p.fanoutEnd ? { kind: 'circle', x: at.x, y: at.y, r: 0.05 } : padShape(p),
+        };
+      });
   const routeNet = (net: string): RouteResult => router.route(net, traceWidth(net), terminalsOf(net));
 
   // Première passe, dans l'ordre de priorité.

@@ -4,7 +4,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import { NeonFlicker, mulberry32 } from '../../src/world/lighting/neonFlicker';
-import { HOME_CAMERA_KEYS, HOME_SEGMENT_SECONDS, homeCameraPose, type HomeCameraPose } from '../../src/world/camera/homeCamera';
+import {
+  HOME_CAMERA_KEYS,
+  HOME_SEGMENT_SECONDS,
+  homeCameraPose,
+  type HomeCameraPose,
+} from '../../src/world/camera/homeCamera';
 import { solveTwoLink } from '../../src/world/room/lampIK';
 import { BENCH, MAT, PEGBOARD, ROOM, SPOTS, WINDOW } from '../../src/world/layout';
 
@@ -99,7 +104,11 @@ describe('travelling de l’accueil', () => {
     for (let t = 0; t < loop; t += 0.05) {
       homeCameraPose(t, a);
       homeCameraPose(t + 0.05, b);
-      const d = Math.hypot(a.position[0] - b.position[0], a.position[1] - b.position[1], a.position[2] - b.position[2]);
+      const d = Math.hypot(
+        a.position[0] - b.position[0],
+        a.position[1] - b.position[1],
+        a.position[2] - b.position[2],
+      );
       expect(d).toBeLessThan(0.05);
     }
     homeCameraPose(0, a);

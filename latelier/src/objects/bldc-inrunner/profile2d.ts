@@ -103,7 +103,12 @@ function segmentLength(a: PathNode, b: P2): number {
  * arrondis par une courbe de Bézier quadratique tangente aux deux segments (courbure douce,
  * aucune arête vive). Retourne la liste de points (sans doublon de fermeture).
  */
-export function roundedPath(nodes: readonly PathNode[], closed: boolean, maxStep: number, cornerSteps = 5): P2[] {
+export function roundedPath(
+  nodes: readonly PathNode[],
+  closed: boolean,
+  maxStep: number,
+  cornerSteps = 5,
+): P2[] {
   const n = nodes.length;
   if (n < 2) return nodes.map((node) => node.p);
   // Longueur de tangente effective de chaque coin (bornée à 45 % des segments adjacents).
@@ -260,7 +265,8 @@ export function pointInPolygon(p: P2, poly: readonly P2[]): boolean {
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const a = poly[i]!;
     const b = poly[j]!;
-    if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside;
+    if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0])
+      inside = !inside;
   }
   return inside;
 }
@@ -268,6 +274,7 @@ export function pointInPolygon(p: P2, poly: readonly P2[]): boolean {
 /** Distance signée d'un point au bord d'un polygone (négative à l'intérieur). */
 export function signedDistanceToPolygon(p: P2, poly: readonly P2[]): number {
   let d = Infinity;
-  for (let i = 0; i < poly.length; i++) d = Math.min(d, distanceToSegment(p, poly[i]!, poly[(i + 1) % poly.length]!));
+  for (let i = 0; i < poly.length; i++)
+    d = Math.min(d, distanceToSegment(p, poly[i]!, poly[(i + 1) % poly.length]!));
   return pointInPolygon(p, poly) ? -d : d;
 }

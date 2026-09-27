@@ -6,8 +6,8 @@
  *   teinte propre à chaque lame, cernes « en cathédrale ») ;
  * - `plywood` : contreplaqué déroulé (bouleau) : veinage large et ondulé, contraste faible.
  *
- * Paramètres : { style?: 'planks', planks?: 5, rings?: 7 (cernes par lame), light?: '#c49a6c',
- * dark?: '#7a5234', knots?: 2, wear?: 0.5 (usure claire au centre + crasse dans les joints),
+ * Paramètres : { style?: 'planks', planks?: 5, rings?: 7 (cernes par lame), light?: '#aa8056',
+ * dark?: '#604028', knots?: 2, wear?: 0.5 (usure claire au centre + crasse dans les joints),
  * stains?: 3 (auréoles de tasse et taches d'huile) }.
  */
 import type { Generator } from './types';
@@ -39,15 +39,20 @@ export const wood: Generator = ({ width, height, params, seed }) => {
   const plywood = style === 'plywood';
   const planks = plywood ? 1 : Math.max(1, Math.round(num(params, 'planks', 5)));
   const rings = num(params, 'rings', plywood ? 4 : 7);
-  const light: RGB = parseRGB(raw(params, 'light'), plywood ? [214, 184, 140] : [196, 154, 108]);
-  const dark: RGB = parseRGB(raw(params, 'dark'), plywood ? [168, 128, 86] : [122, 82, 52]);
+  const light: RGB = parseRGB(raw(params, 'light'), plywood ? [200, 172, 132] : [170, 128, 86]);
+  const dark: RGB = parseRGB(raw(params, 'dark'), plywood ? [150, 112, 74] : [96, 64, 40]);
   const knotCount = Math.round(num(params, 'knots', plywood ? 1 : 2));
   const wear = num(params, 'wear', plywood ? 0.15 : 0.5);
   const stainCount = Math.round(num(params, 'stains', plywood ? 0 : 3));
   const rand = rng(seed, 13);
 
   // Déformations du veinage (périodiques), pores étirés le long du fil.
-  const warp = fbmField(width, height, { scale: plywood ? 2 : 2, scaleY: plywood ? 4 : 10, octaves: 4, seed });
+  const warp = fbmField(width, height, {
+    scale: plywood ? 2 : 2,
+    scaleY: plywood ? 4 : 10,
+    octaves: 4,
+    seed,
+  });
   const warpFine = fbmField(width, height, { scale: 4, scaleY: 32, octaves: 3, seed: seed + 3 });
   const pores = new Float32Array(width * height);
   addValueNoise(pores, width, height, 24, Math.min(height, 512), seed + 5, 0.6);
@@ -72,6 +77,15 @@ export const wood: Generator = ({ width, height, params, seed }) => {
     knots.push({ x: rand() * width, y: rand() * height, r: (0.015 + rand() * 0.02) * width });
   }
 
+  // Voûte des cernes par lame et par colonne (précalculée : évite un sinus par pixel).
+  const archTable = new Float32Array(planks * width);
+  for (let p = 0; p < planks; p++) {
+    for (let x = 0; x < width; x++) {
+      archTable[p * width + x] =
+        plankArch[p]! *
+        (0.75 + 0.25 * Math.sin(2 * Math.PI * ((x / width) * plankWave[p]! + plankOffset[p]!)));
+    }
+  }
   const out = new Uint8ClampedArray(width * height * 4);
   const plankH = height / planks;
   for (let y = 0; y < height; y++) {
@@ -82,9 +96,8 @@ export const wood: Generator = ({ width, height, params, seed }) => {
     const seam = plywood ? 0 : smoothstep(2.2, 0.4, seamDist);
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
-      const u = x / width;
       // Cernes en cathédrale : distance à un axe fictif sous la surface, modulée le long du fil.
-      const arch = plankArch[p]! * (0.75 + 0.25 * Math.sin(2 * Math.PI * (u * plankWave[p]! + plankOffset[p]!)));
+      const arch = archTable[p * width + x]!;
       const dy = (ly - 0.5) * (plywood ? 3 : 1.2);
       let ringCoord = Math.sqrt(dy * dy + arch * arch) + (warp[i]! - 0.5) * (plywood ? 1.2 : 0.35);
       ringCoord += (warpFine[i]! - 0.5) * 0.04;
@@ -104,7 +117,9 @@ export const wood: Generator = ({ width, height, params, seed }) => {
       const late = smoothstep(0.62, 0.9, t) * smoothstep(1, 0.92, t);
       const poreDark = smoothstep(0.55, 0.9, pores[i]!) * 0.5;
       const streak = (pores[i]! - 0.5) * 0.35;
-      let shade = clamp01(0.18 + late * 0.55 + poreDark * 0.3 + streak + (tone[i]! - 0.5) * 0.4 + plankTint[p]!);
+      let shade = clamp01(
+        0.18 + late * 0.55 + poreDark * 0.3 + streak + (tone[i]! - 0.5) * 0.4 + plankTint[p]!,
+      );
       shade = clamp01(shade + knotCore * 0.7);
       let c = mixRGB(light, dark, shade);
       // Usure : zone centrale éclaircie et désaturée ; crasse près des joints.

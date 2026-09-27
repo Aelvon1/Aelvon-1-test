@@ -42,8 +42,11 @@ export async function startMaterialShowcase(ctx: AppContext, _world: World): Pro
   const q = ctx.dev.raw;
   const { engine, materials, textures } = ctx;
   const prefixes = q.get('filter')?.split(',').filter(Boolean) ?? [];
-  const ids = BASE_MATERIAL_IDS.filter((id) => prefixes.length === 0 || prefixes.some((p) => id.startsWith(p)));
-  if (ids.length === 0) throw new Error(`Vitrine des matériaux : aucun identifiant ne correspond à « ${prefixes.join(', ')} ».`);
+  const ids = BASE_MATERIAL_IDS.filter(
+    (id) => prefixes.length === 0 || prefixes.some((p) => id.startsWith(p)),
+  );
+  if (ids.length === 0)
+    throw new Error(`Vitrine des matériaux : aucun identifiant ne correspond à « ${prefixes.join(', ')} ».`);
 
   // Zone utile : le plateau de l'établi, marges comprises.
   const area = { x0: BENCH.x[0] + 0.08, x1: BENCH.x[1] - 0.08, z0: BENCH.z[0] + 0.08, z1: BENCH.z[1] - 0.04 };
@@ -80,7 +83,11 @@ export async function startMaterialShowcase(ctx: AppContext, _world: World): Pro
     const row = Math.floor(index / cols);
     const group = new THREE.Group();
     group.name = `Échantillon ${id}`;
-    group.position.set(center.x - gridW / 2 + cell * (col + 0.5), y0, center.z - gridD / 2 + cell * (row + 0.5));
+    group.position.set(
+      center.x - gridW / 2 + cell * (col + 0.5),
+      y0,
+      center.z - gridD / 2 + cell * (row + 0.5),
+    );
     let material = probe ?? materials.get(id);
     if (!probe && q.get('nobump') === '1' && 'normalNode' in material) {
       // Mise au point : même matériau sans relief procédural.
@@ -102,7 +109,15 @@ export async function startMaterialShowcase(ctx: AppContext, _world: World): Pro
       generator: 'label',
       width: 512,
       height: 112,
-      params: { style: 'plate', title: id, subtitle: '', paper: '#e9e1c8', ink: '#1f1d1a', accent: '#b35a2a', aging: 0.1 },
+      params: {
+        style: 'plate',
+        title: id,
+        subtitle: '',
+        paper: '#e9e1c8',
+        ink: '#1f1d1a',
+        accent: '#b35a2a',
+        aging: 0.1,
+      },
       colorSpace: 'srgb',
       wrap: 'clamp',
     });
@@ -118,16 +133,16 @@ export async function startMaterialShowcase(ctx: AppContext, _world: World): Pro
   engine.scene.add(root);
 
   // Éclairage de studio d'appoint.
-  const key = new THREE.SpotLight(0xfff1dd, 40, 5, Math.PI / 4, 0.7, 1.5);
+  const key = new THREE.SpotLight(0xfff1dd, 18, 5, Math.PI / 4, 0.7, 1.5);
   key.position.copy(center).add(new THREE.Vector3(0.6, 1.1, 0.9));
   key.target.position.copy(center);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
   key.shadow.bias = -0.0002;
-  const fill = new THREE.DirectionalLight(0xcfe0ff, 0.8);
+  const fill = new THREE.DirectionalLight(0xcfe0ff, 0.5);
   fill.position.copy(center).add(new THREE.Vector3(-1.2, 0.8, 1));
   fill.target.position.copy(center);
-  const rim = new THREE.PointLight(0xffd2a0, 3, 3, 2);
+  const rim = new THREE.PointLight(0xffd2a0, 1.5, 3, 2);
   rim.position.copy(center).add(new THREE.Vector3(0, 0.5, -0.3));
   engine.scene.add(key, key.target, fill, fill.target, rim);
 
@@ -166,10 +181,17 @@ export async function startMaterialShowcase(ctx: AppContext, _world: World): Pro
   const dir =
     view && view.length >= 3
       ? new THREE.Vector3(view[0], view[1], view[2]).normalize()
-      : new THREE.Vector3(0, 0.75, 1).normalize();
+      : new THREE.Vector3(0, 1, 0.9).normalize();
   const fov = 35;
-  const halfH = Math.tan(THREE.MathUtils.degToRad(fov / 2));
-  const fitDistance = Math.max(gridD * 0.9, gridW / 2 / (halfH * camera.aspect)) * 1.15;
+  // Cadrage : largeur de la grille dans le champ horizontal, profondeur (vue en biais) dans le
+  // champ vertical.
+  const halfV = THREE.MathUtils.degToRad(fov / 2);
+  const halfH = Math.atan(Math.tan(halfV) * camera.aspect);
+  const fitDistance =
+    Math.max(
+      gridW / 2 / Math.tan(halfH),
+      ((gridD / 2) * Math.max(0.4, Math.abs(dir.y))) / Math.tan(halfV) + gridD / 2,
+    ) * 1.08;
   const distance = view && view.length >= 4 ? view[3]! : focus ? cell * 1.3 : fitDistance;
   camera.position.copy(target).addScaledVector(dir, distance);
   camera.fov = fov;
@@ -232,15 +254,29 @@ function createProbeMaterial(ctx: AppContext, spec: string | null): THREE.Materi
   if (!spec) return null;
   const m = new THREE.MeshBasicNodeMaterial();
   if (spec === 'edge' || spec === 'cavity' || spec === 'curv') {
-    const v = spec === 'edge' ? edgeMask(0.004) : spec === 'cavity' ? cavityMask(0.004) : surfaceCurvature().mul(0.01).add(0.5);
+    const v =
+      spec === 'edge'
+        ? edgeMask(0.004)
+        : spec === 'cavity'
+          ? cavityMask(0.004)
+          : surfaceCurvature().mul(0.01).add(0.5);
     m.colorNode = vec3(v);
     return m;
   }
-  const [name, channel = 'r'] = spec.split('.').length > 2 ? [spec.slice(0, spec.lastIndexOf('.')), spec.slice(spec.lastIndexOf('.') + 1)] : spec.split('.');
+  const [name, channel = 'r'] =
+    spec.split('.').length > 2
+      ? [spec.slice(0, spec.lastIndexOf('.')), spec.slice(spec.lastIndexOf('.') + 1)]
+      : spec.split('.');
   if (!name || !(name in LIB_TEXTURES)) return null;
-  const kit = new SurfaceKit({ textures: ctx.textures, quality: ctx.engine.quality.level }, { space: 'local', scale: 25 });
+  const kit = new SurfaceKit(
+    { textures: ctx.textures, quality: ctx.engine.quality.level },
+    { space: 'local', scale: 25 },
+  );
   const sample = kit.sample(name as LibTextureName);
-  m.colorNode = channel === 'rgb' ? sample.rgb : vec3(channel === 'g' ? sample.g : channel === 'b' ? sample.b : channel === 'a' ? sample.a : sample.r);
+  m.colorNode =
+    channel === 'rgb'
+      ? sample.rgb
+      : vec3(channel === 'g' ? sample.g : channel === 'b' ? sample.b : channel === 'a' ? sample.a : sample.r);
   return m;
 }
 
@@ -252,7 +288,7 @@ function createStudioScene(): THREE.Scene {
   const scene = new THREE.Scene();
   const dome = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide });
   const h = normalize(positionLocal).y;
-  dome.colorNode = mix(color(0x1a1714), color(0x7d8791), smoothstep(-0.25, 0.7, h)).mul(0.45);
+  dome.colorNode = mix(color(0x1a1714), color(0x7d8791), smoothstep(-0.25, 0.7, h)).mul(0.22);
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), dome));
   const panel = (w: number, hgt: number, c: number, intensity: number, pos: THREE.Vector3) => {
     const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
@@ -262,8 +298,8 @@ function createStudioScene(): THREE.Scene {
     mesh.lookAt(0, 0, 0);
     scene.add(mesh);
   };
-  panel(6, 4, 0xfff0dc, 3, new THREE.Vector3(1.5, 7, 3));
-  panel(1.2, 7, 0xd8e6ff, 2, new THREE.Vector3(-8, 2, 1));
-  panel(5, 1.2, 0xffe2c0, 1.5, new THREE.Vector3(0, 3, -8));
+  panel(6, 4, 0xfff0dc, 1.6, new THREE.Vector3(1.5, 7, 3));
+  panel(1.2, 7, 0xd8e6ff, 1.1, new THREE.Vector3(-8, 2, 1));
+  panel(5, 1.2, 0xffe2c0, 0.8, new THREE.Vector3(0, 3, -8));
   return scene;
 }

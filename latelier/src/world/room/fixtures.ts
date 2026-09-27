@@ -7,11 +7,24 @@
 import * as THREE from 'three/webgpu';
 import { ROOM, SPOTS } from '../layout';
 import { StaticBatch } from '../geometry/StaticBatch';
-import { addBox, cylinderBetween, lathe, place, roundedBox, roundedPolyline, tubeAlong } from '../geometry/shapes';
+import {
+  addBox,
+  cylinderBetween,
+  lathe,
+  place,
+  roundedBox,
+  roundedPolyline,
+  tubeAlong,
+} from '../geometry/shapes';
 import type { DecorBuild } from './types';
 
 /** Géométrie + matériau → maillage indépendant (normalisé comme le lot statique). */
-function singleMesh(b: DecorBuild, material: string, geometry: THREE.BufferGeometry, name: string): THREE.Mesh {
+function singleMesh(
+  b: DecorBuild,
+  material: string,
+  geometry: THREE.BufferGeometry,
+  name: string,
+): THREE.Mesh {
   const batch = new StaticBatch();
   batch.add(material, geometry, null);
   const mesh = batch.build((id) => b.materials.get(id), name)[0]!;
@@ -56,8 +69,12 @@ export function buildPendantBulb(b: DecorBuild): BulbParts {
     helixA.push(new THREE.Vector3(bx + Math.cos(a) * 0.0017, y, bz + Math.sin(a) * 0.0017));
     helixB.push(new THREE.Vector3(bx - Math.cos(a) * 0.0017, y, bz - Math.sin(a) * 0.0017));
   }
-  b.batch.add('fabric.cloth', tubeAlong(new THREE.CatmullRomCurve3(helixA), 0.0022, 6, 300), null, { edge: 'none' });
-  b.batch.add('fabric.cloth', tubeAlong(new THREE.CatmullRomCurve3(helixB), 0.0022, 6, 300), null, { edge: 'none' });
+  b.batch.add('fabric.cloth', tubeAlong(new THREE.CatmullRomCurve3(helixA), 0.0022, 6, 300), null, {
+    edge: 'none',
+  });
+  b.batch.add('fabric.cloth', tubeAlong(new THREE.CatmullRomCurve3(helixB), 0.0022, 6, 300), null, {
+    edge: 'none',
+  });
   // Douille bakélite + bague filetée.
   // Profils de révolution parcourus du bas vers le haut : normales sortantes.
   const socket = lathe(
@@ -110,13 +127,22 @@ export function buildPendantBulb(b: DecorBuild): BulbParts {
     cage.push(new THREE.Vector3(bx + Math.cos(a) * 0.011, y, bz + Math.sin(a) * 0.011));
   }
   b.batch.add('world.bulb.filament', tubeAlong(roundedPolyline(cage, 0.002), 0.0007, 4, 600), null, noShadow);
-  const stem = cylinderBetween(new THREE.Vector3(bx, glassTop, bz), new THREE.Vector3(bx, center.y + 0.012, bz), 0.0022, 8);
+  const stem = cylinderBetween(
+    new THREE.Vector3(bx, glassTop, bz),
+    new THREE.Vector3(bx, center.y + 0.012, bz),
+    0.0022,
+    8,
+  );
   b.batch.add('world.bulb.glass', stem.geometry, stem.matrix, noShadow);
   for (let k = 0; k < 4; k++) {
     const a = (k / 4) * Math.PI * 2 + 0.3;
     const wire = cylinderBetween(
       new THREE.Vector3(bx, center.y + 0.012, bz),
-      new THREE.Vector3(bx + Math.cos(a) * 0.011, center.y + (k % 2 === 0 ? 0.018 : -0.018), bz + Math.sin(a) * 0.011),
+      new THREE.Vector3(
+        bx + Math.cos(a) * 0.011,
+        center.y + (k % 2 === 0 ? 0.018 : -0.018),
+        bz + Math.sin(a) * 0.011,
+      ),
       0.0004,
       4,
     );
@@ -141,25 +167,57 @@ export function buildNeonFixture(b: DecorBuild): NeonParts {
   const housingY0 = cy + 0.025;
   const housingY1 = cy + 0.07;
   // Boîtier en tôle émaillée crème.
-  addBox(b.batch, 'world.paint.creamMetal', [x0, housingY0, cz - 0.045], [x1, housingY1, cz + 0.045], 0.012, {}, 2);
+  addBox(
+    b.batch,
+    'world.paint.creamMetal',
+    [x0, housingY0, cz - 0.045],
+    [x1, housingY1, cz + 0.045],
+    0.012,
+    {},
+    2,
+  );
   // Douilles de tube (« pierres tombales ») aux deux extrémités.
   for (const x of [x0 + 0.012, x1 - 0.012]) {
-    addBox(b.batch, 'plastic.white', [x - 0.011, cy - 0.022, cz - 0.02], [x + 0.011, housingY0 + 0.002, cz + 0.02], 0.006, {}, 2);
+    addBox(
+      b.batch,
+      'plastic.white',
+      [x - 0.011, cy - 0.022, cz - 0.02],
+      [x + 0.011, housingY0 + 0.002, cz + 0.02],
+      0.006,
+      {},
+      2,
+    );
   }
   // Tube T8 (phosphore) + culots aluminium.
   const start = new THREE.Vector3(cx - halfLen, cy, cz);
   const end = new THREE.Vector3(cx + halfLen, cy, cz);
-  const tube = cylinderBetween(start.clone().setX(start.x + 0.02), end.clone().setX(end.x - 0.02), tubeR, 20, true);
+  const tube = cylinderBetween(
+    start.clone().setX(start.x + 0.02),
+    end.clone().setX(end.x - 0.02),
+    tubeR,
+    20,
+    true,
+  );
   b.batch.add('world.neon.tube', tube.geometry, tube.matrix, { castShadow: false, edge: 'none' });
   for (const [a, c] of [
     [start.x, start.x + 0.022],
     [end.x - 0.022, end.x],
   ] as const) {
-    const cap = cylinderBetween(new THREE.Vector3(a, cy, cz), new THREE.Vector3(c, cy, cz), tubeR + 0.0006, 20);
+    const cap = cylinderBetween(
+      new THREE.Vector3(a, cy, cz),
+      new THREE.Vector3(c, cy, cz),
+      tubeR + 0.0006,
+      20,
+    );
     b.batch.add('alu.machined', cap.geometry, cap.matrix, { castShadow: false, edge: 'none' });
   }
   // Starter (cartouche) sur le flanc du boîtier.
-  const starter = cylinderBetween(new THREE.Vector3(cx - 0.35, housingY0 + 0.02, cz + 0.045), new THREE.Vector3(cx - 0.35, housingY0 + 0.02, cz + 0.078), 0.0105, 16);
+  const starter = cylinderBetween(
+    new THREE.Vector3(cx - 0.35, housingY0 + 0.02, cz + 0.045),
+    new THREE.Vector3(cx - 0.35, housingY0 + 0.02, cz + 0.078),
+    0.0105,
+    16,
+  );
   b.batch.add('silicone.blue', starter.geometry, starter.matrix);
   // Chaînettes instanciées (maillons alternés à 90°) + pitons.
   const ceilingY = 2.7;
@@ -173,8 +231,16 @@ export function buildNeonFixture(b: DecorBuild): NeonParts {
       links.push(place([x, y, cz], [0, i % 2 === 0 ? 0 : Math.PI / 2, 0]));
     }
     const eye = new THREE.TorusGeometry(0.007, 0.0016, 6, 14);
-    b.batch.add('metal.galvanized', eye, place([x, ceilingY - 0.009, cz], [0, Math.PI / 4, 0]), { edge: 'none' });
-    addBox(b.batch, 'metal.galvanized', [x - 0.008, housingY1 - 0.002, cz - 0.008], [x + 0.008, housingY1 + 0.006, cz + 0.008], 0.003);
+    b.batch.add('metal.galvanized', eye, place([x, ceilingY - 0.009, cz], [0, Math.PI / 4, 0]), {
+      edge: 'none',
+    });
+    addBox(
+      b.batch,
+      'metal.galvanized',
+      [x - 0.008, housingY1 - 0.002, cz - 0.008],
+      [x + 0.008, housingY1 + 0.006, cz + 0.008],
+      0.003,
+    );
   }
   const linkGeometry = new THREE.TorusGeometry(0.0065, 0.0014, 5, 12);
   linkGeometry.scale(0.75, 1.3, 1);
@@ -210,7 +276,12 @@ export function buildLightSwitch(b: DecorBuild): SwitchParts {
   // Boîtier plaqué contre le mur sud (face intérieure z = ROOM.maxZ).
   const back = ROOM.maxZ;
   const front = back - 0.042;
-  const box = singleMesh(b, 'world.switch.box', roundedBox(0.078, 0.118, back - front, 0.012, 2), 'Interrupteur');
+  const box = singleMesh(
+    b,
+    'world.switch.box',
+    roundedBox(0.078, 0.118, back - front, 0.012, 2),
+    'Interrupteur',
+  );
   box.position.set(sx, sy, (front + back) / 2);
   b.group.add(box);
   // Levier : pivote autour de X au ras de la plaque (bascule haut = allumé).
@@ -220,12 +291,22 @@ export function buildLightSwitch(b: DecorBuild): SwitchParts {
   leverGeometry.translate(0, 0, -0.015);
   const leverMesh = singleMesh(b, 'world.switch.lever', leverGeometry, 'Levier de l’interrupteur');
   lever.add(leverMesh);
-  const boss = singleMesh(b, 'world.bakelite', new THREE.CylinderGeometry(0.013, 0.015, 0.006, 20), 'Embase du levier');
+  const boss = singleMesh(
+    b,
+    'world.bakelite',
+    new THREE.CylinderGeometry(0.013, 0.015, 0.006, 20),
+    'Embase du levier',
+  );
   boss.rotation.x = Math.PI / 2;
   boss.position.set(sx, sy - 0.004, front - 0.002);
   b.group.add(lever, boss);
   // Voyant orange (s'allume quand l'éclairage est coupé).
-  const pilot = singleMesh(b, 'world.pilot.orange', new THREE.SphereGeometry(0.0055, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 'Voyant');
+  const pilot = singleMesh(
+    b,
+    'world.pilot.orange',
+    new THREE.SphereGeometry(0.0055, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    'Voyant',
+  );
   pilot.rotation.x = -Math.PI / 2;
   pilot.position.set(sx, sy + 0.038, front);
   pilot.castShadow = false;

@@ -11,11 +11,11 @@ export function createStudioBackdrop(): Node<'vec3'> {
   const uv = screenUV;
   // Horizon du cyclorama un peu sous le centre de l'écran (screenUV.y = 0 en haut) :
   // mur courbe sombre en haut, sol plus clair en bas.
-  const floorTone = vec3(0.23, 0.225, 0.215);
-  const wallTone = vec3(0.12, 0.118, 0.115);
-  const base = mix(wallTone, floorTone, smoothstep(0.3, 0.9, uv.y));
-  const radial = length(uv.sub(vec2(0.5, 0.58)).mul(vec2(1.4, 1.0)));
-  const vignette = smoothstep(0.95, 0.2, radial).mul(0.55).add(0.45);
+  const floorTone = vec3(0.2, 0.196, 0.188);
+  const wallTone = vec3(0.045, 0.046, 0.05);
+  const base = mix(wallTone, floorTone, smoothstep(0.15, 0.85, uv.y));
+  const radial = length(uv.sub(vec2(0.5, 0.62)).mul(vec2(1.2, 1.0)));
+  const vignette = smoothstep(0.9, 0.1, radial).mul(0.75).add(0.25);
   const dither = hash12(uv.mul(1731.7)).sub(0.5).mul(0.004);
   return base.mul(vignette).add(float(dither));
 }

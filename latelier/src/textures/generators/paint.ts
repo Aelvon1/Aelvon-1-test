@@ -62,7 +62,8 @@ export const paint: Generator = ({ width, height, params, seed }) => {
         const bf = (across * 0.5 + 0.5) * (bristles.length - 1);
         const bi = Math.floor(bf);
         const bt = bf - bi;
-        const bristle = bristles[bi]! + (bristles[Math.min(bristles.length - 1, bi + 1)]! - bristles[bi]!) * bt;
+        const bristle =
+          bristles[bi]! + (bristles[Math.min(bristles.length - 1, bi + 1)]! - bristles[bi]!) * bt;
         const ridge = smoothstep(0.55, 0.9, Math.abs(across)) * 0.25;
         const h = 0.5 + (bristle - 0.5) * bristleAmount * (1.2 - load * 0.6) + ridge;
         const o = row + wrapIndex(x, width);

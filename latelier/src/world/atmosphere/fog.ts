@@ -60,7 +60,7 @@ export function createFogSettings() {
     bulbScatter: uniform(0.0035),
     neonScatter: uniform(0.0016),
     lampScatter: uniform(0.0022),
-    windowScatter: uniform(0.2),
+    windowScatter: uniform(0.17),
     bulbColor: uniform(new THREE.Color(1.0, 0.6, 0.3)),
     neonColor: uniform(new THREE.Color(0.75, 1.0, 0.82)),
     lampColor: uniform(new THREE.Color(0.9, 0.95, 1.0)),
@@ -75,7 +75,9 @@ function pointInscatter(origin: Vec3Node, dir: Vec3Node, len: FloatNode, light: 
   const toLight = light.sub(origin);
   const t0 = dot(toLight, dir);
   const h = sqrt(max(dot(toLight, toLight).sub(t0.mul(t0)), 0.0004));
-  return atan(len.sub(t0).div(h)).sub(atan(t0.negate().div(h))).div(h);
+  return atan(len.sub(t0).div(h))
+    .sub(atan(t0.negate().div(h)))
+    .div(h);
 }
 
 /** Intervalle [t1, t2] où a + t·b ∈ [lo, hi] (b non nul). */
@@ -143,7 +145,9 @@ export function createFogNode(u: WorldUniforms, settings: FogSettings, shaft: Wi
     If(tExit.greaterThan(tEnter).and(active.greaterThan(0.001)), () => {
       const stepLen = tExit.sub(tEnter).div(steps);
       // Bruit de gradient entrelacé (décale les pas d'un pixel à l'autre : pas de bandes).
-      const ign = fract(float(52.9829189).mul(fract(dot(screenCoordinate, vec3(0.06711056, 0.00583715, 0).xy))));
+      const ign = fract(
+        float(52.9829189).mul(fract(dot(screenCoordinate, vec3(0.06711056, 0.00583715, 0).xy))),
+      );
       Loop(steps, ({ i }) => {
         const t = tEnter.add(float(i).add(ign).mul(stepLen));
         const q = c.add(d.mul(t));
@@ -157,20 +161,34 @@ export function createFogNode(u: WorldUniforms, settings: FogSettings, shaft: Wi
           .mul(smoothstep(float(shaft.z[1]), float(shaft.z[1]).sub(soft), qz))
           .mul(smoothstep(float(shaft.y[0]), soft.add(shaft.y[0]), qy))
           .mul(smoothstep(float(shaft.y[1]), float(shaft.y[1]).sub(soft), qy));
-        for (const bz of shaft.barsZ) mask = mask.mul(smoothstep(soft.mul(0.5).add(hw), soft.negate().add(hw).max(0), abs(qz.sub(bz))).oneMinus());
-        for (const by of shaft.barsY) mask = mask.mul(smoothstep(soft.mul(0.5).add(hw), soft.negate().add(hw).max(0), abs(qy.sub(by))).oneMinus());
+        for (const bz of shaft.barsZ)
+          mask = mask.mul(
+            smoothstep(soft.mul(0.5).add(hw), soft.negate().add(hw).max(0), abs(qz.sub(bz))).oneMinus(),
+          );
+        for (const by of shaft.barsY)
+          mask = mask.mul(
+            smoothstep(soft.mul(0.5).add(hw), soft.negate().add(hw).max(0), abs(qy.sub(by))).oneMinus(),
+          );
         const drift = vec3(u.time.mul(0.045), u.time.mul(-0.012), u.time.mul(0.03));
-        const density = valueNoise3(q.mul(2.3).add(drift)).mul(0.65).add(valueNoise3(q.mul(6.1).sub(drift)).mul(0.35));
-        const fade = exp(s.mul(-0.32));
+        const density = valueNoise3(q.mul(2.3).add(drift))
+          .mul(0.65)
+          .add(valueNoise3(q.mul(6.1).sub(drift)).mul(0.35));
+        // Le faisceau « naît » sur les 60 premiers cm (air plus pur contre la vitre froide) :
+        // évite un voile uniforme sur la vue extérieure quand on regarde la fenêtre.
+        const fade = exp(s.mul(-0.32)).mul(smoothstep(0.05, 0.65, s));
         shaftLight.addAssign(mask.mul(density.mul(0.8).add(0.35)).mul(fade));
       });
       shaftLight.mulAssign(stepLen);
     });
-    // Phase de Henyey-Greenstein (g = 0,45), normalisée à 1 pour une diffusion latérale.
-    const g = 0.45;
+    // Phase de Henyey-Greenstein (g = 0,35) : ≈ 0,4 de profil, ≈ 1,6 à contre-jour.
+    const g = 0.35;
     const cosTheta = dot(ld, d.negate());
-    const phase = float((1 - g * g) / 0.25).div(pow(float(1 + g * g).sub(cosTheta.mul(2 * g)), 1.5)).mul(0.15);
-    color = color.add(settings.windowColor.mul(shaftLight.mul(phase).mul(settings.windowScatter).mul(active)));
+    const phase = float((1 - g * g) / 0.25)
+      .div(pow(float(1 + g * g).sub(cosTheta.mul(2 * g)), 1.5))
+      .mul(0.13);
+    color = color.add(
+      settings.windowColor.mul(shaftLight.mul(phase).mul(settings.windowScatter).mul(active)),
+    );
     return vec4(color, output.a);
   })();
 }

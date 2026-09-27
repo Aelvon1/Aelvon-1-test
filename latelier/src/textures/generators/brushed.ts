@@ -13,7 +13,17 @@
  * Paramètres : { streaks?: 320 (cellules en travers), along?: 8 (cellules le long), deep?: 40 }.
  */
 import type { Generator } from './types';
-import { addGradientNoise, addValueNoise, clamp01, drawLine, fbmField, normalize, num, packRGBA, rng } from './field';
+import {
+  addGradientNoise,
+  addValueNoise,
+  clamp01,
+  drawLine,
+  fbmField,
+  normalize,
+  num,
+  packRGBA,
+  rng,
+} from './field';
 
 export const brushed: Generator = ({ width, height, params, seed }) => {
   const across = Math.max(8, Math.round(num(params, 'streaks', 320)));
@@ -42,8 +52,18 @@ export const brushed: Generator = ({ width, height, params, seed }) => {
     const x = rand() * width;
     const length = width * (0.2 + rand() * 0.8);
     const slope = (rand() - 0.5) * 0.01;
-    drawLine(deep, width, height, x, y, x + length, y + length * slope, pxScale * (0.6 + rand()), 0.4 + rand() * 0.6, 'max', (t) =>
-      Math.sin(Math.PI * t),
+    drawLine(
+      deep,
+      width,
+      height,
+      x,
+      y,
+      x + length,
+      y + length * slope,
+      pxScale * (0.6 + rand()),
+      0.4 + rand() * 0.6,
+      'max',
+      (t) => Math.sin(Math.PI * t),
     );
   }
 

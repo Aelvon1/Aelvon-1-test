@@ -12,7 +12,18 @@
  * Approximation : dérivées écran (par bloc de 2×2 pixels) ; au loin le relief fin crénelle un peu
  * (les mipmaps des textures l'atténuent).
  */
-import { abs, cross, dFdx, dFdy, dot, faceDirection, normalView, normalize, positionView, sign } from 'three/tsl';
+import {
+  abs,
+  cross,
+  dFdx,
+  dFdy,
+  dot,
+  faceDirection,
+  normalView,
+  normalize,
+  positionView,
+  sign,
+} from 'three/tsl';
 import type { FloatInput, FloatNode, Vec3Node } from './types';
 
 /** Normale (repère vue) perturbée par `height` × `strength` (m). À affecter à `normalNode`. */

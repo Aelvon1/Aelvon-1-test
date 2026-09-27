@@ -12,7 +12,12 @@
  * - émission pilotable (LED, sources, écran) : `userData.setGlow(v)` (voir `factories/optics.ts`).
  */
 import type * as THREE from 'three/webgpu';
-import { BASE_MATERIAL_IDS, type BaseMaterialId, type MaterialFactoryContext, type MaterialLibrary } from './types';
+import {
+  BASE_MATERIAL_IDS,
+  type BaseMaterialId,
+  type MaterialFactoryContext,
+  type MaterialLibrary,
+} from './types';
 import type { MaterialEnv } from './tsl/surface';
 import { PALETTE } from './palette';
 import {
@@ -76,7 +81,14 @@ export const BASE_RECIPES: Record<BaseMaterialId, Recipe> = {
   'alu.anodized.red': anodized(0x8c2320),
   'alu.anodized.silver': anodized(0xb8bcc2, 0.34),
   'alu.machined': (env, name) =>
-    createBareMetal(env, { name, color: 0xc9ccd0, roughness: 0.28, finish: 'brushed', scratches: 0.35, wear: 0.3 }),
+    createBareMetal(env, {
+      name,
+      color: 0xc9ccd0,
+      roughness: 0.28,
+      finish: 'brushed',
+      scratches: 0.35,
+      wear: 0.3,
+    }),
   'steel.ground': (env, name) => createGroundSteel(env, { name }),
   'steel.blackoxide': (env, name) =>
     createBareMetal(env, {
@@ -101,7 +113,14 @@ export const BASE_RECIPES: Record<BaseMaterialId, Recipe> = {
   'steel.stainless': (env, name) =>
     createBareMetal(env, { name, color: 0xcfd3d8, roughness: 0.18, finish: 'brushed', scratches: 0.25 }),
   'steel.chrome': (env, name) =>
-    createBareMetal(env, { name, color: 0xe6e8ea, roughness: 0.05, scratches: 0.15, fingerprints: 0.6, wear: 0.1 }),
+    createBareMetal(env, {
+      name,
+      color: 0xe6e8ea,
+      roughness: 0.05,
+      scratches: 0.15,
+      fingerprints: 0.6,
+      wear: 0.1,
+    }),
   'steel.electrical': (env, name) =>
     createBareMetal(env, {
       name,
@@ -147,7 +166,12 @@ export const BASE_RECIPES: Record<BaseMaterialId, Recipe> = {
     }),
   nickel: (env, name) => createBareMetal(env, { name, color: 0xc9c6bd, roughness: 0.22, scratches: 0.15 }),
   brass: (env, name) =>
-    createBareMetal(env, { name, color: 0xc9a04a, roughness: 0.3, tarnish: { color: 0x5a4a22, amount: 0.35 } }),
+    createBareMetal(env, {
+      name,
+      color: 0xc9a04a,
+      roughness: 0.3,
+      tarnish: { color: 0x5a4a22, amount: 0.35 },
+    }),
   gold: (env, name) =>
     createBareMetal(env, {
       name,
@@ -183,7 +207,14 @@ export const BASE_RECIPES: Record<BaseMaterialId, Recipe> = {
       dirt: 0.05,
     }),
   'solder.flux': (env, name) =>
-    createResin(env, { name, color: 0xc98a3a, transmission: 0.7, thickness: 0.0003, roughness: 0.12, scale: 300 }),
+    createResin(env, {
+      name,
+      color: 0xc98a3a,
+      transmission: 0.7,
+      thickness: 0.0003,
+      roughness: 0.12,
+      scale: 300,
+    }),
   // --- Non-métaux techniques ---
   'fiber.glass': (env, name) => createWovenComposite(env, { name, kind: 'glass' }),
   'fiber.carbon': (env, name) => createWovenComposite(env, { name, kind: 'carbon' }),

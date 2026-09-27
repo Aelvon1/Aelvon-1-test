@@ -4,11 +4,14 @@
  */
 import type { ObjectDef } from '../types';
 import { OBJECT_ID } from './constants';
+import { markingKeys, markingMaterials, markingRequest, MARKINGS } from './markings';
+import { miscMaterials } from './misc';
 import { DEFAULT_PARAMS, type UnoParams } from './params';
+import { allParts } from './parts';
 import { artworkKey } from './pcb/artwork';
 import { artworkTexture, pcbMaterials } from './pcb/materials';
-import { pcbParts } from './pcb/parts';
 import { computeRoutingAsync } from './pcb/routing';
+import { STEPS } from './sequence';
 
 const def: ObjectDef<UnoParams> = {
   id: OBJECT_ID,
@@ -28,9 +31,9 @@ const def: ObjectDef<UnoParams> = {
     },
   ],
   defaultParams: DEFAULT_PARAMS,
-  parts: () => [...pcbParts()],
-  steps: [],
-  materials: { ...pcbMaterials() },
+  parts: allParts,
+  steps: STEPS,
+  materials: { ...pcbMaterials(), ...markingMaterials(), ...miscMaterials() },
   removedPlacement: 'park',
   presentation: { rotationY: 0, viewDirection: [0.25, 0.8, 0.9], minSurfaceDistance: 0.0015 },
   prepare: async (ctx) => {
@@ -42,7 +45,17 @@ const def: ObjectDef<UnoParams> = {
       artworkTexture(ctx, face, ctx.quality);
       keys.push(artworkKey(face, ctx.quality));
     }
-    await Promise.all(keys.map((k) => ctx.textures.ready(k)));
+    // Marquages des composants (demandés ici pour être prêts avant l'affichage).
+    for (const id of Object.keys(MARKINGS)) ctx.textures.get(markingRequest(id, ctx.quality));
+    keys.push(...markingKeys(ctx.quality));
+    let done = 0;
+    await Promise.all(
+      keys.map((k) =>
+        ctx.textures
+          .ready(k)
+          .then(() => ctx.progress(0.75 + (0.25 * ++done) / keys.length, 'Illustration du circuit…')),
+      ),
+    );
     ctx.progress(1);
   },
 };

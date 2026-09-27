@@ -77,7 +77,7 @@ export function fresnelTerm(power = 2): FloatNode {
 export function addHighlight(material: THREE.Material, amount: FloatNode): void {
   const m = material as StandardLike;
   const base = m.emissiveNode ? (m.emissiveNode as Vec3Node) : materialEmissive;
-  const glow = vec3(1.0, 0.62, 0.25).mul(fresnelTerm(1.5).mul(0.55).add(0.06)).mul(amount);
+  const glow = vec3(1.0, 0.62, 0.25).mul(fresnelTerm(3).mul(0.3).add(0.022)).mul(amount);
   m.emissiveNode = base.add(glow);
   m.needsUpdate = true;
 }
@@ -158,7 +158,9 @@ export class WorldMaterials {
     f.set('world.joist', () => {
       const m = this.variant('wood.bench', 'world.joist');
       const g = texture(this.grunge, uv().mul(0.6));
-      m.colorNode = baseColorOf(m).mul(vec3(0.62, 0.55, 0.5)).mul(float(1).sub(g.r.mul(0.25)));
+      m.colorNode = baseColorOf(m)
+        .mul(vec3(0.62, 0.55, 0.5))
+        .mul(float(1).sub(g.r.mul(0.25)));
       m.roughnessNode = clamp(baseRoughnessOf(m).add(0.15), 0, 1);
       return m;
     });
@@ -205,7 +207,7 @@ export class WorldMaterials {
       this.paintedWood({ paint: 0x3b2c22, primer: 0x8e7a62, wood: 0x6f5134, chip: 0.02, roughness: 0.55 }),
     );
     f.set('world.paint.teal', () =>
-      this.paintedMetal({ paint: 0x1f4a55, primer: 0x8a6a5a, chip: 0.0, roughness: 0.5 }),
+      this.paintedMetal({ paint: 0x3f7d8c, primer: 0x8a6a5a, chip: 0.02, roughness: 0.42 }),
     );
     f.set('world.paint.orange', () =>
       this.paintedMetal({ paint: 0xb4541e, primer: 0x3a3a38, chip: -0.04, roughness: 0.42 }),
@@ -237,9 +239,7 @@ export class WorldMaterials {
       });
       // Verre ambré légèrement dépoli par la chaleur : lueur interne proportionnelle à la puissance.
       m.opacityNode = float(0.22).add(this.u.bulb.mul(0.3));
-      m.emissiveNode = vec3(1.0, 0.62, 0.3)
-        .mul(this.u.bulb.mul(2.2))
-        .mul(fresnelTerm(1.2).mul(0.6).add(0.4));
+      m.emissiveNode = vec3(1.0, 0.62, 0.3).mul(this.u.bulb.mul(2.2)).mul(fresnelTerm(1.2).mul(0.6).add(0.4));
       return m;
     });
     f.set('world.neon.tube', () => {
@@ -273,7 +273,7 @@ export class WorldMaterials {
     f.set('world.pilot.orange', () => {
       const m = new THREE.MeshStandardNodeMaterial({ color: 0x5a2a10, roughness: 0.25 });
       // Voyant de repérage : allumé quand l'éclairage est coupé (retrouver l'interrupteur dans le noir).
-      m.emissiveNode = vec3(1.0, 0.35, 0.06).mul(float(1).sub(this.u.bulb).mul(3.5).add(0.25));
+      m.emissiveNode = vec3(1.0, 0.3, 0.04).mul(float(1).sub(this.u.bulb).mul(1.3).add(0.12));
       return m;
     });
     f.set('world.pilot.red', () => {
@@ -364,7 +364,11 @@ export class WorldMaterials {
     const dz = min(p.z.sub(ROOM.minZ), float(ROOM.maxZ).sub(p.z));
     const edge = smoothstep(0.4, 0.0, min(dx, dz).add(g.r.sub(0.5).mul(0.25)));
     const doorX = (DOOR.x[0] + DOOR.x[1]) / 2;
-    const path = smoothstep(0.6, 0.1, distToSegment(p.xz, [doorX, DOOR.z - 0.3], [-0.6, -0.95]).add(g.g.mul(0.2)));
+    const path = smoothstep(
+      0.6,
+      0.1,
+      distToSegment(p.xz, [doorX, DOOR.z - 0.3], [-0.6, -0.95]).add(g.g.mul(0.2)),
+    );
     const underBench = step(p.z, BENCH.z[1] - 0.02)
       .mul(smoothstep(BENCH.x[0] - 0.1, BENCH.x[0] + 0.1, p.x))
       .mul(smoothstep(BENCH.x[1] + 0.1, BENCH.x[1] - 0.1, p.x));
@@ -380,15 +384,26 @@ export class WorldMaterials {
     const m = this.variant('wood.plywood', 'world.ceiling');
     const p = positionWorld;
     const g = texture(this.grunge, uv().mul(0.5).add(0.11));
-    const soot = smoothstep(0.7, 0.0, length(p.xz.sub(vec2(SPOTS.pendantBulb[0], SPOTS.pendantBulb[2]))))
-      .mul(g.r.mul(0.4).add(0.6));
+    const soot = smoothstep(0.7, 0.0, length(p.xz.sub(vec2(SPOTS.pendantBulb[0], SPOTS.pendantBulb[2])))).mul(
+      g.r.mul(0.4).add(0.6),
+    );
     const ring = (cx: number, cz: number, r: number): FloatNode => {
-      const d = length(p.xz.sub(vec2(cx, cz))).add(fbm2(p.xz.mul(5), 3).sub(0.5).mul(r * 0.6));
+      const d = length(p.xz.sub(vec2(cx, cz))).add(
+        fbm2(p.xz.mul(5), 3)
+          .sub(0.5)
+          .mul(r * 0.6),
+      );
       const edgeRing = smoothstep(0.035, 0.0, abs(d.sub(r)));
       const inside = smoothstep(r, r * 0.6, d).mul(0.35);
       return edgeRing.add(inside);
     };
-    const water = clamp(ring(1.3, 0.9, 0.34).add(ring(-1.7, 1.25, 0.22)).add(ring(0.6, -1.5, 0.18)), 0, 1);
+    const water = clamp(
+      ring(1.3, 0.9, 0.34)
+        .add(ring(-1.7, 1.25, 0.22))
+        .add(ring(0.6, -1.5, 0.18)),
+      0,
+      1,
+    );
     const dx = min(p.x.sub(ROOM.minX), float(ROOM.maxX).sub(p.x));
     const dz = min(p.z.sub(ROOM.minZ), float(ROOM.maxZ).sub(p.z));
     const corner = smoothstep(0.35, 0.0, min(dx, dz));
@@ -432,13 +447,22 @@ export class WorldMaterials {
     m.maskNode = d.greaterThan(radius).or(far.greaterThan(0.5));
     const ring = smoothstep(radius * 2.4, radius, d).mul(0.3);
     const g = texture(this.grunge, uv().mul(0.9));
-    const tint = float(1).sub(ring.mul(float(1).sub(far))).sub(far.mul(0.12)).sub(g.r.mul(0.15));
+    const tint = float(1)
+      .sub(ring.mul(float(1).sub(far)))
+      .sub(far.mul(0.12))
+      .sub(g.r.mul(0.15));
     m.colorNode = baseColorOf(m).mul(tint);
     return m;
   }
 
   /** Peinture sur bois, appliquée à la main, écaillée aux arêtes (sous-couche puis bois nu). */
-  private paintedWood(o: { paint: number; primer: number; wood: number; chip: number; roughness: number }): StandardLike {
+  private paintedWood(o: {
+    paint: number;
+    primer: number;
+    wood: number;
+    chip: number;
+    roughness: number;
+  }): StandardLike {
     const m = new THREE.MeshStandardNodeMaterial({ roughness: o.roughness, metalness: 0 });
     const t = texture(this.paint, uv().mul(1.6));
     const g = texture(this.grunge, uv().mul(0.8).add(0.21));
@@ -447,14 +471,13 @@ export class WorldMaterials {
     const score = t.a.mul(0.55).add(wear.mul(0.6));
     const primerMask = smoothstep(0.6, 0.63, score);
     const woodMask = smoothstep(0.68, 0.71, score);
-    const paint = rgb(o.paint)
-      .mul(t.g.mul(0.22).add(0.89))
-      .mul(t.b.mul(0.12).add(0.94))
-      .add(edge.mul(0.035));
+    const paint = rgb(o.paint).mul(t.g.mul(0.22).add(0.89)).mul(t.b.mul(0.12).add(0.94)).add(edge.mul(0.035));
     const wood = rgb(o.wood).mul(g.g.mul(0.4).add(0.8));
     const color = mix(mix(paint, rgb(o.primer), primerMask), wood, woodMask);
     m.colorNode = color.mul(float(1).sub(g.r.mul(0.22)));
-    m.roughnessNode = mix(mix(float(o.roughness), float(0.72), primerMask), float(0.82), woodMask).add(g.g.mul(0.06));
+    m.roughnessNode = mix(mix(float(o.roughness), float(0.72), primerMask), float(0.82), woodMask).add(
+      g.g.mul(0.06),
+    );
     m.normalNode = bumpMap(texture(this.paint, uv().mul(1.6)), float(0.35).mul(float(1).sub(woodMask)));
     return m;
   }
@@ -468,9 +491,7 @@ export class WorldMaterials {
     const score = t.a.mul(0.5).add(edge.mul(0.62)).add(g.a.mul(0.22)).add(o.chip);
     const primerMask = smoothstep(0.62, 0.65, score);
     const metalMask = smoothstep(0.7, 0.73, score);
-    const paint = rgb(o.paint)
-      .mul(t.g.mul(0.2).add(0.9))
-      .add(edge.mul(0.05));
+    const paint = rgb(o.paint).mul(t.g.mul(0.2).add(0.9)).add(edge.mul(0.05));
     const bare = mix(vec3(0.55, 0.55, 0.53), vec3(0.36, 0.2, 0.1), g.r.mul(0.7));
     const color = mix(mix(paint, rgb(o.primer), primerMask), bare, metalMask);
     m.colorNode = color.mul(float(1).sub(g.r.mul(0.18)));

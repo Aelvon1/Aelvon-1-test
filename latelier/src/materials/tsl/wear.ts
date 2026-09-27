@@ -37,7 +37,9 @@ export function surfaceCurvature(): FloatNode {
   const dny = dFdy(n);
   const dpx = dFdx(p);
   const dpy = dFdy(p);
-  return dot(dnx, dpx).add(dot(dny, dpy)).div(max(dot(dpx, dpx).add(dot(dpy, dpy)), 1e-20));
+  return dot(dnx, dpx)
+    .add(dot(dny, dpy))
+    .div(max(dot(dpx, dpx).add(dot(dpy, dpy)), 1e-20));
 }
 
 /**
@@ -58,7 +60,10 @@ export function cavityMask(radius = 0.004): FloatNode {
     const hasCavity = geometry.hasAttribute('cavity');
     const hasOcclusion = geometry.hasAttribute('occlusion');
     if (hasCavity && hasOcclusion) {
-      return max(attribute<'float'>('cavity', 'float'), float(1).sub(attribute<'float'>('occlusion', 'float')));
+      return max(
+        attribute<'float'>('cavity', 'float'),
+        float(1).sub(attribute<'float'>('occlusion', 'float')),
+      );
     }
     if (hasCavity) return attribute<'float'>('cavity', 'float');
     if (hasOcclusion) return float(1).sub(attribute<'float'>('occlusion', 'float'));
@@ -71,7 +76,12 @@ export function cavityMask(radius = 0.004): FloatNode {
  * l'usure gagne des arêtes vers les faces (quelques éclats isolés sur les faces planes au-delà de
  * 0,7). `breakup` : bruit 0..1 (canal A de `grunge` ou `paint`).
  */
-export function wearMask(mask: FloatNode, amount: FloatInput, breakup: FloatNode, softness = 0.06): FloatNode {
+export function wearMask(
+  mask: FloatNode,
+  amount: FloatInput,
+  breakup: FloatNode,
+  softness = 0.06,
+): FloatNode {
   const threshold = float(1).sub(amount);
   const value = mask.mul(breakup.mul(1.2).add(0.4)).add(breakup.mul(0.25));
   return smoothstep(threshold.sub(softness), threshold.add(softness), value);

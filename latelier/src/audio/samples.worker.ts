@@ -15,8 +15,7 @@ import {
 import { mulberry32 } from './math';
 
 export type SampleRequest =
-  | { kind: 'shared'; id: SharedSampleId; sampleRate: number }
-  | { kind: 'impulse'; sampleRate: number };
+  { kind: 'shared'; id: SharedSampleId; sampleRate: number } | { kind: 'impulse'; sampleRate: number };
 
 export type SampleResponse =
   | { kind: 'shared'; id: SharedSampleId; sampleRate: number; channels: Float32Array[] }

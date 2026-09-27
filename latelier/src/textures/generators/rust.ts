@@ -26,7 +26,8 @@ export const rust: Generator = ({ width, height, params, seed }) => {
   const cells = worleyField(width, height, Math.round(scale * 30), seed + 3, 0.9);
   const pits = new Float32Array(width * height);
   for (let i = 0; i < pits.length; i++) {
-    pits[i] = cells.id[i]! < pitDensity * 0.5 ? smoothstep(0.35, 0.05, cells.f1[i]!) * (0.4 + cells.id[i]!) : 0;
+    pits[i] =
+      cells.id[i]! < pitDensity * 0.5 ? smoothstep(0.35, 0.05, cells.f1[i]!) * (0.4 + cells.id[i]!) : 0;
   }
 
   const hue = fbmField(width, height, { scale: scale * 3, octaves: 5, persistence: 0.6, seed: seed + 4 });

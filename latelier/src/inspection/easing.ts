@@ -6,7 +6,8 @@
 export const clamp01 = (u: number): number => (u <= 0 ? 0 : u >= 1 ? 1 : u);
 
 /** Progression locale de `u` dans l'intervalle [a, b], bornée à [0, 1]. */
-export const segment = (u: number, a: number, b: number): number => (b <= a ? (u >= b ? 1 : 0) : clamp01((u - a) / (b - a)));
+export const segment = (u: number, a: number, b: number): number =>
+  b <= a ? (u >= b ? 1 : 0) : clamp01((u - a) / (b - a));
 
 export const easeInOutCubic = (u: number): number => {
   const t = clamp01(u);

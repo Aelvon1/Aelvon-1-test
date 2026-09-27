@@ -76,11 +76,16 @@ describe('bibliothèque de matériaux', () => {
 
   it('les surcharges de variante agissent sur les propriétés lues par les nœuds', () => {
     const { library } = createLibrary();
-    const v = library.variant('plastic.black', { color: 0xff0000, roughness: 0.2 }) as THREE.MeshPhysicalNodeMaterial;
+    const v = library.variant('plastic.black', {
+      color: 0xff0000,
+      roughness: 0.2,
+    }) as THREE.MeshPhysicalNodeMaterial;
     expect(v.color.r).toBeGreaterThan(0.9);
     expect(v.roughness).toBe(0.2);
     // Une carte de normales explicite remplace le relief procédural.
-    const n = library.variant('plastic.black', { normalMap: new THREE.Texture() }) as THREE.MeshPhysicalNodeMaterial;
+    const n = library.variant('plastic.black', {
+      normalMap: new THREE.Texture(),
+    }) as THREE.MeshPhysicalNodeMaterial;
     expect(n.normalNode).toBeNull();
     expect((library.get('plastic.black') as THREE.MeshPhysicalNodeMaterial).normalNode).not.toBeNull();
   });

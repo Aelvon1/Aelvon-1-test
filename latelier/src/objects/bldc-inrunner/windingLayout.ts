@@ -164,7 +164,10 @@ export function buildWindingLayout(d: BldcDims, quality: 0 | 1 | 2 | 3 = 2): Win
   const pack = packSlot({ ...st, slot0: 0 }, st.liner, conductors, nS, w.strandOuterD / 2, side);
   const rs = pack.radius;
   // Faisceau rond d'un conducteur dans les têtes de bobines (brins jointifs).
-  const round: P2[] = w.strandOffsets.map(([a, b]) => [(a * rs) / (w.strandOuterD / 2), (b * rs) / (w.strandOuterD / 2)]);
+  const round: P2[] = w.strandOffsets.map(([a, b]) => [
+    (a * rs) / (w.strandOuterD / 2),
+    (b * rs) / (w.strandOuterD / 2),
+  ]);
   const rb = round.reduce((m, p) => Math.max(m, Math.hypot(p[0], p[1])), 0) + rs;
   const req = rs * Math.sqrt(nS) * 1.05;
 
@@ -197,7 +200,8 @@ export function buildWindingLayout(d: BldcDims, quality: 0 | 1 | 2 | 3 = 2): Win
   const budget = d.webX - half - 0.3;
   const runBase = 0.3 * d.s + rb;
   const rowsMax = Math.max(1, Math.floor((budget - 0.4 * d.s - 4.3 * rb) / (2.04 * rb)) + 1);
-  const radialRoom = sp.kind === 'concentrated' ? st.Rsb - st.Ri - st.tipHeight - st.wedgeHeight : 0.5 * (st.Ro - st.Ri);
+  const radialRoom =
+    sp.kind === 'concentrated' ? st.Rsb - st.Ri - st.tipHeight - st.wedgeHeight : 0.5 * (st.Ro - st.Ri);
   const colsMax = Math.max(1, Math.floor(radialRoom / (2 * rb)));
   const cols = Math.min(colsMax, Math.max(1, Math.ceil(conductors / rowsMax)));
   const cell = (k: number) => {
@@ -206,7 +210,8 @@ export function buildWindingLayout(d: BldcDims, quality: 0 | 1 | 2 | 3 = 2): Win
     return { rho: (col - (cols - 1) / 2) * 2 * rb * 1.02, h: row * 2 * rb * 1.02 };
   };
   const tRun = cols * 2 * rb;
-  const rIn = st.Ri + 0.25 + tRun / 2;
+  // Bord intérieur des nappes : au-dessus de l'alésage, et au-delà des capteurs Hall s'il y en a.
+  const rIn = Math.max(st.Ri + 0.25, d.params.sensors ? d.hall.r1 + 0.3 : 0) + tRun / 2;
   const rOut = st.Ro - 0.35 - tRun / 2;
   const rows = Math.ceil(conductors / cols);
   const runTop = runBase + (rows - 1) * 2 * rb * 1.02 + rb;
@@ -350,13 +355,19 @@ export function buildWindingLayout(d: BldcDims, quality: 0 | 1 | 2 | 3 = 2): Win
     ordered.forEach((coil, ci) => {
       const go = sideOf(coil, 'go');
       const ret = sideOf(coil, 'ret');
-      const dTheta = sp.kind === 'concentrated' ? (2 * Math.PI) / sp.slots : (spanSlots * 2 * Math.PI) / sp.slots;
+      const dTheta =
+        sp.kind === 'concentrated' ? (2 * Math.PI) / sp.slots : (spanSlots * 2 * Math.PI) / sp.slots;
       if (ci > 0) {
         // Liaison depuis la sortie de la bobine précédente.
         const target = conductorAt(go, 0);
         ascend(last, current);
         linkArc(current, linkR, linkH, last.angle, shortest(last.angle, target.angle));
-        samples.push({ p: point(current * (half + linkH), linkR, target.angle), theta: target.angle, w: 1, slot: null });
+        samples.push({
+          p: point(current * (half + linkH), linkR, target.angle),
+          theta: target.angle,
+          w: 1,
+          slot: null,
+        });
         descend(target, current);
       }
       for (let m = 0; m < passes; m++) {
@@ -380,7 +391,12 @@ export function buildWindingLayout(d: BldcDims, quality: 0 | 1 | 2 | 3 = 2): Win
       // Côté de sortie de la bobine.
       current = passes % 2 === 1 ? (-current as 1 | -1) : current;
       // Point de sortie (face du paquet) : fin du dernier passage.
-      samples.push({ p: point(current * half, last.R, last.angle, last.lat), theta: last.angle, w: 0, slot: last.offsets });
+      samples.push({
+        p: point(current * half, last.R, last.angle, last.lat),
+        theta: last.angle,
+        w: 0,
+        slot: last.offsets,
+      });
     });
 
     // --- Liaison au point neutre : épissure dans une gaine, fils entrant par ses deux bouts ------
@@ -397,12 +413,18 @@ export function buildWindingLayout(d: BldcDims, quality: 0 | 1 | 2 | 3 = 2): Win
     ][phase]! as [number, number];
     const inside: V3[] = [
       point(current * (half + linkH), linkR, endTheta),
-      point(current * (half + linkH + lane[1] * rb), linkR + lane[0] * rb, endTheta + dir * (sleeveLen * 0.3) / linkR),
-      point(current * (half + linkH + lane[1] * rb), linkR + lane[0] * rb, thetaN - dir * 0.15 / linkR),
+      point(
+        current * (half + linkH + lane[1] * rb),
+        linkR + lane[0] * rb,
+        endTheta + (dir * (sleeveLen * 0.3)) / linkR,
+      ),
+      point(current * (half + linkH + lane[1] * rb), linkR + lane[0] * rb, thetaN - (dir * 0.15) / linkR),
     ];
     for (const p of catmullRom(inside, q.step)) samples.push({ p, theta: cyl(p).theta, w: 1, slot: null });
 
-    phases.push(finalizePhase(phase, samples, nS, round, rs, rb, req, tailEnd, sleeveEnd, neutralStart, neutralSide));
+    phases.push(
+      finalizePhase(phase, samples, nS, round, rs, rb, req, tailEnd, sleeveEnd, neutralStart, neutralSide),
+    );
   }
 
   // Point neutre : gaine tangentielle posée au sommet des têtes de bobines.

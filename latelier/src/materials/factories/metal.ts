@@ -78,7 +78,11 @@ export interface BareMetalOptions extends MappingOptions, CommonOptions {
 }
 
 export function createBareMetal(env: MaterialEnv, o: BareMetalOptions): THREE.MeshPhysicalNodeMaterial {
-  const kit = new SurfaceKit(env, { space: o.space ?? 'local', scale: o.scale ?? 25, sharpness: o.sharpness });
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'local',
+    scale: o.scale ?? 25,
+    sharpness: o.sharpness,
+  });
   const m = physical(o.name, {
     color: o.color,
     roughness: o.roughness ?? 0.3,
@@ -222,7 +226,10 @@ export interface GroundSteelOptions extends CommonOptions {
  * Les stries de rectification suivant la circonférence (u), le reflet est étiré le long de
  * l'axe : rotation π/2 (option `grain: 'v'` pour une géométrie à UV transposées).
  */
-export function createGroundSteel(env: MaterialEnv, o: GroundSteelOptions = {}): THREE.MeshPhysicalNodeMaterial {
+export function createGroundSteel(
+  env: MaterialEnv,
+  o: GroundSteelOptions = {},
+): THREE.MeshPhysicalNodeMaterial {
   const kit = new SurfaceKit(env, { space: 'local', scale: 25, ...o.mapping });
   const grain = o.grain ?? 'u';
   const m = physical(o.name, {
@@ -237,7 +244,9 @@ export function createGroundSteel(env: MaterialEnv, o: GroundSteelOptions = {}):
   const streaks = grain === 'u' ? kit.sampleUV('brushed', ru, rv) : kit.sampleUV('brushed', rv, ru);
   const grunge = kit.grunge();
   const prints = fingerprintMask(grunge, o.fingerprints ?? 0.3);
-  const color = materialColor.mul(streaks.r.sub(0.5).mul(0.12).add(1)).mul(streaks.a.sub(0.5).mul(0.08).add(1));
+  const color = materialColor
+    .mul(streaks.r.sub(0.5).mul(0.12).add(1))
+    .mul(streaks.a.sub(0.5).mul(0.08).add(1));
   const roughness = materialRoughness.add(streaks.r.sub(0.5).mul(0.1)).add(streaks.b.mul(0.12));
   m.colorNode = color;
   m.roughnessNode = clampRoughness(smudgeRoughness(roughness, prints));
@@ -290,7 +299,7 @@ export function createPaintedMetal(env: MaterialEnv, o: PaintedMetalOptions): TH
   const paint = kit.sample('paint');
   const grunge = kit.grunge();
   const rust = kit.sample('rust', 0.8);
-  const scratch = kit.sample('scratches', 1.5);
+  const scratch = kit.sample('scratches', 3);
   const radius = o.edgeRadius ?? 0.008;
   const edges = edgeMask(radius);
   const cavity = cavityMask(radius);
@@ -314,13 +323,21 @@ export function createPaintedMetal(env: MaterialEnv, o: PaintedMetalOptions): TH
   roughness = mix(roughness, float(0.32), bare);
 
   // Rayures traversant la peinture : lignes claires et métalliques.
-  const scratchLine = saturate(scratch.r.mul(wear * 1.3));
-  color = mix(color, metal, scratchLine.mul(0.7));
+  // Rayures : quelques-unes traversent jusqu'au métal, la plupart ne marquent que la peinture.
+  const scratchLine = saturate(scratch.r.mul(wear * 0.9).mul(grunge.a.mul(1.2).add(0.2)));
+  const scuff = saturate(scratch.g.mul(wear * 0.8));
+  color = mix(color, metal, scratchLine.mul(0.55));
+  color = color.mul(scuff.mul(0.12).add(1));
   let metalness: FloatNode = max(bare, scratchLine.mul(0.8));
   roughness = mix(roughness, float(0.4), scratchLine);
 
   // Rouille : recoins, éclats, arêtes.
-  const rusty = rustMask({ coverage: rust.r, cavity: max(cavity, bare.mul(0.8)), edges: chip, amount: o.rust ?? 0.3 });
+  const rusty = rustMask({
+    coverage: rust.r,
+    cavity: max(cavity, bare.mul(0.8)),
+    edges: chip,
+    amount: o.rust ?? 0.3,
+  });
   color = mix(color, rustColor(rust.b, rust.g), rusty);
   roughness = mix(roughness, float(0.9), rusty);
   metalness = metalness.mul(float(1).sub(rusty));
@@ -364,7 +381,10 @@ export interface GalvanizedOptions extends MappingOptions, CommonOptions {
 }
 
 /** Tôle galvanisée : fleurs de zinc (cellules de reflets inégaux), rouille blanche, crasse. */
-export function createGalvanized(env: MaterialEnv, o: GalvanizedOptions = {}): THREE.MeshPhysicalNodeMaterial {
+export function createGalvanized(
+  env: MaterialEnv,
+  o: GalvanizedOptions = {},
+): THREE.MeshPhysicalNodeMaterial {
   const kit = new SurfaceKit(env, { space: o.space ?? 'world', scale: o.scale ?? 4, sharpness: o.sharpness });
   const m = physical(o.name, { color: o.color ?? 0x9ea4a6, roughness: o.roughness ?? 0.4, metalness: 1 });
   // Fleurage : canal A de `rust` (cellules) détourné comme motif cristallin.
@@ -374,7 +394,12 @@ export function createGalvanized(env: MaterialEnv, o: GalvanizedOptions = {}): T
   const spangle = cells.a.sub(0.35).mul(1.4);
   let color: Vec3Node = materialColor.mul(spangle.mul(0.18).add(1));
   let roughness: FloatNode = materialRoughness.add(spangle.mul(0.2)).add(cells.b.sub(0.5).mul(0.1));
-  const white = saturate(cavity.mul(0.8).add(smoothstep(0.55, 0.9, grunge.r).mul(0.6)).mul(o.whiteRust ?? 0.4));
+  const white = saturate(
+    cavity
+      .mul(0.8)
+      .add(smoothstep(0.55, 0.9, grunge.r).mul(0.6))
+      .mul(o.whiteRust ?? 0.4),
+  );
   color = mix(color, vec3(0.62, 0.63, 0.6), white);
   roughness = mix(roughness, float(0.9), white);
   const dirt = dirtMask(grunge, cavity, o.dirt ?? 0.3);
@@ -399,7 +424,10 @@ export interface RustyMetalOptions extends MappingOptions, CommonOptions {
 }
 
 /** Métal très rouillé : calamine sombre, rouille orange feuilletée, restes de peinture. */
-export function createRustyMetal(env: MaterialEnv, o: RustyMetalOptions = {}): THREE.MeshPhysicalNodeMaterial {
+export function createRustyMetal(
+  env: MaterialEnv,
+  o: RustyMetalOptions = {},
+): THREE.MeshPhysicalNodeMaterial {
   const kit = new SurfaceKit(env, { space: o.space ?? 'world', scale: o.scale ?? 3, sharpness: o.sharpness });
   const m = physical(o.name, { color: 0x6e4128, roughness: 0.85, metalness: 0.4 });
   const rust = kit.sample('rust');

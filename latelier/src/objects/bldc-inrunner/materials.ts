@@ -99,8 +99,12 @@ function braidedSleeve(tint: number): MaterialFactory {
     m.name = 'Gaine tressée';
     const U = uv().x.mul(24);
     const V = uv().y.mul(3.2);
-    const braid = sin(U.add(V).mul(Math.PI)).mul(sin(U.sub(V).mul(Math.PI))).mul(0.12);
-    m.colorNode = vec3(new THREE.Color(tint).r, new THREE.Color(tint).g, new THREE.Color(tint).b).mul(float(0.9).add(braid));
+    const braid = sin(U.add(V).mul(Math.PI))
+      .mul(sin(U.sub(V).mul(Math.PI)))
+      .mul(0.12);
+    m.colorNode = vec3(new THREE.Color(tint).r, new THREE.Color(tint).g, new THREE.Color(tint).b).mul(
+      float(0.9).add(braid),
+    );
     return m;
   };
 }

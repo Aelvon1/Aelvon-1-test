@@ -84,7 +84,11 @@ function orient(size: THREE.Vector3, forced: Vec3 | undefined): Oriented {
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(forced[0], forced[1], forced[2], 'XYZ'));
     const box = new THREE.Box3();
     for (let i = 0; i < 8; i++) {
-      _corner.set(i & 1 ? size.x / 2 : -size.x / 2, i & 2 ? size.y / 2 : -size.y / 2, i & 4 ? size.z / 2 : -size.z / 2);
+      _corner.set(
+        i & 1 ? size.x / 2 : -size.x / 2,
+        i & 2 ? size.y / 2 : -size.y / 2,
+        i & 4 ? size.z / 2 : -size.z / 2,
+      );
       box.expandByPoint(_corner.applyQuaternion(q));
     }
     const e = box.getSize(new THREE.Vector3());
@@ -173,12 +177,16 @@ function buildPlan(entries: Entry[], region: Parameters<typeof layoutKnolling>[1
     const cx = (slot.footprint.minX + slot.footprint.maxX) / 2;
     const cz = (slot.footprint.minZ + slot.footprint.maxZ) / 2;
     const dy = inside(cx, cz, mat) ? 0 : -benchDrop;
-    const matrices = slot.instances.map((p) => targetMatrix([p[0], p[1] + dy, p[2]], e.oriented.quaternion, e.scale, e.boxCenter));
+    const matrices = slot.instances.map((p) =>
+      targetMatrix([p[0], p[1] + dy, p[2]], e.oriented.quaternion, e.scale, e.boxCenter),
+    );
     if (e.part.instanced) plan.instanceTargets.set(e.part.id, matrices);
     else plan.targets.set(e.part.id, matrices[0]!);
     const height = e.item.size[1] * (e.item.layout === 'stack' ? e.item.count : 1);
     plan.bounds.expandByPoint(_center.set(slot.footprint.minX, MAT.center[1] + dy, slot.footprint.minZ));
-    plan.bounds.expandByPoint(_center.set(slot.footprint.maxX, MAT.center[1] + dy + height, slot.footprint.maxZ));
+    plan.bounds.expandByPoint(
+      _center.set(slot.footprint.maxX, MAT.center[1] + dy + height, slot.footprint.maxZ),
+    );
     if (e.part.def.label !== false)
       plan.labels.push({
         partId: e.part.id,
@@ -235,7 +243,11 @@ export function planKnolling(assembly: Assembly, graph: DisassemblyGraph): Place
  * Plan de rangement des pièces retirées : pièces retirables (sous-arbre compris), rangées autour
  * de l'emprise `objectFootprint` (monde) de l'objet au repos.
  */
-export function planParking(assembly: Assembly, graph: DisassemblyGraph, objectFootprint: THREE.Box3): PlacementPlan {
+export function planParking(
+  assembly: Assembly,
+  graph: DisassemblyGraph,
+  objectFootprint: THREE.Box3,
+): PlacementPlan {
   const entries: Entry[] = [];
   for (const part of assembly.order) {
     if (!part.def.removal) continue;
@@ -245,7 +257,8 @@ export function planParking(assembly: Assembly, graph: DisassemblyGraph, objectF
   const declIndex = new Map(assembly.order.map((p, i) => [p.id, i] as const));
   entries.sort(
     (a, b) =>
-      stepRank(graph, a.part.id) - stepRank(graph, b.part.id) || declIndex.get(a.part.id)! - declIndex.get(b.part.id)!,
+      stepRank(graph, a.part.id) - stepRank(graph, b.part.id) ||
+      declIndex.get(a.part.id)! - declIndex.get(b.part.id)!,
   );
   const keepOut: Rect[] = [...BENCH_OBSTACLES];
   if (!objectFootprint.isEmpty()) {

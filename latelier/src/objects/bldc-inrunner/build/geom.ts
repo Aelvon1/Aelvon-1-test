@@ -136,10 +136,22 @@ export class MeshBuilder {
 /** Matrice d'un repère : origine + axes (colonnes). */
 export function basis(origin: V3, xAxis: V3, yAxis: V3, zAxis: V3): THREE.Matrix4 {
   return new THREE.Matrix4().set(
-    xAxis[0], yAxis[0], zAxis[0], origin[0],
-    xAxis[1], yAxis[1], zAxis[1], origin[1],
-    xAxis[2], yAxis[2], zAxis[2], origin[2],
-    0, 0, 0, 1,
+    xAxis[0],
+    yAxis[0],
+    zAxis[0],
+    origin[0],
+    xAxis[1],
+    yAxis[1],
+    zAxis[1],
+    origin[1],
+    xAxis[2],
+    yAxis[2],
+    zAxis[2],
+    origin[2],
+    0,
+    0,
+    0,
+    1,
   );
 }
 
@@ -165,6 +177,8 @@ export interface RevolveOptions {
   sweep?: number;
   /** Échelle des u (1 = un tour complet). */
   uRepeat?: number;
+  /** v = abscisse curviligne du profil en mm (sinon normalisée 0..1). */
+  vLength?: boolean;
 }
 
 /**
@@ -178,12 +192,14 @@ export function revolve(mb: MeshBuilder, profile: readonly RevPoint[], opts: Rev
   const seg = Math.max(3, opts.segments);
   const phi0 = opts.phi0 ?? 0;
   const sweep = opts.sweep ?? Math.PI * 2;
-  const full = Math.abs(sweep - Math.PI * 2) < 1e-9;
-  const cols = full ? seg + 1 : seg + 1;
+  const cols = seg + 1;
   // Normales du profil.
   const pn: P2[] = [];
   const len: number[] = [0];
-  for (let i = 1; i < n; i++) len.push(len[i - 1]! + Math.hypot(profile[i]![0] - profile[i - 1]![0], profile[i]![1] - profile[i - 1]![1]));
+  for (let i = 1; i < n; i++)
+    len.push(
+      len[i - 1]! + Math.hypot(profile[i]![0] - profile[i - 1]![0], profile[i]![1] - profile[i - 1]![1]),
+    );
   const total = len[n - 1] || 1;
   for (let i = 0; i < n; i++) {
     const a = profile[Math.max(0, i - 1)]!;
@@ -203,7 +219,7 @@ export function revolve(mb: MeshBuilder, profile: readonly RevPoint[], opts: Rev
     for (let i = 0; i < n; i++) {
       const [x, r] = profile[i]!;
       const [nx, nr] = pn[i]!;
-      mb.vertex(x, r * c, r * s, nx, nr * c, nr * s, t * uRepeat, len[i]! / total);
+      mb.vertex(x, r * c, r * s, nx, nr * c, nr * s, t * uRepeat, opts.vLength ? len[i]! : len[i]! / total);
     }
   }
   for (let j = 0; j < seg; j++) {
@@ -221,7 +237,11 @@ export function revolve(mb: MeshBuilder, profile: readonly RevPoint[], opts: Rev
 }
 
 /** Profil arrondi : congés (longueur de tangente) aux sommets marqués d'un rayon. */
-export function roundedProfile(nodes: readonly (readonly [number, number, number?])[], maxStep = 0.2, steps = 5): RevPoint[] {
+export function roundedProfile(
+  nodes: readonly (readonly [number, number, number?])[],
+  maxStep = 0.2,
+  steps = 5,
+): RevPoint[] {
   const out: RevPoint[] = [];
   const n = nodes.length;
   const pts = nodes.map((p) => [p[0], p[1]] as const);
@@ -231,7 +251,11 @@ export function roundedProfile(nodes: readonly (readonly [number, number, number
     const a = pts[i - 1]!;
     const b = pts[i]!;
     const c = pts[i + 1]!;
-    return Math.min(r, 0.45 * Math.hypot(b[0] - a[0], b[1] - a[1]), 0.45 * Math.hypot(c[0] - b[0], c[1] - b[1]));
+    return Math.min(
+      r,
+      0.45 * Math.hypot(b[0] - a[0], b[1] - a[1]),
+      0.45 * Math.hypot(c[0] - b[0], c[1] - b[1]),
+    );
   });
   const push = (x: number, r: number) => {
     const last = out[out.length - 1];
@@ -323,7 +347,14 @@ export function planarFace(
 }
 
 /** Anneau plan (rayons r0 < r1, même échantillonnage angulaire que `revolve`). */
-export function annulus(mb: MeshBuilder, x: number, r0: number, r1: number, segments: number, normalSign: 1 | -1): void {
+export function annulus(
+  mb: MeshBuilder,
+  x: number,
+  r0: number,
+  r1: number,
+  segments: number,
+  normalSign: 1 | -1,
+): void {
   const base = mb.vertexCount;
   for (let j = 0; j <= segments; j++) {
     const phi = (j / segments) * Math.PI * 2;
@@ -347,6 +378,8 @@ export interface ExtrudeOptions {
   round1?: number;
   segments?: number;
   capGroup?: number;
+  /** Groupe de la face de fin (défaut : `capGroup`). */
+  capGroup1?: number;
   sideGroup?: number;
   /** UV des faces : coordonnées 2D → UV (défaut : identité en mm). `side` = 0 début, 1 fin. */
   capUV?: (p: P2, side: 0 | 1) => P2;
@@ -354,7 +387,14 @@ export interface ExtrudeOptions {
   skipCap0?: boolean;
   skipCap1?: boolean;
   /** Trous borgnes sur les faces : centre, rayon, profondeur, face (0 début, 1 fin), chanfrein. */
-  blindHoles?: readonly { c: P2; r: number; depth: number; side: 0 | 1; chamfer?: number; segments?: number }[];
+  blindHoles?: readonly {
+    c: P2;
+    r: number;
+    depth: number;
+    side: 0 | 1;
+    chamfer?: number;
+    segments?: number;
+  }[];
 }
 
 /**
@@ -433,19 +473,39 @@ export function extrude(
     }
     const first = rings[0]!;
     const last = rings[rings.length - 1]!;
-    insetContours[0]!.push(pts.map((p, i) => [p[0] - normals[i]![0] * first.inset * miter[i]!, p[1] - normals[i]![1] * first.inset * miter[i]!] as P2));
-    insetContours[1]!.push(pts.map((p, i) => [p[0] - normals[i]![0] * last.inset * miter[i]!, p[1] - normals[i]![1] * last.inset * miter[i]!] as P2));
+    insetContours[0]!.push(
+      pts.map(
+        (p, i) =>
+          [
+            p[0] - normals[i]![0] * first.inset * miter[i]!,
+            p[1] - normals[i]![1] * first.inset * miter[i]!,
+          ] as P2,
+      ),
+    );
+    insetContours[1]!.push(
+      pts.map(
+        (p, i) =>
+          [
+            p[0] - normals[i]![0] * last.inset * miter[i]!,
+            p[1] - normals[i]![1] * last.inset * miter[i]!,
+          ] as P2,
+      ),
+    );
   }
   // Faces (avec trous borgnes éventuels).
-  mb.setGroup(opts.capGroup ?? 0);
   for (const sideIdx of [0, 1] as const) {
     if ((sideIdx === 0 && opts.skipCap0) || (sideIdx === 1 && opts.skipCap1)) continue;
+    mb.setGroup(sideIdx === 1 ? (opts.capGroup1 ?? opts.capGroup ?? 0) : (opts.capGroup ?? 0));
     const [o, ...h] = insetContours[sideIdx]!;
     const blind = (opts.blindHoles ?? []).filter((b) => b.side === sideIdx);
     const extraHoles = blind.map((b) => circle(b.c[0], b.c[1], b.r + (b.chamfer ?? 0), b.segments ?? 24));
     const z = sideIdx === 0 ? z0 : z1;
-    planarFace(mb, o!, [...h, ...extraHoles], { origin: [0, 0, z], u: [1, 0, 0], v: [0, 1, 0], normal: [0, 0, sideIdx === 0 ? -1 : 1] }, (p) =>
-      capUV(p, sideIdx),
+    planarFace(
+      mb,
+      o!,
+      [...h, ...extraHoles],
+      { origin: [0, 0, z], u: [1, 0, 0], v: [0, 1, 0], normal: [0, 0, sideIdx === 0 ? -1 : 1] },
+      (p) => capUV(p, sideIdx),
     );
     for (const b of blind) {
       const ch = b.chamfer ?? 0;
@@ -548,13 +608,22 @@ export interface TubeOptions {
  * Tube le long d'une polyligne. Indices ordonnés par segment (anneau i → i+1) : une plage de
  * dessin `6 × radialSegments × k` montre exactement les k premiers segments (débobinage).
  */
-export function tube(mb: MeshBuilder, points: ArrayLike<number>, count: number, opts: TubeOptions): { indicesPerSegment: number } {
+export function tube(
+  mb: MeshBuilder,
+  points: ArrayLike<number>,
+  count: number,
+  opts: TubeOptions,
+): { indicesPerSegment: number } {
   const radial = opts.profile ? opts.profile.length : Math.max(3, opts.radialSegments);
   const frames = opts.frames ?? transportFrames(points, count);
-  const prof: P2[] =
-    opts.profile?.slice() ??
-    Array.from({ length: radial }, (_, j) => [Math.cos((j / radial) * Math.PI * 2), Math.sin((j / radial) * Math.PI * 2)] as P2);
-  const profNormals = opts.profile ? vertexNormals(oriented(prof, true)).normals : prof;
+  // Profil orienté dans le sens trigonométrique : normales (dy, −dx) sortantes, indices alignés.
+  const prof: P2[] = opts.profile
+    ? oriented(opts.profile, true)
+    : Array.from(
+        { length: radial },
+        (_, j) => [Math.cos((j / radial) * Math.PI * 2), Math.sin((j / radial) * Math.PI * 2)] as P2,
+      );
+  const profNormals = opts.profile ? vertexNormals(prof).normals : prof;
   const base = mb.vertexCount;
   let s = 0;
   const vScale = opts.vScale ?? 1;
@@ -591,7 +660,7 @@ export function tube(mb: MeshBuilder, points: ArrayLike<number>, count: number, 
     for (let j = 0; j < radial; j++) {
       const a = base + i * (radial + 1) + j;
       const b = a + radial + 1;
-      mb.quad(a, b, b + 1, a + 1);
+      mb.quad(a, a + 1, b + 1, b);
     }
   }
   const cap = (i: number, sign: 1 | -1) => {
@@ -601,7 +670,16 @@ export function tube(mb: MeshBuilder, points: ArrayLike<number>, count: number, 
     const ty = T[2] * Bv[0] - T[0] * Bv[2];
     const tz = T[0] * Bv[1] - T[1] * Bv[0];
     const r = opts.radii ? opts.radii[i]! : (opts.radius ?? 1);
-    const c = mb.vertex(points[i * 3]!, points[i * 3 + 1]!, points[i * 3 + 2]!, sign * tx, sign * ty, sign * tz, 0.5, 0.5);
+    const c = mb.vertex(
+      points[i * 3]!,
+      points[i * 3 + 1]!,
+      points[i * 3 + 2]!,
+      sign * tx,
+      sign * ty,
+      sign * tz,
+      0.5,
+      0.5,
+    );
     const ring: number[] = [];
     for (let j = 0; j < radial; j++) {
       const [a, b] = prof[j]!;
@@ -710,7 +788,7 @@ export function threadSurface(mb: MeshBuilder, o: ThreadOptions): void {
       let nz = ax * by - ay * bx;
       // Orientation : vers l'extérieur (vis) ou vers l'axe (taraudage).
       const radial = nx * p[0] + ny * p[1];
-      if ((radial < 0) !== !!o.internal) {
+      if (radial < 0 !== !!o.internal) {
         nx = -nx;
         ny = -ny;
         nz = -nz;
@@ -720,7 +798,7 @@ export function threadSurface(mb: MeshBuilder, o: ThreadOptions): void {
         ny = o.internal ? -p[1] : p[1];
         nz = 0;
       }
-      mb.vertex(p[0], p[1], p[2], nx, ny, nz, k / o.segmentsPerTurn, (theta / (2 * Math.PI)) + zeta);
+      mb.vertex(p[0], p[1], p[2], nx, ny, nz, k / o.segmentsPerTurn, theta / (2 * Math.PI) + zeta);
     }
   }
   for (let k = 0; k < K; k++) {
@@ -789,7 +867,16 @@ export function sphere(mb: MeshBuilder, r: number, seg: number, rings: number, s
       const nx = Math.sin(th) * Math.cos(ph);
       const ny = Math.cos(th);
       const nz = Math.sin(th) * Math.sin(ph);
-      mb.vertex(r * nx * squash[0], r * ny * squash[1], r * nz * squash[2], nx / squash[0], ny / squash[1], nz / squash[2], u, v);
+      mb.vertex(
+        r * nx * squash[0],
+        r * ny * squash[1],
+        r * nz * squash[2],
+        nx / squash[0],
+        ny / squash[1],
+        nz / squash[2],
+        u,
+        v,
+      );
     }
   }
   for (let j = 0; j < rings; j++) {
@@ -803,7 +890,15 @@ export function sphere(mb: MeshBuilder, r: number, seg: number, rings: number, s
 }
 
 /** Boîte à arêtes arrondies (extrusion d'un rectangle arrondi le long de Z, faces arrondies). */
-export function roundedBox(mb: MeshBuilder, w: number, h: number, d: number, r: number, rz: number, maxStep = 0.1): void {
+export function roundedBox(
+  mb: MeshBuilder,
+  w: number,
+  h: number,
+  d: number,
+  r: number,
+  rz: number,
+  maxStep = 0.1,
+): void {
   const hw = w / 2;
   const hh = h / 2;
   const rr = Math.min(r, hw * 0.95, hh * 0.95);

@@ -62,7 +62,13 @@ export const LID_TOP = DIM.height + DIM.gasket + DIM.lidPlate;
 /** Plastique ABS/PC moulé : rugosité légèrement bruitée (grain de moule), écrit en TSL. */
 function moldedPlastic(color: number, roughness: number): MaterialFactory {
   return () => {
-    const m = new THREE.MeshPhysicalNodeMaterial({ color, roughness, metalness: 0, clearcoat: 0.06, clearcoatRoughness: 0.5 });
+    const m = new THREE.MeshPhysicalNodeMaterial({
+      color,
+      roughness,
+      metalness: 0,
+      clearcoat: 0.06,
+      clearcoatRoughness: 0.5,
+    });
     // Grain de moule : variation de rugosité à l'échelle du dixième de millimètre.
     m.roughnessNode = float(roughness).add(mx_noise_float(positionLocal.mul(2600), 0.05));
     return m;
@@ -77,16 +83,27 @@ export const MATERIALS: Record<string, MaterialFactory> = {
   'pcb.terminal': moldedPlastic(0x2d8a4e, 0.5),
   // Membrane : surface de révolution fermée, visible des deux côtés.
   'tpe.gray': () =>
-    new THREE.MeshPhysicalNodeMaterial({ color: 0x5b5f63, roughness: 0.82, metalness: 0, side: THREE.DoubleSide }),
+    new THREE.MeshPhysicalNodeMaterial({
+      color: 0x5b5f63,
+      roughness: 0.82,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    }),
 };
 
 const mat = (ctx: BuildContext<BoxParams>, key: string) => ctx.materials.get(`${OBJECT_ID}/${key}`);
-const housing = (ctx: BuildContext<BoxParams>) => mat(ctx, ctx.params.color === 'black' ? 'abs.black' : 'abs.gray');
+const housing = (ctx: BuildContext<BoxParams>) =>
+  mat(ctx, ctx.params.color === 'black' ? 'abs.black' : 'abs.gray');
 
 // --- Utilitaires géométriques ------------------------------------------------------------------
 
 /** Rectangle à coins arrondis centré (mm), éventuellement percé de trous circulaires. */
-function roundedRect(w: number, d: number, r: number, holes: readonly [number, number, number][] = []): THREE.Shape {
+function roundedRect(
+  w: number,
+  d: number,
+  r: number,
+  holes: readonly [number, number, number][] = [],
+): THREE.Shape {
   const x = w / 2;
   const y = d / 2;
   const s = new THREE.Shape();
@@ -108,7 +125,13 @@ function roundedRect(w: number, d: number, r: number, holes: readonly [number, n
 }
 
 /** Extrusion verticale (mm) d'une forme du plan XZ, de y0 à y0 + depth, convertie en mètres. */
-function extrudeUp(shape: THREE.Shape, depth: number, y0: number, curveSegments = 10, bevel = 0): THREE.BufferGeometry {
+function extrudeUp(
+  shape: THREE.Shape,
+  depth: number,
+  y0: number,
+  curveSegments = 10,
+  bevel = 0,
+): THREE.BufferGeometry {
   const g = new THREE.ExtrudeGeometry(shape, {
     depth: depth - 2 * bevel,
     curveSegments,
@@ -161,7 +184,12 @@ function latheMm(points: readonly [number, number][], segments: number, sharpDeg
   runs.push(run);
   const parts = runs
     .filter((r) => r.length >= 2)
-    .map((r) => new THREE.LatheGeometry(r.map(([x, y]) => new THREE.Vector2(mm(x), mm(y))), segments).toNonIndexed());
+    .map((r) =>
+      new THREE.LatheGeometry(
+        r.map(([x, y]) => new THREE.Vector2(mm(x), mm(y))),
+        segments,
+      ).toNonIndexed(),
+    );
   return parts.length === 1 ? parts[0]! : merge(parts);
 }
 
@@ -169,7 +197,8 @@ function latheMm(points: readonly [number, number][], segments: number, sharpDeg
 function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const clean = parts.map((g) => {
     const ng = g.index ? g.toNonIndexed() : g;
-    for (const name of Object.keys(ng.attributes)) if (name !== 'position' && name !== 'normal' && name !== 'uv') ng.deleteAttribute(name);
+    for (const name of Object.keys(ng.attributes))
+      if (name !== 'position' && name !== 'normal' && name !== 'uv') ng.deleteAttribute(name);
     ng.clearGroups();
     return ng;
   });
@@ -255,7 +284,8 @@ export function buildBase(ctx: BuildContext<BoxParams>): THREE.Object3D {
       20,
     );
     for (const sx of [-1, 1])
-      for (const sz of [-1, 1]) parts.push(boss.clone().translate(mm(sx * DIM.bossOffset), 0, mm(sz * DIM.bossOffset)));
+      for (const sz of [-1, 1])
+        parts.push(boss.clone().translate(mm(sx * DIM.bossOffset), 0, mm(sz * DIM.bossOffset)));
     boss.dispose();
     const standoff = latheMm(
       [
@@ -289,7 +319,13 @@ export function buildLid(ctx: BuildContext<BoxParams>): THREE.Object3D {
   const group = new THREE.Group();
   group.position.set(0, mm(DIM.height), 0);
   const plate = ctx.geometry.get('lid.plate', () => {
-    const plateGeo = extrudeUp(roundedRect(DIM.width - 0.8, DIM.width - 0.8, DIM.corner - 0.4, LID_HOLES(2.3)), DIM.lidPlate, DIM.gasket, 12, 0.4);
+    const plateGeo = extrudeUp(
+      roundedRect(DIM.width - 0.8, DIM.width - 0.8, DIM.corner - 0.4, LID_HOLES(2.3)),
+      DIM.lidPlate,
+      DIM.gasket,
+      12,
+      0.4,
+    );
     // Lèvre de centrage : quatre segments qui entrent dans la boîte (interrompus aux fûts).
     const inner = DIM.width / 2 - DIM.wall - 0.4;
     const lip: THREE.BufferGeometry[] = [plateGeo];
@@ -313,15 +349,49 @@ export function buildLid(ctx: BuildContext<BoxParams>): THREE.Object3D {
       background: '#ece6d6',
       ops: [
         { op: 'rect', x: 1, y: 1, w: 42, h: 20, stroke: '#2b2b2b', lineWidth: 0.35, radius: 1.2 },
-        { op: 'text', text: 'DÉRIVO', x: 22, y: 7.2, font: "bold 5.4px 'DejaVu Sans', sans-serif", fill: '#1f3b5a', align: 'center', baseline: 'middle', letterSpacing: 0.6 },
-        { op: 'text', text: 'BOÎTE DE DÉRIVATION', x: 22, y: 12.2, font: "2.2px 'DejaVu Sans', sans-serif", fill: '#2b2b2b', align: 'center', baseline: 'middle' },
-        { op: 'text', text: 'IP55 · 80×80 · 450 V~', x: 22, y: 16.2, font: "bold 2.3px 'DejaVu Sans Mono', monospace", fill: '#2b2b2b', align: 'center', baseline: 'middle' },
+        {
+          op: 'text',
+          text: 'DÉRIVO',
+          x: 22,
+          y: 7.2,
+          font: "bold 5.4px 'DejaVu Sans', sans-serif",
+          fill: '#1f3b5a',
+          align: 'center',
+          baseline: 'middle',
+          letterSpacing: 0.6,
+        },
+        {
+          op: 'text',
+          text: 'BOÎTE DE DÉRIVATION',
+          x: 22,
+          y: 12.2,
+          font: "2.2px 'DejaVu Sans', sans-serif",
+          fill: '#2b2b2b',
+          align: 'center',
+          baseline: 'middle',
+        },
+        {
+          op: 'text',
+          text: 'IP55 · 80×80 · 450 V~',
+          x: 22,
+          y: 16.2,
+          font: "bold 2.3px 'DejaVu Sans Mono', monospace",
+          fill: '#2b2b2b',
+          align: 'center',
+          baseline: 'middle',
+        },
         { op: 'noise', amount: 0.05, seed: 7, mono: true },
       ],
     },
   });
-  const labelGeo = ctx.geometry.get('lid.label', () => flipV(new THREE.PlaneGeometry(mm(44), mm(22)).rotateX(-Math.PI / 2)));
-  const labelMaterial = ctx.materials.variant('paper.label', { map: labelTexture, color: 0xffffff, name: 'Étiquette du couvercle' });
+  const labelGeo = ctx.geometry.get('lid.label', () =>
+    flipV(new THREE.PlaneGeometry(mm(44), mm(22)).rotateX(-Math.PI / 2)),
+  );
+  const labelMaterial = ctx.materials.variant('paper.label', {
+    map: labelTexture,
+    color: 0xffffff,
+    name: 'Étiquette du couvercle',
+  });
   const label = mesh(labelGeo, labelMaterial, 'Étiquette');
   label.position.set(0, mm(DIM.gasket + DIM.lidPlate + 0.05), 0);
   group.add(label);
@@ -380,7 +450,10 @@ function screwGeometries(head: number, headH: number, shank: number, length: num
   const body = latheMm(profile.reverse(), 18);
   // Empreinte cruciforme : deux lames sombres croisées affleurant le dôme.
   const w = head * 0.52;
-  const cross = merge([boxMm(w, 0.7, head * 0.12, 0, headH - 0.28, 0), boxMm(head * 0.12, 0.7, w, 0, headH - 0.28, 0)]);
+  const cross = merge([
+    boxMm(w, 0.7, head * 0.12, 0, headH - 0.28, 0),
+    boxMm(head * 0.12, 0.7, w, 0, headH - 0.28, 0),
+  ]);
   return { body, cross };
 }
 
@@ -392,8 +465,14 @@ function buildScrews(
   positions: readonly [number, number, number][],
   label: (i: number) => string,
 ): PartBuild {
-  const body = ctx.geometry.get(`${key}.body`, () => screwGeometries(dims.head, dims.headH, dims.shank, dims.length, dims.pitch).body);
-  const cross = ctx.geometry.get(`${key}.cross`, () => screwGeometries(dims.head, dims.headH, dims.shank, dims.length, dims.pitch).cross);
+  const body = ctx.geometry.get(
+    `${key}.body`,
+    () => screwGeometries(dims.head, dims.headH, dims.shank, dims.length, dims.pitch).body,
+  );
+  const cross = ctx.geometry.get(
+    `${key}.cross`,
+    () => screwGeometries(dims.head, dims.headH, dims.shank, dims.length, dims.pitch).cross,
+  );
   const count = positions.length;
   const steel = new THREE.InstancedMesh(body, ctx.materials.get('steel.zinc'), count);
   const recess = new THREE.InstancedMesh(cross, ctx.materials.get('steel.blackoxide'), count);
@@ -465,7 +544,19 @@ export function buildTerminal(ctx: BuildContext<BoxParams>): THREE.Object3D {
   const cage = ctx.geometry.get('terminal.cage', () => merge([boxMm(4.6, 4.4, 7, 0, 5.4, 3.2)]));
   const entry = ctx.geometry.get('terminal.entry', () => merge([boxMm(3.6, 3.6, 0.3, 0, 5.4, 6.56)]));
   const screw = ctx.geometry.get('terminal.screw', () =>
-    merge([latheMm([[1.2, 6], [1.2, 9.8], [1.9, 9.8], [1.9, 11.4], [0, 11.4]], 16), boxMm(3.9, 0.6, 0.55, 0, 11.3, 0)]),
+    merge([
+      latheMm(
+        [
+          [1.2, 6],
+          [1.2, 9.8],
+          [1.9, 9.8],
+          [1.9, 11.4],
+          [0, 11.4],
+        ],
+        16,
+      ),
+      boxMm(3.9, 0.6, 0.55, 0, 11.3, 0),
+    ]),
   );
   const brass = ctx.materials.get('brass');
   const dark = ctx.materials.get('plastic.black');
@@ -559,9 +650,30 @@ export function buildBoard(ctx: BuildContext<BoxParams>): THREE.Object3D {
       background: '#0f5e57',
       ops: [
         // Pistes (cuivre sous vernis : plus clair). L → R1 → D1 (anode) ; N → D1 (cathode).
-        { op: 'polyline', points: [5.75, 6, 5.75, 8.5, 19, 8.5, 20.9, 12.5], stroke: '#2b8a78', lineWidth: 0.9, lineCap: 'round', lineJoin: 'round' },
-        { op: 'polyline', points: [31.1, 12.5, 33.5, 12.5, 33.5, 16.5, 31.27, 18.4], stroke: '#2b8a78', lineWidth: 0.9, lineCap: 'round', lineJoin: 'round' },
-        { op: 'polyline', points: [13.25, 6, 14.5, 7.2, 35, 7.2, 35, 20, 28.73, 20.6, 28.73, 18.4], stroke: '#2b8a78', lineWidth: 0.9, lineCap: 'round', lineJoin: 'round' },
+        {
+          op: 'polyline',
+          points: [5.75, 6, 5.75, 8.5, 19, 8.5, 20.9, 12.5],
+          stroke: '#2b8a78',
+          lineWidth: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+        },
+        {
+          op: 'polyline',
+          points: [31.1, 12.5, 33.5, 12.5, 33.5, 16.5, 31.27, 18.4],
+          stroke: '#2b8a78',
+          lineWidth: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+        },
+        {
+          op: 'polyline',
+          points: [13.25, 6, 14.5, 7.2, 35, 7.2, 35, 20, 28.73, 20.6, 28.73, 18.4],
+          stroke: '#2b8a78',
+          lineWidth: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+        },
         // Pastilles étamées (bornier, R1, D1) et trous de fixation.
         { op: 'circle', x: 5.75, y: 6, r: 1.3, fill: '#cfd2d4' },
         { op: 'circle', x: 13.25, y: 6, r: 1.3, fill: '#cfd2d4' },
@@ -575,13 +687,67 @@ export function buildBoard(ctx: BuildContext<BoxParams>): THREE.Object3D {
         { op: 'circle', x: 36, y: 4, r: 1.35, fill: '#1a1a1a' },
         // Sérigraphie.
         { op: 'rect', x: 19.2, y: 11.2, w: 13.6, h: 2.6, stroke: '#f2f2ee', lineWidth: 0.2 },
-        { op: 'text', text: 'R1 1k', x: 26, y: 9.8, font: "1.4px 'DejaVu Sans Mono', monospace", fill: '#f2f2ee', align: 'center', baseline: 'middle' },
+        {
+          op: 'text',
+          text: 'R1 1k',
+          x: 26,
+          y: 9.8,
+          font: "1.4px 'DejaVu Sans Mono', monospace",
+          fill: '#f2f2ee',
+          align: 'center',
+          baseline: 'middle',
+        },
         { op: 'circle', x: 30, y: 18.4, r: 2.9, stroke: '#f2f2ee', lineWidth: 0.2 },
-        { op: 'text', text: 'D1', x: 30, y: 22.8, font: "1.4px 'DejaVu Sans Mono', monospace", fill: '#f2f2ee', align: 'center', baseline: 'middle' },
-        { op: 'text', text: 'L', x: 5.75, y: 11.3, font: "bold 1.6px 'DejaVu Sans', sans-serif", fill: '#f2f2ee', align: 'center', baseline: 'middle' },
-        { op: 'text', text: 'N', x: 13.25, y: 11.3, font: "bold 1.6px 'DejaVu Sans', sans-serif", fill: '#f2f2ee', align: 'center', baseline: 'middle' },
-        { op: 'text', text: 'TÉMOIN 12–24 V', x: 22, y: 23.4, font: "1.5px 'DejaVu Sans', sans-serif", fill: '#f2f2ee', align: 'center', baseline: 'middle' },
-        { op: 'text', text: 'DRV-T2 rév. B', x: 25, y: 4.6, font: "1.1px 'DejaVu Sans Mono', monospace", fill: '#f2f2ee', align: 'center', baseline: 'middle' },
+        {
+          op: 'text',
+          text: 'D1',
+          x: 30,
+          y: 22.8,
+          font: "1.4px 'DejaVu Sans Mono', monospace",
+          fill: '#f2f2ee',
+          align: 'center',
+          baseline: 'middle',
+        },
+        {
+          op: 'text',
+          text: 'L',
+          x: 5.75,
+          y: 11.3,
+          font: "bold 1.6px 'DejaVu Sans', sans-serif",
+          fill: '#f2f2ee',
+          align: 'center',
+          baseline: 'middle',
+        },
+        {
+          op: 'text',
+          text: 'N',
+          x: 13.25,
+          y: 11.3,
+          font: "bold 1.6px 'DejaVu Sans', sans-serif",
+          fill: '#f2f2ee',
+          align: 'center',
+          baseline: 'middle',
+        },
+        {
+          op: 'text',
+          text: 'TÉMOIN 12–24 V',
+          x: 22,
+          y: 23.4,
+          font: "1.5px 'DejaVu Sans', sans-serif",
+          fill: '#f2f2ee',
+          align: 'center',
+          baseline: 'middle',
+        },
+        {
+          op: 'text',
+          text: 'DRV-T2 rév. B',
+          x: 25,
+          y: 4.6,
+          font: "1.1px 'DejaVu Sans Mono', monospace",
+          fill: '#f2f2ee',
+          align: 'center',
+          baseline: 'middle',
+        },
       ],
     },
   });
@@ -594,12 +760,21 @@ export function buildBoard(ctx: BuildContext<BoxParams>): THREE.Object3D {
     return g;
   });
   const edge = ctx.materials.get('fr4.core');
-  const top = ctx.materials.variant('mask.teal', { map: art, color: 0xffffff, name: 'Vernis épargne (sérigraphié)' });
+  const top = ctx.materials.variant('mask.teal', {
+    map: art,
+    color: 0xffffff,
+    name: 'Vernis épargne (sérigraphié)',
+  });
   const bottom = ctx.materials.get('mask.teal');
   group.add(mesh(pcb, [edge, edge, top, bottom, edge, edge], 'Circuit imprimé'));
   // Bornier à ressort 2 points (vert), entrées face −Z, leviers orange.
   const terminal = ctx.geometry.get('pcb.terminal', () =>
-    merge([boxMm(15, 10, 8, 0, 5, 0), boxMm(15, 2.5, 3, 0, 8.75, 2.5), boxMm(3.4, 3.4, 0.3, -3.75, 4, -4.1), boxMm(3.4, 3.4, 0.3, 3.75, 4, -4.1)]),
+    merge([
+      boxMm(15, 10, 8, 0, 5, 0),
+      boxMm(15, 2.5, 3, 0, 8.75, 2.5),
+      boxMm(3.4, 3.4, 0.3, -3.75, 4, -4.1),
+      boxMm(3.4, 3.4, 0.3, 3.75, 4, -4.1),
+    ]),
   );
   const t = mesh(terminal, mat(ctx, 'pcb.terminal'), 'Bornier à ressort');
   // Entrées alignées sur les extrémités des conducteurs (dessin : x 5,75 / 13,25, y 6).
@@ -655,7 +830,11 @@ export function buildLed(ctx: BuildContext<BoxParams>): PartBuild {
   // Coordonnées du dessin de la carte (mm depuis le coin arrière gauche) → repère de la carte.
   group.position.set(mm(30 - bw / 2), 0, mm(18.4 - bd / 2));
   const lens = ctx.geometry.get('led.lens', () => {
-    const pts: [number, number][] = [[2.9, 2.0], [2.9, 3.0], [2.5, 3.0]];
+    const pts: [number, number][] = [
+      [2.9, 2.0],
+      [2.9, 3.0],
+      [2.5, 3.0],
+    ];
     for (let a = 0; a <= 8; a++) {
       const ang = (a / 8) * (Math.PI / 2);
       pts.push([2.5 * Math.cos(ang), 3.0 + 5.2 + 2.5 * Math.sin(ang) - 2.5]);
@@ -663,7 +842,9 @@ export function buildLed(ctx: BuildContext<BoxParams>): PartBuild {
     return latheMm([[0, 2.0], ...pts], 24);
   });
   group.add(mesh(lens, ctx.materials.get('led.red'), 'Lentille époxy'));
-  const leg = ctx.geometry.get('led.leg', () => new THREE.CylinderGeometry(mm(0.25), mm(0.25), mm(5.6), 6).translate(0, mm(0.6), 0));
+  const leg = ctx.geometry.get('led.leg', () =>
+    new THREE.CylinderGeometry(mm(0.25), mm(0.25), mm(5.6), 6).translate(0, mm(0.6), 0),
+  );
   const tin = ctx.materials.get('tin');
   const joint = solderJointGeometry(ctx);
   const solder = ctx.materials.get('solder');
@@ -706,7 +887,13 @@ export function buildResistor(ctx: BuildContext<BoxParams>): PartBuild {
     g.translate(0, mm(lift + 1.2), 0);
     return g;
   });
-  group.add(mesh(body, ctx.materials.variant('ceramic.tan', { color: 0xd9c49a, roughness: 0.45, name: 'Laque de résistance' }), 'Corps'));
+  group.add(
+    mesh(
+      body,
+      ctx.materials.variant('ceramic.tan', { color: 0xd9c49a, roughness: 0.45, name: 'Laque de résistance' }),
+      'Corps',
+    ),
+  );
   const band = ctx.geometry.get('res.band', () => {
     const g = new THREE.CylinderGeometry(mm(1.23), mm(1.23), mm(0.55), 20, 1, true);
     g.rotateZ(Math.PI / 2);
@@ -715,7 +902,14 @@ export function buildResistor(ctx: BuildContext<BoxParams>): PartBuild {
   });
   const colors = [0x5a3218, 0x111111, 0xb02418, 0xb8963c];
   [-2.3, -1.2, -0.1, 2.0].forEach((x, i) => {
-    const b = mesh(band, ctx.materials.variant(i === 3 ? 'gold' : 'plastic.black', { color: colors[i]!, name: `Anneau ${i + 1}` }), 'Anneau de couleur');
+    const b = mesh(
+      band,
+      ctx.materials.variant(i === 3 ? 'gold' : 'plastic.black', {
+        color: colors[i]!,
+        name: `Anneau ${i + 1}`,
+      }),
+      'Anneau de couleur',
+    );
     b.position.x = mm(x);
     group.add(b);
   });
@@ -793,5 +987,9 @@ export function buildGrommets(ctx: BuildContext<BoxParams>): PartBuild {
     m.makeTranslation(mm(-DIM.width / 2), mm(DIM.grommetY), mm(z));
     grommets.setMatrixAt(i, m);
   });
-  return { object: grommets, instanced: grommets, instanceLabel: (i) => (i === 0 ? 'Membrane avant' : 'Membrane arrière') };
+  return {
+    object: grommets,
+    instanced: grommets,
+    instanceLabel: (i) => (i === 0 ? 'Membrane avant' : 'Membrane arrière'),
+  };
 }

@@ -14,7 +14,16 @@
 import type * as THREE from 'three/webgpu';
 import type { AudioApi, AudioBus, AudioDebugInfo, LoopHandle, LoopId, PlayOptions, SoundId } from './types';
 import { smoothParam } from './envelope';
-import { SynthKit, type Voice } from './kit';
+import {
+  PREGENERATED_SAMPLE_RATE,
+  ROOM_IMPULSE_SEED,
+  ROOM_RT60,
+  SHARED_SAMPLE_IDS,
+  renderRoomImpulse,
+  type SharedSampleId,
+} from './buffers';
+import { SynthKit, type SampleProvider, type Voice } from './kit';
+import type { SampleRequest, SampleResponse } from './samples.worker';
 import { LOOPS, type LoopControl, type LoopSpec } from './loops';
 import { AUDIO_BUSES, Mixer } from './mixer';
 import { clamp01, jitter, mulberry32, volumeToGain } from './math';
@@ -27,6 +36,8 @@ const LOOKAHEAD = 0.3;
 const TICK_MS = 50;
 /** Distance de référence des sons ponctuels positionnés (m). */
 const SHOT_REF_DISTANCE = 0.8;
+/** Fréquences de contexte courantes : réponses impulsionnelles préparées d'avance. */
+const COMMON_SAMPLE_RATES = [48000, 44100] as const;
 
 interface Vec3 {
   x: number;
@@ -94,6 +105,8 @@ class LoopHandleImpl implements LoopHandle {
     private readonly spec: LoopSpec,
     options: PlayOptions,
   ) {
+    // Approximation : `options.pitch` n'a pas d'effet sur les boucles (leur caractère se règle
+    // par `setIntensity`, ex. vitesse du ventilateur).
     this.volume = Math.max(0, options.volume ?? 1);
     this.intensity = spec.intensity;
     this.position = options.position
@@ -185,8 +198,8 @@ class LoopHandleImpl implements LoopHandle {
     const fade = Math.max(0.02, fadeSeconds);
     this.control?.release?.(now, fade);
     smoothParam(this.level.gain, 0, now, fade);
-    // Arrêt des sources une fois le fondu éteint (< −40 dB) ; la voix se libère d'elle-même.
-    this.voice.stopAll(now + fade * 1.7 + 0.02);
+    // Arrêt des sources une fois la rampe linéaire arrivée à zéro ; la voix se libère d'elle-même.
+    this.voice.stopAll(now + fade + 0.05);
     this.control = null;
   }
 
@@ -195,8 +208,13 @@ class LoopHandleImpl implements LoopHandle {
   }
 }
 
-export class AudioEngine implements AudioApi, EngineInternals {
+export class AudioEngine implements AudioApi, EngineInternals, SampleProvider {
   private ctx: AudioContext | null = null;
+  /** Échantillons pré-générés par le worker (cédés au kit à la création du contexte). */
+  private readonly samples = new Map<SharedSampleId, { data: Float32Array; sampleRate: number }>();
+  private readonly impulses = new Map<number, Float32Array[]>();
+  private worker: Worker | null = null;
+  private pendingResponses = 0;
   private mixerNode: Mixer | null = null;
   private synthKit: SynthKit | null = null;
   private unsupported = false;
@@ -211,6 +229,10 @@ export class AudioEngine implements AudioApi, EngineInternals {
   private readonly listenerState = new Float64Array(9).fill(Number.NaN);
   private readonly listenerScratch = new Float64Array(9);
   private readonly disposers: (() => void)[] = [];
+
+  constructor() {
+    this.startSampleWorker();
+  }
 
   get started(): boolean {
     return this.ctx?.state === 'running';
@@ -285,6 +307,10 @@ export class AudioEngine implements AudioApi, EngineInternals {
     this.mixerNode?.setBusGain(bus, volumeToGain(this.busVolumes[bus]));
   }
 
+  /**
+   * Auditeur = caméra. Approximation : oreilles au centre de la caméra, sans modèle de tête ni
+   * d'occultation par les meubles (la réverbération de pièce masque l'essentiel).
+   */
   updateListener(camera: THREE.Camera): void {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return;
@@ -356,6 +382,14 @@ export class AudioEngine implements AudioApi, EngineInternals {
     this.loops.delete(handle);
   }
 
+  /** Cède au kit un tampon pré-généré (libéré de la réserve). */
+  take(id: SharedSampleId): { data: Float32Array; sampleRate: number } | null {
+    const entry = this.samples.get(id);
+    if (!entry) return null;
+    this.samples.delete(id);
+    return entry;
+  }
+
   dispose(): void {
     for (const loop of [...this.loops]) loop.stop(0.05);
     this.loops.clear();
@@ -363,6 +397,9 @@ export class AudioEngine implements AudioApi, EngineInternals {
     this.timer = null;
     for (const d of this.disposers) d();
     this.disposers.length = 0;
+    this.stopWorker();
+    this.samples.clear();
+    this.impulses.clear();
     this.mixerNode?.dispose();
     this.mixerNode = null;
     this.synthKit = null;
@@ -395,8 +432,10 @@ export class AudioEngine implements AudioApi, EngineInternals {
       return null;
     }
     this.ctx = ctx;
-    this.synthKit = new SynthKit(ctx, this.rng);
-    this.mixerNode = new Mixer(ctx, this.synthKit);
+    this.synthKit = new SynthKit(ctx, this.rng, this);
+    this.mixerNode = new Mixer(ctx, this.synthKit, this.impulses.get(ctx.sampleRate));
+    this.impulses.clear();
+    if (!this.mixerNode.hasImpulse) this.provideImpulseLater(ctx);
     for (const bus of AUDIO_BUSES) {
       this.mixerNode.buses[bus].gain.value = volumeToGain(this.busVolumes[bus]);
       this.mixerNode.sends[bus].gain.value = volumeToGain(this.busVolumes[bus]);
@@ -407,6 +446,70 @@ export class AudioEngine implements AudioApi, EngineInternals {
     this.timer = setInterval(() => this.tick(), TICK_MS);
     this.installLifecycle(ctx);
     return ctx;
+  }
+
+  /**
+   * Lance la génération des échantillons dans un worker dès la construction (pendant le
+   * chargement) : au démarrage du son, il ne reste qu'à les copier dans des AudioBuffer.
+   */
+  private startSampleWorker(): void {
+    if (typeof window === 'undefined' || typeof Worker === 'undefined') return;
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL('./samples.worker.ts', import.meta.url), {
+        type: 'module',
+        name: 'audio-samples',
+      });
+    } catch (error) {
+      console.warn('[Audio] Worker d’échantillons indisponible : génération à la demande.', error);
+      return;
+    }
+    worker.onmessage = (event: MessageEvent<SampleResponse>) => this.onSamples(event.data);
+    worker.onerror = (event) => {
+      console.warn('[Audio] Échec du worker d’échantillons : génération à la demande.', event.message);
+      this.stopWorker();
+    };
+    const post = (request: SampleRequest) => {
+      worker.postMessage(request);
+      this.pendingResponses++;
+    };
+    for (const id of SHARED_SAMPLE_IDS) post({ kind: 'shared', id, sampleRate: PREGENERATED_SAMPLE_RATE });
+    for (const sampleRate of COMMON_SAMPLE_RATES) post({ kind: 'impulse', sampleRate });
+    this.worker = worker;
+  }
+
+  private onSamples(response: SampleResponse): void {
+    if (response.kind === 'shared') {
+      this.samples.set(response.id, { data: response.channels[0]!, sampleRate: response.sampleRate });
+    } else if (this.mixerNode && this.ctx) {
+      if (!this.mixerNode.hasImpulse && response.sampleRate === this.ctx.sampleRate) {
+        this.mixerNode.setImpulse(response.channels);
+      }
+    } else {
+      this.impulses.set(response.sampleRate, response.channels);
+    }
+    if (--this.pendingResponses <= 0) this.stopWorker();
+  }
+
+  private stopWorker(): void {
+    this.worker?.terminate();
+    this.worker = null;
+    this.pendingResponses = 0;
+  }
+
+  /**
+   * Réponse impulsionnelle manquante (fréquence de contexte inhabituelle ou worker absent) :
+   * elle arrivera du worker si une réponse à cette fréquence est encore attendue, sinon elle est
+   * calculée ici juste après la création du contexte (hors du geste utilisateur).
+   */
+  private provideImpulseLater(ctx: AudioContext): void {
+    const expected =
+      this.worker !== null && (COMMON_SAMPLE_RATES as readonly number[]).includes(ctx.sampleRate);
+    if (expected) return;
+    setTimeout(() => {
+      if (!this.mixerNode || this.mixerNode.hasImpulse || this.ctx !== ctx) return;
+      this.mixerNode.setImpulse(renderRoomImpulse(ctx.sampleRate, ROOM_RT60, mulberry32(ROOM_IMPULSE_SEED)));
+    }, 50);
   }
 
   /** Programme les événements des boucles sur l'horloge audio. */

@@ -27,12 +27,18 @@ import { buildShell, type GlassRect } from './room/shell';
 import { buildBench } from './room/bench';
 import { buildLightSwitch, buildNeonFixture, buildPendantBulb } from './room/fixtures';
 import { MagnifierLamp } from './room/MagnifierLamp';
+import { buildLabels } from './room/labels';
 import { createRainGlassMaterial } from './window/rainGlass';
 import { Lighting } from './lighting/Lighting';
 import { createWindowShaft, type WindowShaft } from './atmosphere/shaft';
 import { createFogNode, createFogSettings, type FogSettings } from './atmosphere/fog';
 import { Dust } from './atmosphere/dust';
-import { createBenchInteractable, createLampInteractable, createSwitchInteractable, type HighlightTarget } from './interact/interactables';
+import {
+  createBenchInteractable,
+  createLampInteractable,
+  createSwitchInteractable,
+  type HighlightTarget,
+} from './interact/interactables';
 import { HOME_CAMERA_FOV, homeCameraPose, type HomeCameraPose } from './camera/homeCamera';
 import { createStudioBackdrop } from './studioBackdrop';
 import { buildProps, type PropsHandle } from './props';
@@ -80,7 +86,10 @@ export class World {
   };
   private readonly inspection = { active: false, neutral: false, lampWasOn: true };
   private studioBackdrop: Node<'vec3'> | null = null;
-  private savedBackground: { node: Node | null | undefined; color: THREE.Color | THREE.Texture | null } | null = null;
+  private savedBackground: {
+    node: Node | null | undefined;
+    color: THREE.Color | THREE.Texture | null;
+  } | null = null;
   private readonly homePose: HomeCameraPose = { position: [0, 0, 0], target: [0, 0, 0] };
   private readonly raycaster = new THREE.Raycaster();
   private readonly rayHits: THREE.Intersection[] = [];
@@ -135,6 +144,7 @@ export class World {
     this.switchPosition.copy(lightSwitch.position);
     const lamp = new MagnifierLamp(b);
     this.lamp = lamp;
+    buildLabels(ctx, b);
     this.buildWindowGlass();
     await yieldToMain();
 
@@ -181,7 +191,11 @@ export class World {
     progress(0.93, 'Lumière de la salle…');
     this.uniforms.time.value = ctx.dev.frozenTime ?? 0;
     this.lighting.update(0);
-    this.lighting.captureEnvironment(engine.renderer, engine.quality.envMapSize, this.dust ? [this.dust.sprite] : []);
+    this.lighting.captureEnvironment(
+      engine.renderer,
+      engine.quality.envMapSize,
+      this.dust ? [this.dust.sprite] : [],
+    );
     this.lighting.invalidateShadows();
     this.built = true;
     progress(1, 'Salle prête');
@@ -217,7 +231,10 @@ export class World {
     const key = full ? 'full' : 'simple';
     let material = this.glassMaterials[key];
     if (!material) {
-      material = this.materials.adopt(`world.glass.rain.${key}`, createRainGlassMaterial(this.uniforms, { full }));
+      material = this.materials.adopt(
+        `world.glass.rain.${key}`,
+        createRainGlassMaterial(this.uniforms, { full }),
+      );
       this.glassMaterials[key] = material;
     }
     return material;
@@ -293,7 +310,11 @@ export class World {
     if (this.built && this.lighting && this.lighting.environmentSize !== profile.envMapSize) {
       // Recapture différée (hors de la pile de l'événement d'interface).
       this.ctx.idle.push(() => {
-        this.lighting.captureEnvironment(this.ctx.engine.renderer, profile.envMapSize, this.dust ? [this.dust.sprite] : []);
+        this.lighting.captureEnvironment(
+          this.ctx.engine.renderer,
+          profile.envMapSize,
+          this.dust ? [this.dust.sprite] : [],
+        );
       });
     }
   }
@@ -327,7 +348,10 @@ export class World {
     if (neutral !== s.neutral) {
       const scene = this.ctx.engine.scene;
       if (neutral) {
-        this.savedBackground = { node: scene.backgroundNode, color: scene.background as THREE.Color | THREE.Texture | null };
+        this.savedBackground = {
+          node: scene.backgroundNode,
+          color: scene.background as THREE.Color | THREE.Texture | null,
+        };
         this.studioBackdrop ??= createStudioBackdrop();
         scene.backgroundNode = this.studioBackdrop;
       } else if (this.savedBackground) {
@@ -359,9 +383,12 @@ export class World {
     u.highlightLamp.value += (this.highlights.lamp.target - u.highlightLamp.value) * k;
     u.highlightBench.value += (this.highlights.bench.target - u.highlightBench.value) * k;
 
-    const lampMoved = this.lamp?.update(frame.dt) ?? false;
+    // Pendant le mouvement du bras, seule l'ombre de la lampe est recalculée (Lighting) ; les
+    // ombres statiques (ampoule, fenêtre) le sont une fois le bras immobile.
+    const wasMoving = this.lamp?.moving ?? false;
+    this.lamp?.update(frame.dt);
     this.lighting.update(frame.dt);
-    if (lampMoved) this.lighting.invalidateShadows();
+    if (wasMoving && !(this.lamp?.moving ?? false)) this.lighting.invalidateShadows();
     this.updateAudio();
     this.props?.update(frame);
   }
@@ -412,7 +439,9 @@ export class World {
         let o: THREE.Object3D | null = hit.object;
         while (o) {
           if (it.targets.includes(o)) {
-            return hit.distance <= (it.maxDistance ?? 1.8) ? { interactable: it, distance: hit.distance } : null;
+            return hit.distance <= (it.maxDistance ?? 1.8)
+              ? { interactable: it, distance: hit.distance }
+              : null;
           }
           o = o.parent;
         }

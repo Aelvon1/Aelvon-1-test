@@ -38,7 +38,11 @@ export function computeExplodeStages(parts: readonly StagedPart[]): ExplodeStage
     if (known !== undefined) return known;
     let d = 0;
     const guard = new Set<string>([id]);
-    for (let cur = byId.get(id)?.parent; cur && byId.has(cur) && !guard.has(cur); cur = byId.get(cur)?.parent) {
+    for (
+      let cur = byId.get(id)?.parent;
+      cur && byId.has(cur) && !guard.has(cur);
+      cur = byId.get(cur)?.parent
+    ) {
       guard.add(cur);
       d++;
     }
@@ -118,7 +122,11 @@ export function composeOffsets(
   for (const p of parts) {
     const sum: [number, number, number] = [0, 0, 0];
     const guard = new Set<string>();
-    for (let cur: string | undefined = p.id; cur && byId.has(cur) && !guard.has(cur); cur = byId.get(cur)?.parent) {
+    for (
+      let cur: string | undefined = p.id;
+      cur && byId.has(cur) && !guard.has(cur);
+      cur = byId.get(cur)?.parent
+    ) {
       guard.add(cur);
       const o = own.get(cur)!;
       sum[0] += o[0];

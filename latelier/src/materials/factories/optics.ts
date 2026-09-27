@@ -102,7 +102,11 @@ export interface GlassOptions extends MappingOptions, CommonOptions {
 
 /** Verre transparent : transmission, réfraction, voile de poussière et traces de doigts. */
 export function createGlass(env: MaterialEnv, o: GlassOptions = {}): THREE.MeshPhysicalNodeMaterial {
-  const kit = new SurfaceKit(env, { space: o.space ?? 'local', scale: o.scale ?? 25, sharpness: o.sharpness });
+  const kit = new SurfaceKit(env, {
+    space: o.space ?? 'local',
+    scale: o.scale ?? 25,
+    sharpness: o.sharpness,
+  });
   const m = physical(o.name, {
     color: o.tint ?? 0xffffff,
     roughness: o.roughness ?? 0.03,
@@ -117,7 +121,12 @@ export function createGlass(env: MaterialEnv, o: GlassOptions = {}): THREE.MeshP
   const grunge = kit.grunge();
   const amount = o.dirt ?? 0.25;
   const prints = fingerprintMask(grunge, amount * 1.6);
-  const dust = saturate(grunge.g.mul(0.6).add(smoothstep(0.5, 0.9, grunge.r).mul(0.5)).mul(amount));
+  const dust = saturate(
+    grunge.g
+      .mul(0.6)
+      .add(smoothstep(0.5, 0.9, grunge.r).mul(0.5))
+      .mul(amount),
+  );
   m.roughnessNode = clampRoughness(materialRoughness.add(prints.mul(0.35)).add(dust.mul(0.5)), 0.02);
   m.transmissionNode = float(1).sub(dust.mul(0.55));
   m.colorNode = mix(materialColor, vec3(0.62, 0.6, 0.55), dust.mul(0.8));
@@ -125,7 +134,7 @@ export function createGlass(env: MaterialEnv, o: GlassOptions = {}): THREE.MeshP
 }
 
 export interface WindowGlassOptions extends GlassOptions {
-  /** Gouttes de pluie et ruisselets animés (défaut vrai). */
+  /** Gouttes de pluie et ruisselets animés (défaut : selon la qualité, absent en Bas). */
   rain?: boolean;
   /** Répétitions du motif de pluie par mètre (défaut 2,5). */
   rainScale?: number;
@@ -139,7 +148,10 @@ export interface WindowGlassOptions extends GlassOptions {
  * Mappage des gouttes : UV de la vitre (v vers le haut, 1 répétition = 1/`rainScale` m si les UV
  * sont en mètres — sinon régler `rainScale`).
  */
-export function createWindowGlass(env: MaterialEnv, o: WindowGlassOptions = {}): THREE.MeshPhysicalNodeMaterial {
+export function createWindowGlass(
+  env: MaterialEnv,
+  o: WindowGlassOptions = {},
+): THREE.MeshPhysicalNodeMaterial {
   const m = createGlass(env, {
     thickness: 0.004,
     attenuation: { color: 0xd8efe4, distance: 0.08 },
@@ -148,7 +160,8 @@ export function createWindowGlass(env: MaterialEnv, o: WindowGlassOptions = {}):
     scale: 2,
     ...o,
   });
-  if (o.rain === false) return m;
+  // Profil de qualité : pas de pluie sur la vitre en qualité Basse (`rainOnGlass`).
+  if (!(o.rain ?? env.quality >= 1)) return m;
   const rain = libTexture(env.textures, env.quality, 'raindrops');
   const scale = o.rainScale ?? 2.5;
   const speed = o.rainSpeed ?? 0.012;
@@ -159,7 +172,9 @@ export function createWindowGlass(env: MaterialEnv, o: WindowGlassOptions = {}):
   const height = max(still.r, sliding.r.mul(sliding.b.mul(0.6).add(0.4)));
   const wet = max(still.g, sliding.g);
   m.normalNode = bumpNormal(height, 0.0012);
-  m.roughnessNode = clampRoughness(mix(materialRoughness, float(0.02), wet), 0.02);
+  // Les gouttes lavent le voile de poussière : rugosité minimale sous l'eau.
+  const dryRoughness = (m.roughnessNode as FloatNode | null) ?? materialRoughness;
+  m.roughnessNode = clampRoughness(mix(dryRoughness, float(0.02), wet), 0.02);
   return m;
 }
 
@@ -236,13 +251,24 @@ export function createScopeScreen(
   const gx = abs(fract(p.x.mul(10)).sub(0.5));
   const gy = abs(fract(p.y.mul(8)).sub(0.5));
   const grid = max(smoothstep(0.47, 0.5, gx), smoothstep(0.465, 0.5, gy)).mul(0.25);
-  const axes = max(smoothstep(0.004, 0.0, abs(p.x.sub(0.5))), smoothstep(0.004, 0.0, abs(p.y.sub(0.5)))).mul(0.2);
+  const axes = max(smoothstep(0.004, 0.0, abs(p.x.sub(0.5))), smoothstep(0.004, 0.0, abs(p.y.sub(0.5)))).mul(
+    0.2,
+  );
   // Trace : sinusoïde amortie qui défile, épaisseur ~1 % de la hauteur, halo doux.
-  const phase = p.x.mul(3).sub(time.mul(0.35)).mul(Math.PI * 2);
-  const wave = sin(phase).mul(0.22).mul(sin(p.x.mul(Math.PI)).mul(0.6).add(0.4)).add(0.5);
+  const phase = p.x
+    .mul(3)
+    .sub(time.mul(0.35))
+    .mul(Math.PI * 2);
+  const wave = sin(phase)
+    .mul(0.22)
+    .mul(sin(p.x.mul(Math.PI)).mul(0.6).add(0.4))
+    .add(0.5);
   const d = abs(p.y.sub(wave));
   const trace = smoothstep(0.012, 0.0, d).add(smoothstep(0.06, 0.0, d).mul(0.25));
-  const border = smoothstep(0.0, 0.04, p.x).mul(smoothstep(1, 0.96, p.x)).mul(smoothstep(0, 0.04, p.y)).mul(smoothstep(1, 0.96, p.y));
+  const border = smoothstep(0.0, 0.04, p.x)
+    .mul(smoothstep(1, 0.96, p.x))
+    .mul(smoothstep(0, 0.04, p.y))
+    .mul(smoothstep(1, 0.96, p.y));
   const glow: FloatNode = saturate(trace.add(grid).add(axes).add(0.03)).mul(border);
   m.emissiveNode = materialEmissive.mul(glow);
   return makeGlowable(m, o.intensity ?? 3, 1);
@@ -266,9 +292,16 @@ export function createForestBackdrop(
   const forest = libTexture(env.textures, env.quality, 'forest');
   const noise = libTexture(env.textures, env.quality, 'noise');
   const img = texture(forest, uv());
-  const drift = texture(noise, uv().mul(vec2(1.5, 0.8)).add(vec2(time.mul(0.004), 0))).a;
+  const drift = texture(
+    noise,
+    uv()
+      .mul(vec2(1.5, 0.8))
+      .add(vec2(time.mul(0.004), 0)),
+  ).a;
   const fogColor: Vec3Node = rgb(0xc5cbc7);
-  const mist = smoothstep(0.35, 0.9, drift).mul(float(1).sub(img.a.mul(0.6))).mul(0.35);
+  const mist = smoothstep(0.35, 0.9, drift)
+    .mul(float(1).sub(img.a.mul(0.6)))
+    .mul(0.35);
   const brightness = o.brightness ?? 1;
   m.colorNode = mix(img.rgb, fogColor, mist).mul(materialColor).mul(brightness);
   m.fog = false;

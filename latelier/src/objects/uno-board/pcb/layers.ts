@@ -41,7 +41,8 @@ export interface Hole {
 /** Tous les perçages de la carte. */
 export function allHoles(routing: Routing): Hole[] {
   const holes: Hole[] = [];
-  for (const p of routing.pads) if (p.drill !== undefined) holes.push({ x: p.x, y: p.y, d: p.drill, plated: true });
+  for (const p of routing.pads)
+    if (p.drill !== undefined) holes.push({ x: p.x, y: p.y, d: p.drill, plated: true });
   for (const v of routing.vias) holes.push({ x: v.x, y: v.y, d: DRC.viaDrill, plated: true });
   for (const h of MOUNTING_HOLES) holes.push({ x: h.x, y: h.y, d: h.d, plated: false });
   return holes;
@@ -59,7 +60,9 @@ export function coreGeometry(routing: Routing): THREE.BufferGeometry {
     const pts: THREE.Vector2[] = [];
     for (let k = 0; k < n; k++) {
       const a = (-k / n) * Math.PI * 2; // sens horaire (trou)
-      pts.push(new THREE.Vector2((h.x - BOARD_CX) * MM + Math.cos(a) * r, (h.y - BOARD_CY) * MM + Math.sin(a) * r));
+      pts.push(
+        new THREE.Vector2((h.x - BOARD_CX) * MM + Math.cos(a) * r, (h.y - BOARD_CY) * MM + Math.sin(a) * r),
+      );
     }
     shape.holes.push(new THREE.Path(pts));
   }
@@ -132,14 +135,25 @@ export function thtPadGeometry(p: PlacedPad): THREE.BufferGeometry {
 
 /** Anneau de via (face supérieure). */
 export function viaRingGeometry(): THREE.BufferGeometry {
-  return annulus((DRC.viaDiameter / 2) * MM, (DRC.viaDrill / 2) * MM - T_PLATING, T_CU, T_HASL * 0.8, false, 20);
+  return annulus(
+    (DRC.viaDiameter / 2) * MM,
+    (DRC.viaDrill / 2) * MM - T_PLATING,
+    T_CU,
+    T_HASL * 0.8,
+    false,
+    20,
+  );
 }
 
 /**
  * Matrice d'une pastille au point (x, y) carte, hauteur `y0` (m). Face inférieure : retournée
  * (rotation de π autour de X), la géométrie s'étend alors vers le bas.
  */
-export function padMatrix(p: { x: number; y: number; rot?: number }, bottom: boolean, y0: number): THREE.Matrix4 {
+export function padMatrix(
+  p: { x: number; y: number; rot?: number },
+  bottom: boolean,
+  y0: number,
+): THREE.Matrix4 {
   return mat(boardX(p.x), y0, boardZ(p.y), bottom ? Math.PI : 0, p.rot ?? 0, 0);
 }
 

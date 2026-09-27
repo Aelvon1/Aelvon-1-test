@@ -51,12 +51,7 @@ export function surfaceFrame(space: MappingSpace): SurfaceFrame {
  * Échantillonnage triplanaire d'une texture : trois projections (plans YZ, ZX, XY) pondérées par
  * |normale|^`sharpness`. `scale` = répétitions par mètre.
  */
-export function triplanar(
-  map: THREE.Texture,
-  frame: SurfaceFrame,
-  scale: number,
-  sharpness = 4,
-): Vec4Node {
+export function triplanar(map: THREE.Texture, frame: SurfaceFrame, scale: number, sharpness = 4): Vec4Node {
   const p = frame.position.mul(scale);
   const w0 = pow(abs(frame.normal), vec3(sharpness));
   const w = w0.div(w0.x.add(w0.y).add(w0.z).add(1e-5));

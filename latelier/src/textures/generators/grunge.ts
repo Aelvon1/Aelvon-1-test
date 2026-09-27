@@ -110,7 +110,12 @@ export const grunge: Generator = ({ width, height, params, seed }) => {
   for (let i = 0; i < prints.length; i++) prints[i] = clamp01(prints[i]! + smudge[i]! * 0.6);
 
   // A : rupture de l'usure (bruit moyen, bords nets une fois seuillé dans le shader).
-  const breakup = fbmField(width, height, { scale: scale * 4, octaves: 5, persistence: 0.6, seed: seed + 47 });
+  const breakup = fbmField(width, height, {
+    scale: scale * 4,
+    octaves: 5,
+    persistence: 0.6,
+    seed: seed + 47,
+  });
   normalize(breakup);
 
   return packRGBA(width, height, stains, fine, prints, breakup);

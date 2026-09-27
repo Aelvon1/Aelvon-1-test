@@ -9,10 +9,8 @@
  *                         maître ─► mute ─► compresseur ─► limiteur ─► sortie
  */
 import type { AudioBus } from './types';
-import { renderRoomImpulse } from './buffers';
 import { smoothParam } from './envelope';
 import type { SynthKit } from './kit';
-import { mulberry32 } from './math';
 
 export const AUDIO_BUSES: readonly AudioBus[] = ['ambience', 'sfx', 'ui'];
 
@@ -23,12 +21,14 @@ export class Mixer {
   readonly master: GainNode;
   readonly mute: GainNode;
   readonly analyser: AnalyserNode;
+  private readonly reverb: ConvolverNode;
   private readonly nodes: AudioNode[] = [];
   private readonly meterData: Float32Array<ArrayBuffer>;
 
   constructor(
     readonly ctx: BaseAudioContext,
-    kit: SynthKit,
+    private readonly kit: SynthKit,
+    impulse?: readonly Float32Array[],
   ) {
     const gain = (value: number) => {
       const g = ctx.createGain();
@@ -58,24 +58,35 @@ export class Mixer {
     this.master.connect(this.mute).connect(glue).connect(limiter).connect(ctx.destination);
     limiter.connect(this.analyser);
 
-    // Réverbération de l'atelier (≈ 0,55 s : béton, mais pièce encombrée).
-    const reverb = ctx.createConvolver();
-    reverb.normalize = false;
-    const [left, right] = renderRoomImpulse(ctx.sampleRate, 0.55, mulberry32(7));
-    reverb.buffer = kit.fromSamples(left, [left, right]);
+    // Réverbération de l'atelier (≈ 0,55 s : béton, mais pièce encombrée). La réponse
+    // impulsionnelle arrive du worker (`setImpulse`) : silencieuse d'ici là.
+    this.reverb = ctx.createConvolver();
+    this.reverb.normalize = false;
     const returnHp = ctx.createBiquadFilter();
     returnHp.type = 'highpass';
     returnHp.frequency.value = 170;
     const returnGain = gain(0.9);
-    this.nodes.push(reverb, returnHp);
-    reverb.connect(returnHp).connect(returnGain).connect(this.master);
+    this.nodes.push(this.reverb, returnHp);
+    this.reverb.connect(returnHp).connect(returnGain).connect(this.master);
+    if (impulse) this.setImpulse(impulse);
 
     this.buses = { ambience: gain(1), sfx: gain(1), ui: gain(1) };
     this.sends = { ambience: gain(1), sfx: gain(1), ui: gain(1) };
     for (const bus of AUDIO_BUSES) {
       this.buses[bus].connect(this.master);
-      this.sends[bus].connect(reverb);
+      this.sends[bus].connect(this.reverb);
     }
+  }
+
+  get hasImpulse(): boolean {
+    return this.reverb.buffer !== null;
+  }
+
+  /** Installe la réponse impulsionnelle (stéréo, à la fréquence du contexte). */
+  setImpulse(channels: readonly Float32Array[]): void {
+    const [left, right] = channels;
+    if (!left) return;
+    this.reverb.buffer = this.kit.fromSamples(left, right ? [left, right] : [left]);
   }
 
   /** Règle le gain d'un bus (et de son envoi de réverbération) sans clic. */

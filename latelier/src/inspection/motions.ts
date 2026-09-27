@@ -45,7 +45,13 @@ export interface MotionSample {
   spread: number;
 }
 
-export const createMotionSample = (): MotionSample => ({ offset: 0, spin: 0, tilt: 0, lateral: 0, spread: 0 });
+export const createMotionSample = (): MotionSample => ({
+  offset: 0,
+  spin: 0,
+  tilt: 0,
+  lateral: 0,
+  spread: 0,
+});
 
 /** Découpage temporel d'un mouvement : durée totale (s) et frontières de phases (fractions). */
 export interface MotionTiming {
@@ -155,7 +161,12 @@ const tremor = (seconds: number, frequency: number, envelope: number, amplitude 
  * Échantillon de RETRAIT pour la progression u ∈ [0, 1] (0 = en place, 1 = fin de course).
  * Écrit dans `out` (aucune allocation) et le retourne.
  */
-export function sampleRemoval(spec: MotionSpec, u: number, out: MotionSample, timing = motionTiming(spec)): MotionSample {
+export function sampleRemoval(
+  spec: MotionSpec,
+  u: number,
+  out: MotionSample,
+  timing = motionTiming(spec),
+): MotionSample {
   const t = clamp01(u);
   const d = Math.max(0, spec.distance);
   const seconds = t * timing.total;
@@ -261,7 +272,12 @@ export function sampleRemoval(spec: MotionSpec, u: number, out: MotionSample, ti
  * Remontage d'un aimant : approche lente jusqu'à ~30 % de la course, aspiration accélérée,
  * claquement au contact puis léger rebond amorti. u ∈ [0, 1] (0 = pièce retirée).
  */
-function sampleMagnetReinsert(spec: MotionSpec, u: number, out: MotionSample, timing: MotionTiming): MotionSample {
+function sampleMagnetReinsert(
+  spec: MotionSpec,
+  u: number,
+  out: MotionSample,
+  timing: MotionTiming,
+): MotionSample {
   const t = clamp01(u);
   const d = Math.max(0, spec.distance);
   const near = d * 0.3;
@@ -305,7 +321,10 @@ export const removalProgress = (u: number, direction: 1 | -1): number =>
  * Fusion de l'étain pour un dessoudage, en fonction de la progression de retrait (0..1) :
  * 0 = soudure intacte, 1 = étain entièrement fondu/aspiré. Utilisable par les hooks des objets.
  */
-export function meltProgress(removal: number, spec: MotionSpec = { motion: 'desolder', distance: 0.01 }): number {
+export function meltProgress(
+  removal: number,
+  spec: MotionSpec = { motion: 'desolder', distance: 0.01 },
+): number {
   const { a } = motionTiming(spec, 1);
   return smoothstep(segment(removal, a * 0.1, a * 0.9));
 }
@@ -316,7 +335,9 @@ export function motionCues(spec: MotionSpec, direction: 1 | -1): MotionCue[] {
   const forward = direction === 1;
   switch (spec.motion) {
     case 'magneticPull':
-      return forward ? [{ at: a, sound: 'magnet.release' }] : [{ at: motionTiming(spec, -1).b, sound: 'magnet.clack' }];
+      return forward
+        ? [{ at: a, sound: 'magnet.release' }]
+        : [{ at: motionTiming(spec, -1).b, sound: 'magnet.clack' }];
     case 'pressOut':
       return forward
         ? [

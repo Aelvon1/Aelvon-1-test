@@ -10,6 +10,7 @@
 import type { ObjectPreset, ParamSchema } from '../types';
 import { signedArea, type P2 } from './profile2d';
 import { laminationSlotPolygon, type LaminationSpec } from './lamination';
+import { canContour } from './sections';
 
 export const OBJECT_ID = 'bldc-inrunner';
 
@@ -75,7 +76,12 @@ export const PARAM_SCHEMA: readonly ParamSchema[] = [
       { value: '9-6', label: '9 encoches / 6 pôles (concentré sur dents)' },
     ],
   },
-  { key: 'sensors', label: 'Capteurs à effet Hall', kind: 'boolean', help: 'Moteur « sensored » (démarrage doux).' },
+  {
+    key: 'sensors',
+    label: 'Capteurs à effet Hall',
+    kind: 'boolean',
+    help: 'Moteur « sensored » (démarrage doux).',
+  },
   {
     key: 'leads',
     label: 'Sorties de phase',
@@ -199,8 +205,26 @@ interface FormatSpec {
   cells: number;
 }
 
-const M25: ScrewSpec = { name: 'M2,5', d: 2.5, pitch: 0.45, headD: 4.5, headH: 2.5, length: 6, key: 2, tool: 'hex-key-2' };
-const M2: ScrewSpec = { name: 'M2', d: 2, pitch: 0.4, headD: 3.8, headH: 2, length: 5, key: 1.5, tool: 'hex-key-1.5' };
+const M25: ScrewSpec = {
+  name: 'M2,5',
+  d: 2.5,
+  pitch: 0.45,
+  headD: 4.5,
+  headH: 2.5,
+  length: 6,
+  key: 2,
+  tool: 'hex-key-2',
+};
+const M2: ScrewSpec = {
+  name: 'M2',
+  d: 2,
+  pitch: 0.4,
+  headD: 3.8,
+  headH: 2,
+  length: 5,
+  key: 1.5,
+  tool: 'hex-key-1.5',
+};
 
 const FORMATS: Record<FormatId, FormatSpec> = {
   '2848': {
@@ -312,7 +336,8 @@ export function slotPoleSpec(id: SlotPoleId): SlotPoleSpec {
     const p = 3;
     const coils: CoilDef[] = [];
     // Bobines concentrées : une par dent, séquence A B C (120° électriques entre dents).
-    for (let k = 0; k < Q; k++) coils.push({ phase: (k % 3) as 0 | 1 | 2, go: (k - 1 + Q) % Q, ret: k, tooth: k });
+    for (let k = 0; k < Q; k++)
+      coils.push({ phase: (k % 3) as 0 | 1 | 2, go: (k - 1 + Q) % Q, ret: k, tooth: k });
     const pitchElec = (360 * p) / Q; // 120°
     return {
       id,
@@ -333,7 +358,7 @@ export function slotPoleSpec(id: SlotPoleId): SlotPoleSpec {
   const pitch = Q / (2 * p);
   const coils: CoilDef[] = [];
   for (let s = 0; s < Q; s++) {
-    const elec = (((s * p * 360) / Q) % 360 + 360) % 360;
+    const elec = ((((s * p * 360) / Q) % 360) + 360) % 360;
     const belt = PHASE_BELTS[Math.floor(elec / 60 + 1e-9) % 6]!;
     if (belt.sign === 1) coils.push({ phase: belt.phase, go: s, ret: (s + pitch) % Q, tooth: null });
   }
@@ -365,7 +390,10 @@ export const STRAND_DIAMETERS = [0.2, 0.25, 0.28, 0.3, 0.32, 0.35, 0.4, 0.45, 0.
 export const enamelledDiameter = (d: number): number => d + 0.028 + 0.035 * d;
 
 /** Choix du fil : diamètre de brin et nombre de brins en parallèle pour une section visée. */
-export function chooseStrands(targetArea: number, preferred: number): { d: number; count: number; area: number } {
+export function chooseStrands(
+  targetArea: number,
+  preferred: number,
+): { d: number; count: number; area: number } {
   const areaOf = (d: number) => (Math.PI * d * d) / 4;
   let d: number = preferred;
   let count = Math.max(1, Math.round(targetArea / areaOf(d)));
@@ -626,7 +654,13 @@ function stackLength(f: FormatSpec, sp: SlotPoleSpec): number {
  * PAS du nombre de pôles (flux par pôle ∝ 1/p, fréquence électrique ∝ p). Le KV impose donc les
  * spires en série par phase N·c : N ∝ 1 / (KV · kw · D · L · c).
  */
-export function turnsForKv(kv: number, kw: number, rotorD: number, stack: number, coilsPerPhase: number): number {
+export function turnsForKv(
+  kv: number,
+  kw: number,
+  rotorD: number,
+  stack: number,
+  coilsPerPhase: number,
+): number {
   return referenceTurnsConstant() / (kv * kw * rotorD * stack * coilsPerPhase);
 }
 
@@ -634,7 +668,8 @@ export function turnsForKv(kv: number, kw: number, rotorD: number, stack: number
 export const roundTurns = (n: number): number => Math.max(1, Math.round(n * 2) / 2);
 
 /** Nombre de billes d'un roulement miniature (espacement ≈ 1,75 × Ø bille sur le cercle primitif). */
-export const ballCount = (b: BearingSpec): number => Math.floor((Math.PI * (b.d + b.D)) / 2 / (1.75 * b.ballD));
+export const ballCount = (b: BearingSpec): number =>
+  Math.floor((Math.PI * (b.d + b.D)) / 2 / (1.75 * b.ballD));
 
 /** Nombre réel de tôles du paquet. */
 export const laminationCount = (stack: number, thickness: number): number => Math.round(stack / thickness);
@@ -664,9 +699,8 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
     if (Math.abs(rel) > label.halfAngle) finAngles.push(a);
   }
   const finWidth = 1.5 * s;
-  // Point le plus bas : coin arrondi des ailettes basses (≈ rayon d'ailette × cos(demi-pas)).
-  const finHalfAngle = finWidth / 2 / canR;
-  const axisY = canR * Math.cos(finPitch / 2 - finHalfAngle * 0.6);
+  // Point le plus bas : sommets arrondis des deux ailettes du bas (le moteur repose dessus).
+  const axisY = -Math.min(...canContour(bodyR, canR, finAngles, finWidth, 0.05).map((p) => p[0]));
 
   // --- Flasques ---------------------------------------------------------------------------------
   const webX = half - flangeT - f.webDepth;
@@ -682,7 +716,7 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
   const screw = {
     ...f.screw,
     pcdR: screwPcd,
-    angles: [0, 120 * DEG, 240 * DEG],
+    angles: [60 * DEG, 180 * DEG, 300 * DEG],
     holeDepth: f.screw.length - flangeT + 0.8,
   };
   const mount = { r: f.mountSpacing / 2, angles: [90 * DEG, 270 * DEG], d: 3, pitch: 0.5 };
@@ -696,7 +730,8 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
   const slotPoly = laminationSlotPolygon({ ...lam, slot0: 0 }, 0.05);
   const slotArea = Math.abs(signedArea(slotPoly));
   // Aire utile : on retire l'isolant (périmètre mouillé × épaisseur, hors ouverture).
-  const wetPerimeter = 2 * (lam.Rsb - lam.Ri - lam.tipHeight) + (2 * Math.PI * lam.Rsb) / sp.slots - lam.toothWidth;
+  const wetPerimeter =
+    2 * (lam.Rsb - lam.Ri - lam.tipHeight) + (2 * Math.PI * lam.Rsb) / sp.slots - lam.toothWidth;
   const usableSlotArea = Math.max(0.1, slotArea - wetPerimeter * liner);
 
   // --- Rotor ------------------------------------------------------------------------------------
@@ -772,8 +807,15 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
   const p = sp.polePairs;
   const hallSpacing = (120 / p) * DEG;
   const hallAngles = [Math.PI - hallSpacing, Math.PI, Math.PI + hallSpacing];
-  const hallR0 = bossR + 0.15;
-  const hall = { angles: hallAngles, r0: hallR0, r1: hallR0 + 1.5, width: 3, x0: -webX - 0.2, x1: magnetX0 - 0.4 };
+  const hallR0 = bossR + 0.35;
+  const hall = {
+    angles: hallAngles,
+    r0: hallR0,
+    r1: hallR0 + 1.5,
+    width: 3,
+    x0: -webX - 0.2,
+    x1: magnetX0 - 0.4,
+  };
   const recessDepth = 1 * s;
   const pcbT = 0.8;
   const pcb = {
@@ -789,7 +831,14 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
     recessDepth,
   };
   pcb.screwR = (pcb.rIn + pcb.rOut) / 2 + 1.2 * s;
-  const connector = { angle: Math.PI, r: pcb.rOut - 2.2 * s, width: 10.5, depth: 3.8, height: 4.5, pitch: 1.5 };
+  const connector = {
+    angle: Math.PI,
+    r: pcb.rOut - 2.2 * s,
+    width: 10.5,
+    depth: 3.8,
+    height: 4.5,
+    pitch: 1.5,
+  };
 
   // --- Sorties : languettes A/B/C sur un bornier en haut de la flasque arrière ------------------
   const tabY = 9.8 * s;
@@ -803,8 +852,16 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
     width: 3 * s,
     t: 0.5,
   };
-  const block = { y0: tabY - 2.4 * s, y1: tabY + 2.4 * s, z: 7 * s, x0: -half, x1: -half - 1.5 * s };
-  const leadHoles = tabs.z.map((z) => ({ y: tabY - 0.2 * s, z, r: 1.1 * s }));
+  // Trous de passage des sorties : sur un arc au milieu de la collerette de centrage.
+  const holeR = (spigotInnerR + boreR) / 2;
+  const leadHoles = tabs.z.map((z) => ({ y: Math.sqrt(holeR * holeR - z * z), z, r: 1.1 * s }));
+  const block = {
+    y0: tabY - 2.4 * s,
+    y1: Math.max(...leadHoles.map((h) => h.y)) + leadHoles[0]!.r + 0.8 * s,
+    z: 7 * s,
+    x0: -half,
+    x1: -half - 1.5 * s,
+  };
 
   // --- Bobinage ---------------------------------------------------------------------------------
   const kw = sp.windingFactor;
@@ -923,7 +980,13 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
     shaftX0,
     shaftX1,
     flat,
-    bearing: { ...b, frontX: frontBearingX, rearX: rearBearingX, pitchR: bearingPitchR, ballCount: ballCount(b) },
+    bearing: {
+      ...b,
+      frontX: frontBearingX,
+      rearX: rearBearingX,
+      pitchR: bearingPitchR,
+      ballCount: ballCount(b),
+    },
     circlip,
     shims,
     wave,
@@ -940,7 +1003,8 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
 }
 
 /** Centre angulaire (rad) de l'encoche `k`. */
-export const slotAngle = (d: BldcDims, k: number): number => d.stator.slot0 + (k * 2 * Math.PI) / d.stator.slots;
+export const slotAngle = (d: BldcDims, k: number): number =>
+  d.stator.slot0 + (k * 2 * Math.PI) / d.stator.slots;
 
 /** Libellés des phases (repère couleur du simulateur). */
 export const PHASE_NAMES = ['A', 'B', 'C'] as const;

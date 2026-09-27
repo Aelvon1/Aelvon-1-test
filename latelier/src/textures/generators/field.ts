@@ -502,7 +502,8 @@ export const smoothstep = (a: number, b: number, v: number): number => {
 };
 
 /** Générateur aléatoire déterministe dérivé d'une graine et d'un canal. */
-export const rng = (seed: number, salt: number): (() => number) => mulberry32((seed ^ (salt * 0x9e3779b1)) >>> 0);
+export const rng = (seed: number, salt: number): (() => number) =>
+  mulberry32((seed ^ (salt * 0x9e3779b1)) >>> 0);
 
 /** Lit un nombre dans des paramètres inconnus (valeur par défaut sinon). */
 export function num(params: unknown, key: string, fallback: number): number {

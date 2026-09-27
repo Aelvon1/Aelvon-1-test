@@ -13,7 +13,15 @@ import * as THREE from 'three/webgpu';
 import type { AppContext } from '../core/context';
 import type { FrameInfo } from '../core/Engine';
 import { CameraTween, capturePose, poseLookingAt, type CameraPose } from '../core/cameraTween';
-import { patchInspection, pushToast, type InspectionState, type PartDynamic, type PartStatic, type PartTreeNode, type StepSummary } from '../core/store';
+import {
+  patchInspection,
+  pushToast,
+  type InspectionState,
+  type PartDynamic,
+  type PartStatic,
+  type PartTreeNode,
+  type StepSummary,
+} from '../core/store';
 import type { KeyInfo } from '../core/Input';
 import type { AppEvents } from '../core/events';
 import type { ObjectDef, ObjectParams } from '../objects/types';
@@ -172,7 +180,10 @@ export class Inspection {
     if (!this.tween) this.camera.update(dt);
     if (this.blockedTimer > 0) {
       this.blockedTimer -= dt;
-      if (this.blockedTimer <= 0) this.ctx.postfx.setOutline('blocked', []);
+      if (this.blockedTimer <= 0) {
+        this.ctx.postfx.setOutline('blocked', []);
+        patchInspection(this.ctx.store, { blocked: null });
+      }
     }
   }
 
@@ -209,7 +220,7 @@ export class Inspection {
 
   /** Ferme l'inspection : retour caméra vers `returnPose`, puis libération. */
   async close(returnPose: CameraPose): Promise<void> {
-    this.openToken++;
+    const token = ++this.openToken;
     this.camera.deactivate();
     this.session?.sequencer.cancel();
     this.ctx.postfx.setOutline('selected', []);
@@ -218,6 +229,8 @@ export class Inspection {
     const camera = this.ctx.engine.camera;
     this.tween = new CameraTween(camera, capturePose(camera), returnPose, 1.3);
     await this.tween.done;
+    // Un autre objet a été ouvert pendant le retour caméra : il ne doit pas être libéré.
+    if (token !== this.openToken) return;
     this.disposeSession();
     this.ctx.store.setState({ inspection: null });
     this.world.setInspectionMode({ active: false, neutral: false });
@@ -361,6 +374,9 @@ export class Inspection {
   /** L'objet est construit et la caméra arrivée : pose sur le tapis, store complet, contrôles. */
   private startSession(session: Session): void {
     this.session = session;
+    const failed = session.assembly.buildErrors;
+    if (failed.length)
+      pushToast(this.ctx.store, `${failed.length} pièce(s) n'ont pas pu être construites (voir la console).`, 'error', 6000);
     const root = session.assembly.root;
     this.ctx.engine.scene.add(root);
     session.drop = { elapsed: 0, played: false };
@@ -379,7 +395,9 @@ export class Inspection {
     const sphere = bounds.getBoundingSphere(new THREE.Sphere());
     const pres = session.def.presentation;
     const dirObj = pres?.viewDirection ?? [0.3, 0.75, 1];
-    const direction = new THREE.Vector3(dirObj[0], dirObj[1], dirObj[2]).normalize().applyQuaternion(assembly.root.quaternion);
+    const direction = new THREE.Vector3(dirObj[0], dirObj[1], dirObj[2])
+      .normalize()
+      .applyQuaternion(assembly.root.quaternion);
     const camera = this.ctx.engine.camera;
     let distance = fitDistance(sphere.radius, INSPECTION_VIEW.fov, camera.aspect, 1.4);
     const view = this.ctx.dev.view;
@@ -625,12 +643,17 @@ export class Inspection {
   }
 
   /** Relais de la sélection souris de la caméra temporaire vers le bus. */
-  private emitPick(kind: 'hover' | 'select' | 'toggle', object: THREE.Object3D | null, instance: number | null): void {
+  private emitPick(
+    kind: 'hover' | 'select' | 'toggle',
+    object: THREE.Object3D | null,
+    instance: number | null,
+  ): void {
     const a = this.assembly;
     const hit = a && object ? a.pick(object, instance) : null;
     const bus = this.ctx.bus;
     if (kind === 'hover') bus.emit('inspection:hover', { partId: hit?.partId ?? null });
-    else if (kind === 'select') bus.emit('inspection:select', { partId: hit?.partId ?? null, instance: hit?.instance ?? null });
+    else if (kind === 'select')
+      bus.emit('inspection:select', { partId: hit?.partId ?? null, instance: hit?.instance ?? null });
     else if (hit) bus.emit('inspection:toggleRemove', { partId: hit.partId });
   }
 
@@ -656,12 +679,18 @@ export class Inspection {
       return;
     }
     const names = blockage.blockers.map(nameOf).join(', ');
-    const message = reinsert && blockage.reason === 'Remonter d’abord' ? `Remonter d'abord : ${names}` : `Bloqué par : ${names}`;
+    const message =
+      reinsert && blockage.reason === 'Remonter d’abord'
+        ? `Remonter d'abord : ${names}`
+        : `Bloqué par : ${names}`;
     patchInspection(store, { blocked: { partId, blockers: [...blockage.blockers] } });
     bus.emit('inspection:blocked', { partId, blockers: [...blockage.blockers] });
     pushToast(store, message, 'warning');
     this.ctx.audio.play('ui.error');
-    postfx.setOutline('blocked', blockage.blockers.flatMap((id) => s.assembly.meshesOf(id, true)));
+    postfx.setOutline(
+      'blocked',
+      blockage.blockers.flatMap((id) => s.assembly.meshesOf(id, true)),
+    );
     this.blockedTimer = BLOCKED_OUTLINE_SECONDS;
   }
 
@@ -675,7 +704,11 @@ export class Inspection {
     const part = a.parts.get(partId)!;
     const inst = part.instanced && instance !== null && instance < part.instanced.count ? instance : null;
     patchInspection(this.ctx.store, {
-      selected: { partId, instance: inst, instanceLabel: inst !== null ? a.instanceLabelOf(partId, inst) : null },
+      selected: {
+        partId,
+        instance: inst,
+        instanceLabel: inst !== null ? a.instanceLabelOf(partId, inst) : null,
+      },
     });
     this.ctx.postfx.setOutline('selected', a.meshesOf(partId, true));
   }
@@ -750,7 +783,10 @@ export class Inspection {
     const target = this.ctx.store.getState().inspection?.explode ?? 0;
     if (s.explodeRate === target) return;
     const step = dt / EXPLODE_SECONDS;
-    s.explodeRate = target > s.explodeRate ? Math.min(target, s.explodeRate + step) : Math.max(target, s.explodeRate - step);
+    s.explodeRate =
+      target > s.explodeRate
+        ? Math.min(target, s.explodeRate + step)
+        : Math.max(target, s.explodeRate - step);
     s.composer.setExplodeRate(s.explodeRate);
   }
 
@@ -769,8 +805,15 @@ export class Inspection {
     if (!s.knolling) {
       if (!enabled) return;
       const plan = planKnolling(s.assembly, s.graph);
-      if (!plan.fits) console.warn('[Inspection] Vue rangée : place insuffisante sur l’établi, chevauchements possibles.');
-      s.knolling = { plan, rank: new Map(plan.order.map((id, i) => [id, i] as const)), active: false, elapsed: 0, running: false };
+      if (!plan.fits)
+        console.warn('[Inspection] Vue rangée : place insuffisante sur l’établi, chevauchements possibles.');
+      s.knolling = {
+        plan,
+        rank: new Map(plan.order.map((id, i) => [id, i] as const)),
+        active: false,
+        elapsed: 0,
+        running: false,
+      };
       for (const [id, m] of plan.targets) s.composer.get(id)!.knollTarget = m;
       for (const [id, list] of plan.instanceTargets) s.composer.get(id)!.knollInstanceTargets = list;
     }
@@ -796,7 +839,9 @@ export class Inspection {
       const pose = s.composer.get(id);
       if (!pose) continue;
       // Entrée : de la première à la dernière pièce ; sortie : ordre inverse.
-      pose.knollWeight = k.active ? knollingWeight(k.elapsed, rank, n) : 1 - knollingWeight(k.elapsed, n - 1 - rank, n);
+      pose.knollWeight = k.active
+        ? knollingWeight(k.elapsed, rank, n)
+        : 1 - knollingWeight(k.elapsed, n - 1 - rank, n);
     }
     s.composer.refreshAllVisibility();
     s.composer.markDirty();
@@ -844,7 +889,10 @@ export class Inspection {
     if (dev.select) this.select(dev.select, null);
     if (dev.labels) patchInspection(store, { labels: true });
     if (dev.xray) patchInspection(store, { xray: true });
-    if (dev.section) patchInspection(store, { section: { enabled: true, axis: dev.section.axis, position: dev.section.position, flip: false } });
+    if (dev.section)
+      patchInspection(store, {
+        section: { enabled: true, axis: dev.section.axis, position: dev.section.position, flip: false },
+      });
     if (dev.neutral) {
       patchInspection(store, { neutralBackground: true });
       this.world.setInspectionMode({ active: true, neutral: true });
