@@ -38,7 +38,8 @@ export const BENCH = {
   x: [-1.8, 0.2] as const,
   z: [-2.0, -1.25] as const,
   topHeight: 0.92,
-  topThickness: 0.045,
+  /** Plateau en lames de bois massif (4 lames le long de X). */
+  topThickness: 0.06,
 } as const;
 
 /** Tapis antistatique (≥ 60 × 50 cm) posé sur l'établi : zone d'inspection des objets. */
@@ -49,8 +50,19 @@ export const MAT = {
   thickness: 0.003,
 } as const;
 
-/** Panneau perforé au-dessus de l'établi (sur le mur nord). */
-export const PEGBOARD = { x: [-1.8, 0.2] as const, y: [1.08, 2.08] as const, z: -1.985 } as const;
+/**
+ * Panneau perforé au-dessus de l'établi (sur le mur nord). `z` = FACE AVANT du panneau (6 mm
+ * d'isorel sur tasseaux de 9 mm). Trous Ø 6,4 mm au pas de 25,4 mm : le trou (i, j) est centré en
+ * x = x[0] + (i + 0,5) × holeSpacing, y = y[0] + (j + 0,5) × holeSpacing (crochets des outils).
+ * Cadre bois de 25 mm tout autour, en saillie de 16 mm devant la face.
+ */
+export const PEGBOARD = {
+  x: [-1.8, 0.2] as const,
+  y: [1.08, 2.08] as const,
+  z: -1.985,
+  holeSpacing: 0.0254,
+  holeDiameter: 0.0064,
+} as const;
 
 /** Fenêtre (mur ouest). */
 export const WINDOW = { x: -2.5, z: [-1.25, -0.05] as const, y: [1.0, 2.0] as const } as const;
@@ -81,7 +93,8 @@ export const SPOTS = {
   trash: [0.55, 0, -1.2] as const,
   lightSwitch: [1.08, 1.25, 1.985] as const,
   pendantBulb: [0, 2.35, 0] as const,
-  neonTube: [-0.8, 2.6, -1.55] as const,
+  /** Centre du tube néon (réglette suspendue par chaînettes sous les solives, tube de 1,2 m selon X). */
+  neonTube: [-0.8, 2.38, -1.55] as const,
   calendar: [0.65, 1.55, -1.985] as const,
   magnifierLampBase: [-1.62, BENCH.topHeight, -1.9] as const,
   radio: [-2.2, ELECTRONICS_DESK.height, 0.95] as const,

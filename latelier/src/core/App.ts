@@ -187,6 +187,13 @@ export class App {
       machine.go('inspection');
       postfx.setMode('inspection');
       await startPreview(ctx, this.world, previewId);
+    } else if (import.meta.env.DEV && dev.raw.get('materials') === '1') {
+      // Vitrine des matériaux de la bibliothèque (mise au point du rendu).
+      const { startMaterialShowcase } = await import('../dev/materialShowcase');
+      machine.go('transition');
+      machine.go('inspection');
+      postfx.setMode('inspection');
+      await startMaterialShowcase(ctx, this.world);
     } else if (dev.inspect) {
       machine.go('transition');
       await this.openObject(dev.inspect);
@@ -290,7 +297,11 @@ export class App {
 
     // Clic sur le canvas en exploration sans verrouillage : reprise.
     ctx.engine.canvas.addEventListener('click', () => {
-      if (machine.phase === 'exploration' && !input.pointerLocked) this.enterExploration(true);
+      if (machine.phase === 'exploration' && !input.pointerLocked) {
+        // Geste utilisateur : démarre aussi l'audio (utile avec ?skip=home, sans bouton « Entrer »).
+        void audio.resume();
+        this.enterExploration(true);
+      }
     });
 
     input.onKeyDown((key) => {

@@ -49,7 +49,11 @@ export class MaterialLibraryImpl implements MaterialLibrary {
     const m = material as THREE.MeshPhysicalNodeMaterial;
     if (overrides.color !== undefined && 'color' in m) m.color = new THREE.Color(overrides.color);
     if (overrides.map !== undefined && 'map' in m) m.map = overrides.map;
-    if (overrides.normalMap !== undefined && 'normalMap' in m) m.normalMap = overrides.normalMap;
+    if (overrides.normalMap !== undefined && 'normalMap' in m) {
+      m.normalMap = overrides.normalMap;
+      // Une carte de normales explicite remplace le relief procédural (normalNode).
+      if (overrides.normalMap && 'normalNode' in m) m.normalNode = null;
+    }
     if (overrides.roughness !== undefined && 'roughness' in m) m.roughness = overrides.roughness;
     if (overrides.metalness !== undefined && 'metalness' in m) m.metalness = overrides.metalness;
     if (overrides.emissive !== undefined && 'emissive' in m) m.emissive = new THREE.Color(overrides.emissive);
@@ -58,6 +62,9 @@ export class MaterialLibraryImpl implements MaterialLibrary {
     if (overrides.opacity !== undefined) material.opacity = overrides.opacity;
     if (overrides.transparent !== undefined) material.transparent = overrides.transparent;
     if (overrides.side !== undefined) material.side = overrides.side;
+    // Crochet des fabriques : rattache au clone ce qui doit lui être propre (ex. `setGlow`).
+    const onVariant: unknown = base.userData.onVariant;
+    if (typeof onVariant === 'function') (onVariant as (clone: THREE.Material) => void)(material);
     material.needsUpdate = true;
     return material;
   }

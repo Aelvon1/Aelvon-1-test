@@ -154,22 +154,27 @@ export class Input {
    * Axes de déplacement (positions physiques ZQSD/WASD + flèches) :
    * `forward` +1 = avancer, `right` +1 = pas chassé à droite.
    */
-  moveAxes(): { forward: number; right: number } {
-    const f =
+  moveAxes(out: { forward: number; right: number } = { forward: 0, right: 0 }): {
+    forward: number;
+    right: number;
+  } {
+    // `out` facultatif : permet une lecture par image sans allocation.
+    out.forward =
       (this.isDown('KeyW') || this.isDown('ArrowUp') ? 1 : 0) -
       (this.isDown('KeyS') || this.isDown('ArrowDown') ? 1 : 0);
-    const r =
+    out.right =
       (this.isDown('KeyD') || this.isDown('ArrowRight') ? 1 : 0) -
       (this.isDown('KeyA') || this.isDown('ArrowLeft') ? 1 : 0);
-    return { forward: f, right: r };
+    return out;
   }
 
   /** Récupère et remet à zéro le déplacement souris accumulé (pixels) depuis le dernier appel. */
-  consumeMouseDelta(): { x: number; y: number } {
-    const delta = { x: this.mouseDX, y: this.mouseDY };
+  consumeMouseDelta(out: { x: number; y: number } = { x: 0, y: 0 }): { x: number; y: number } {
+    out.x = this.mouseDX;
+    out.y = this.mouseDY;
     this.mouseDX = 0;
     this.mouseDY = 0;
-    return delta;
+    return out;
   }
 
   onKeyDown(handler: KeyHandler): () => void {

@@ -33,7 +33,14 @@ export type SoundId =
   | 'tool.pickup'
   | 'neon.flicker'; // claquement du starter du néon
 
-/** Sons continus (boucles contrôlables). */
+/**
+ * Sons continus (boucles contrôlables). `setIntensity` (0..1) selon la boucle :
+ * pluie → force de l'averse ; néon → grésillement/crépitements (tube fatigué, scintillement) ;
+ * ventilateur → vitesse (montée/descente en régime) ; radio → qualité de réception (1 = nette) ;
+ * fer → grésillement ; air chaud → débit ; oscilloscope, fond de pièce → niveau.
+ * Positions conseillées : pluie sur la vitre à la fenêtre, néon au tube, radio/ventilateur
+ * à l'appareil ; `rain.roof` et `room.tone` non positionnés (sons diffus).
+ */
 export type LoopId =
   | 'rain.roof'
   | 'rain.window'
@@ -77,4 +84,19 @@ export interface AudioApi {
   updateListener(camera: THREE.Camera): void;
   /** Coupe/rétablit tout (pause). */
   setMuted(muted: boolean): void;
+  /** Débogage (facultatif) : état du contexte, boucles actives, niveau de sortie. */
+  debugInfo?(): AudioDebugInfo;
+  /** Libère le contexte audio et toutes les boucles (facultatif). */
+  dispose?(): void;
+}
+
+/** État de débogage du moteur audio. */
+export interface AudioDebugInfo {
+  state: AudioContextState | 'none' | 'unsupported';
+  sampleRate: number;
+  /** Boucles actives (ou en attente du démarrage du contexte). */
+  loops: LoopId[];
+  /** Niveau efficace de la sortie (0..1). */
+  level: number;
+  muted: boolean;
 }

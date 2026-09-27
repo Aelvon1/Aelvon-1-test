@@ -136,6 +136,8 @@ export const BASE_MATERIAL_IDS = [
   'emissive.tungsten', // filament/ampoule tungstène
   'emissive.neon', // tube néon légèrement verdâtre
   'emissive.screen', // écran d'oscilloscope phosphore vert
+  // --- Ajouts (bibliothèque matériaux) ---
+  'backdrop.forest', // fond extérieur vu par la fenêtre : forêt dans la brume (non éclairé)
 ] as const;
 
 export type BaseMaterialId = (typeof BASE_MATERIAL_IDS)[number];
