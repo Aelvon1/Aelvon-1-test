@@ -187,6 +187,9 @@ export class InspectionView {
   activate(): void {
     this.active = true;
     this.lights.setActive(true);
+    // Étiquettes restées actives depuis l'inspection précédente : réaffichées sans attendre un
+    // changement du store.
+    this.labels.setState(this.labelState(this.ctx.store.getState().inspection));
     if (this.ctx.input.pointerLocked) this.ctx.input.exitPointerLock();
   }
 

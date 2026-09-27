@@ -419,7 +419,8 @@ export class InspectionLabels {
   }
 
   private layoutKnolling(labels: readonly KnollingLabel[], width: number, height: number): PlacedTag[] {
-    const area: LabelArea = { left: 0, top: 0, right: width, bottom: height };
+    // Hors des panneaux latéraux et de la frise (ils recouvrent la couche des étiquettes).
+    const area: LabelArea = this.area(width, height);
     const candidates: TagCandidate[] = [];
     const p = { x: 0, y: 0 };
     const byId = new Map(this.infos.map((i) => [i.part.id, i] as const));

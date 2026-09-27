@@ -188,6 +188,11 @@ export class InspectionCamera implements InspectionCameraController {
     return this.lastClearance;
   }
 
+  /** Un glisser (orbite ou panoramique) est en cours : le survol est suspendu. */
+  get dragging(): boolean {
+    return this.drag?.moved === true;
+  }
+
   /** Signale un changement de la scène inspectée (poses, visibilité, coupe…). */
   notifySceneChanged(): void {
     this.sceneDirty = true;
@@ -368,6 +373,8 @@ export class InspectionCamera implements InspectionCameraController {
     const maxOffset = Math.max(0.05, this.objectRadius * 2.5);
     _v.subVectors(s.target, this.objectCenter);
     if (_v.lengthSq() > maxOffset * maxOffset) s.target.copy(this.objectCenter).add(_v.setLength(maxOffset));
+    // Ni la cible ni la caméra sous le tapis (panoramique vers le bas).
+    if (s.target.y < this.o.floorY) s.target.y = this.o.floorY;
     const minD = this.minSurfaceDistance;
     // Recul maximal : 4 cadrages de l'objet, et au moins la distance de la dernière transition
     // (vue rangée, qui s'étend pendant son animation).
@@ -633,6 +640,8 @@ export class InspectionCamera implements InspectionCameraController {
     if (d.mode === 'orbit') this.panVelocity.set(0, 0, 0);
     else this.orbitVelocity.set(0, 0);
     this.endDrag();
+    // Fin d'un glisser : le survol reprend à la position réelle du pointeur.
+    if (d.moved && this.isActive) this.listener?.onPointerMove(e.clientX, e.clientY);
     if (click && d.button === 0 && this.isActive) this.listener?.onClick(e.clientX, e.clientY, e);
   }
 

@@ -124,6 +124,8 @@ export class Selection implements CameraPointerListener {
   private lastHoverPart: string | null = null;
   private lastHoverInstance: number | null = null;
   private pendingToggle: { partId: string; timer: ReturnType<typeof setTimeout> } | null = null;
+  /** Dernière matrice de vue vue par le survol. */
+  private readonly lastView = new THREE.Matrix4();
   private readonly hit: PickHit = {
     partId: '',
     instance: null,
@@ -266,7 +268,13 @@ export class Selection implements CameraPointerListener {
   update(dt: number): void {
     if (!this.assembly) return;
     this.hoverTimer += dt;
-    if (this.pointer && this.pointerDirty && this.hoverTimer >= HOVER_INTERVAL) {
+    // La caméra a bougé (zoom à la molette, transition, élan) : la pièce sous le pointeur change.
+    const view = this.o.ctx.engine.camera.matrixWorld;
+    if (!view.equals(this.lastView)) {
+      this.lastView.copy(view);
+      this.pointerDirty = true;
+    }
+    if (this.pointer && this.pointerDirty && this.hoverTimer >= HOVER_INTERVAL && !this.o.camera.dragging) {
       this.hoverTimer = 0;
       this.pointerDirty = false;
       const hit = this.pickAt(this.pointer.x, this.pointer.y);
