@@ -235,7 +235,10 @@ export class Picker implements CameraSceneQuery {
       if (g.boundingSphere) {
         _sphere.copy(g.boundingSphere).applyMatrix4(mesh.matrixWorld);
         if (!this.raycaster.ray.intersectsSphere(_sphere)) return;
-        if (this.raycaster.far < Infinity && _sphere.distanceToPoint(this.raycaster.ray.origin) > this.raycaster.far)
+        if (
+          this.raycaster.far < Infinity &&
+          _sphere.distanceToPoint(this.raycaster.ray.origin) > this.raycaster.far
+        )
           return;
       }
       probe.matrixWorld.copy(mesh.matrixWorld);
@@ -254,9 +257,17 @@ export class Picker implements CameraSceneQuery {
       _sphere.copy(inst.boundingSphere).applyMatrix4(inst.matrixWorld);
       if (!this.raycaster.ray.intersectsSphere(_sphere)) return;
     }
+    const g = mesh.geometry;
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    const local = g.boundingSphere;
     for (let i = 0; i < inst.count; i++) {
       inst.getMatrixAt(i, _m);
       probe.matrixWorld.multiplyMatrices(inst.matrixWorld, _m);
+      // Rejet rapide par instance (tôles, broches, billes : des centaines d'instances).
+      if (local) {
+        _sphere.copy(local).applyMatrix4(probe.matrixWorld);
+        if (!this.raycaster.ray.intersectsSphere(_sphere)) continue;
+      }
       const before = this.hits.length;
       acceleratedRaycast.call(probe, this.raycaster, this.hits);
       for (let k = before; k < this.hits.length; k++) {

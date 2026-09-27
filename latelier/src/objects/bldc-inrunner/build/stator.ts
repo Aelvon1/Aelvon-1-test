@@ -140,7 +140,60 @@ function strandTubes(
   return { indicesPerSegment: strands * radial * 6 };
 }
 
-/** Écheveau du brin libéré : pont depuis le point de coupe puis spirale lâche qui s'allonge. */
+/**
+ * Repères de transport parallèle d'une polyligne (n × 3), écrits dans `N` et `B` (sans allocation).
+ */
+function transportFramesInto(p: Float32Array, count: number, N: Float32Array, B: Float32Array): void {
+  let nx = 0;
+  let ny = 0;
+  let nz = 0;
+  for (let i = 0; i < count; i++) {
+    const a = Math.max(0, i - 1) * 3;
+    const b = Math.min(count - 1, i + 1) * 3;
+    let tx = p[b]! - p[a]!;
+    let ty = p[b + 1]! - p[a + 1]!;
+    let tz = p[b + 2]! - p[a + 2]!;
+    const tl = Math.hypot(tx, ty, tz) || 1;
+    tx /= tl;
+    ty /= tl;
+    tz /= tl;
+    if (i === 0) {
+      // Normale initiale : T × (X ou Y), la plus stable.
+      if (Math.abs(tx) < 0.9) {
+        nx = 0;
+        ny = tz;
+        nz = -ty;
+      } else {
+        nx = -tz;
+        ny = 0;
+        nz = tx;
+      }
+    } else {
+      // Projection de la normale précédente sur le plan normal courant.
+      const d = nx * tx + ny * ty + nz * tz;
+      nx -= d * tx;
+      ny -= d * ty;
+      nz -= d * tz;
+    }
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    nx /= nl;
+    ny /= nl;
+    nz /= nl;
+    const o = i * 3;
+    N[o] = nx;
+    N[o + 1] = ny;
+    N[o + 2] = nz;
+    // B = T × N (unitaire : T et N orthonormés).
+    B[o] = ty * nz - tz * ny;
+    B[o + 1] = tz * nx - tx * nz;
+    B[o + 2] = tx * ny - ty * nx;
+  }
+}
+
+/**
+ * Écheveau du brin libéré : pont depuis le point de coupe puis spirale lâche qui s'allonge.
+ * Tampons préalloués : la mise à jour (à chaque image du débobinage) n'alloue rien.
+ */
 class FreeStrand {
   readonly mesh: THREE.Mesh;
   private readonly geometry: THREE.BufferGeometry;
@@ -148,6 +201,13 @@ class FreeStrand {
   private readonly radial = 6;
   private readonly radius: number;
   private readonly pile: { center: V3; r: number; pitch: number };
+  /** Ligne moyenne (mm) et repères de transport parallèle (N, B), `rings` échantillons. */
+  private readonly pts: Float32Array;
+  private readonly frameN: Float32Array;
+  private readonly frameB: Float32Array;
+  /** Cosinus/sinus des génératrices de la section. */
+  private readonly cosJ: Float32Array;
+  private readonly sinJ: Float32Array;
 
   constructor(
     material: THREE.Material,
@@ -158,6 +218,15 @@ class FreeStrand {
     this.rings = rings;
     this.radius = radius;
     this.pile = pile;
+    this.pts = new Float32Array(rings * 3);
+    this.frameN = new Float32Array(rings * 3);
+    this.frameB = new Float32Array(rings * 3);
+    this.cosJ = new Float32Array(this.radial + 1);
+    this.sinJ = new Float32Array(this.radial + 1);
+    for (let j = 0; j <= this.radial; j++) {
+      this.cosJ[j] = Math.cos((j / this.radial) * Math.PI * 2);
+      this.sinJ[j] = Math.sin((j / this.radial) * Math.PI * 2);
+    }
     const ring = this.radial + 1;
     const pos = new Float32Array(rings * ring * 3);
     const nor = new Float32Array(rings * ring * 3);
@@ -182,60 +251,66 @@ class FreeStrand {
     this.mesh.visible = false;
   }
 
-  /** Met à jour le brin libre : point de coupe `from` (mm) et longueur déroulée (mm). */
-  update(from: V3, length: number): void {
+  /** Met à jour le brin libre : point de coupe (fx, fy, fz) en mm et longueur déroulée (mm). */
+  update(fx: number, fy: number, fz: number, length: number): void {
     if (length < 0.5) {
       this.mesh.visible = false;
       return;
     }
     this.mesh.visible = true;
     const { center, r, pitch } = this.pile;
-    // Point d'entrée de l'écheveau et pont (courbe de Bézier) depuis le point de coupe.
-    const entry: V3 = [center[0], center[1] - r * 0.2, center[2] + r];
-    const ctrl: V3 = [from[0], Math.max(from[1], entry[1]) + 6, (from[2] + entry[2]) / 2];
-    const bridgeLen = Math.hypot(entry[0] - from[0], entry[1] - from[1], entry[2] - from[2]) * 1.2;
+    const pts = this.pts;
+    // Point d'entrée de l'écheveau et pont (courbe de Bézier quadratique) depuis le point de coupe.
+    const ex = center[0];
+    const ey = center[1] - r * 0.2;
+    const ez = center[2] + r;
+    const cx = fx;
+    const cy = Math.max(fy, ey) + 6;
+    const cz = (fz + ez) / 2;
+    const bridgeLen = Math.hypot(ex - fx, ey - fy, ez - fz) * 1.2;
     const helixLen = Math.max(0, length - bridgeLen);
     const bridgeRings = Math.max(2, Math.min(24, Math.ceil(Math.min(length, bridgeLen) / 1.2)));
-    const pts: number[] = [];
     const bridgeFrac = Math.min(1, length / bridgeLen);
     for (let i = 0; i < bridgeRings; i++) {
       const t = (i / (bridgeRings - 1)) * bridgeFrac;
       const u = 1 - t;
-      for (let c = 0; c < 3; c++) pts.push(u * u * from[c]! + 2 * u * t * ctrl[c]! + t * t * entry[c]!);
+      pts[i * 3] = u * u * fx + 2 * u * t * cx + t * t * ex;
+      pts[i * 3 + 1] = u * u * fy + 2 * u * t * cy + t * t * ey;
+      pts[i * 3 + 2] = u * u * fz + 2 * u * t * cz + t * t * ez;
     }
-    // Spirale lâche autour de l'axe Z du repère de la pièce (écheveau posé à côté).
+    // Spirale lâche d'axe X (écheveau posé à côté du stator), qui s'allonge avec le fil libéré.
     const turnLen = 2 * Math.PI * r;
     const helixRings = Math.min(this.rings - bridgeRings, Math.ceil(helixLen / 1.1));
     for (let i = 1; i <= helixRings; i++) {
-      const s = (i / helixRings) * helixLen;
-      const a = (s / turnLen) * Math.PI * 2 + Math.PI / 2;
-      const wobble = 0.12 * r * Math.sin(a * 2.3);
-      const rr = r + wobble;
-      pts.push(
-        center[0] + (s / turnLen) * pitch,
-        center[1] + rr * Math.cos(a) - r * 0.2,
-        center[2] + rr * Math.sin(a),
-      );
+      const sLen = (i / helixRings) * helixLen;
+      const a = (sLen / turnLen) * Math.PI * 2 + Math.PI / 2;
+      const rr = r + 0.12 * r * Math.sin(a * 2.3);
+      const o = (bridgeRings + i - 1) * 3;
+      pts[o] = center[0] + (sLen / turnLen) * pitch;
+      pts[o + 1] = center[1] + rr * Math.cos(a) - r * 0.2;
+      pts[o + 2] = center[2] + rr * Math.sin(a);
     }
-    const count = pts.length / 3;
-    const frames = transportFrames(pts, count);
+    const count = bridgeRings + helixRings;
+    transportFramesInto(pts, count, this.frameN, this.frameB);
     const pos = this.geometry.getAttribute('position') as THREE.BufferAttribute;
     const nor = this.geometry.getAttribute('normal') as THREE.BufferAttribute;
+    const N = this.frameN;
+    const B = this.frameB;
     const ring = this.radial + 1;
     for (let i = 0; i < count; i++) {
-      const N = frames.N[i]!;
-      const B = frames.B[i]!;
+      const i3 = i * 3;
       for (let j = 0; j <= this.radial; j++) {
-        const a = (j / this.radial) * Math.PI * 2;
-        const nx = Math.cos(a) * N[0] + Math.sin(a) * B[0];
-        const ny = Math.cos(a) * N[1] + Math.sin(a) * B[1];
-        const nz = Math.cos(a) * N[2] + Math.sin(a) * B[2];
+        const c = this.cosJ[j]!;
+        const sn = this.sinJ[j]!;
+        const nx = c * N[i3]! + sn * B[i3]!;
+        const ny = c * N[i3 + 1]! + sn * B[i3 + 1]!;
+        const nz = c * N[i3 + 2]! + sn * B[i3 + 2]!;
         const v = i * ring + j;
         pos.setXYZ(
           v,
-          (pts[i * 3]! + this.radius * nx) * MM,
-          (pts[i * 3 + 1]! + this.radius * ny) * MM,
-          (pts[i * 3 + 2]! + this.radius * nz) * MM,
+          (pts[i3]! + this.radius * nx) * MM,
+          (pts[i3 + 1]! + this.radius * ny) * MM,
+          (pts[i3 + 2]! + this.radius * nz) * MM,
         );
         nor.setXYZ(v, nx, ny, nz);
       }
@@ -345,9 +420,13 @@ export function buildPhase(ctx: Ctx, phase: 0 | 1 | 2): PartBuild {
       state.visible = Math.max(0, Math.round((1 - eased) * (wire.count - 1)) + 1);
       applyVisible(state);
       const k = Math.min(wire.count - 1, Math.max(0, state.visible - 1));
-      const from: V3 = [wire.centers[k * 3]!, wire.centers[k * 3 + 1]!, wire.centers[k * 3 + 2]!];
       const unwound = wire.arc[wire.count - 1]! - wire.arc[k]!;
-      free.update(from, u >= 1 ? wire.arc[wire.count - 1]! : unwound);
+      free.update(
+        wire.centers[k * 3]!,
+        wire.centers[k * 3 + 1]!,
+        wire.centers[k * 3 + 2]!,
+        u >= 1 ? wire.arc[wire.count - 1]! : unwound,
+      );
     },
     dispose() {
       free.dispose();

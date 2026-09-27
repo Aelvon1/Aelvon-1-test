@@ -125,6 +125,20 @@ export interface InspectionState {
   rightPanelOpen: boolean;
   /** Construction/préparation en cours (0..1) ou null. */
   buildProgress: number | null;
+  /**
+   * Dépendances de démontage résolues par pièce (copiées du graphe une fois l'objet construit),
+   * pour que la fiche affiche « Bloqué par : … » avant toute tentative. Absent pendant la
+   * construction.
+   */
+  dependencies?: Record<string, PartDependencies>;
+}
+
+/** Dépendances d'une pièce dans le graphe de démontage (tags et règle du parent développés). */
+export interface PartDependencies {
+  /** Pièces à retirer avant celle-ci. */
+  requires: readonly string[];
+  /** Pièces qui exigent le retrait de celle-ci (à remonter avant elle). */
+  dependents: readonly string[];
 }
 
 export interface Toast {

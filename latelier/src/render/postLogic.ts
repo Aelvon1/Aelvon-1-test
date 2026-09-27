@@ -79,6 +79,37 @@ export function buildConfigKey(config: PostBuildConfig): string {
   ].join('|');
 }
 
+/**
+ * Configuration de secours (pilote qui refuse un shader, mémoire insuffisante…) : ni MSAA,
+ * ni AO, ni bloom, ni profondeur de champ ; FXAA + étalonnage + contours seulement.
+ */
+export function safeBuildConfig(config: PostBuildConfig): PostBuildConfig {
+  return { ...config, msaaSamples: 0, ao: false, bloom: false, dof: false, antialias: 'fxaa', grain: false };
+}
+
+/**
+ * Choisit la configuration à construire en évitant celles qui ont déjà échoué sur ce GPU :
+ * la configuration demandée, sinon celle de secours, sinon `null` (rendu direct sans
+ * post-traitement, tone mapping AgX assuré par le renderer).
+ */
+export function selectBuildConfig(
+  requested: PostBuildConfig,
+  failedKeys: ReadonlySet<string>,
+): PostBuildConfig | null {
+  if (!failedKeys.has(buildConfigKey(requested))) return requested;
+  const safe = safeBuildConfig(requested);
+  return failedKeys.has(buildConfigKey(safe)) ? null : safe;
+}
+
+/**
+ * Nom valide pour une variable WGSL / GLSL (lettre ou « _ » puis lettres, chiffres, « _ » ;
+ * pas de « __ » initial, réservé en WGSL). Un nœud TSL nommé (`setName`, `label`) devient une
+ * déclaration du shader : « PostFX.aoBlurH » produisait un WGSL invalide (écran noir).
+ */
+export function isValidShaderIdentifier(name: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !name.startsWith('__') && name !== '_';
+}
+
 /** Réglages visuels continus propres à chaque mode (interpolés en douceur). */
 export interface ModeLook {
   /** Force du vignettage 0..1. */

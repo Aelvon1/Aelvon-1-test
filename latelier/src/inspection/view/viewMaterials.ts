@@ -81,6 +81,11 @@ export function supportsSectionCap(material: THREE.Material): boolean {
 /**
  * Variante « face de coupe » : double face ; les faces avant gardent le rendu d'origine, les
  * faces arrière reçoivent la couleur de coupe unie, hachurée en diagonale (écran).
+ *
+ * Approximation : la « face de coupe » est l'intérieur du volume vu à travers la coupe (faces
+ * arrière), pas un polygone de section calculé. Exact pour les maillages fermés ; un maillage
+ * ouvert (tôle, surface simple) laisse voir le vide, et les matériaux transparents ou déjà double
+ * face (`supportsSectionCap` faux) sont coupés sans face pleine.
  */
 export function createSectionCapVariant(material: THREE.Material): THREE.Material {
   const clone = material.clone() as THREE.NodeMaterial;

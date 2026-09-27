@@ -87,7 +87,10 @@ const _target = new THREE.Vector3();
 const _center = new THREE.Vector3();
 const _size = new THREE.Vector3();
 const _box = new THREE.Box3();
+const _matrix = new THREE.Matrix4();
 const AXES = ['y', 'z', 'x'] as const;
+/** Pièce instanciée : nombre d'instances essayées pour trouver un point visible. */
+const MAX_INSTANCE_TRIES = 4;
 
 export class InspectionLabels {
   private readonly root: HTMLDivElement;
@@ -359,28 +362,52 @@ export class InspectionLabels {
   /**
    * Point visible de la pièce : l'ancre si rien ne la cache (ou si le premier impact est sur la
    * pièce elle-même : le point de surface est alors retenu), sinon, pour un ancrage par défaut,
-   * le centre des faces de ses bornes tournées vers la caméra. Faux si tout est caché.
+   * le centre des faces de ses bornes tournées vers la caméra. Pièce instanciée : bornes de
+   * l'instance sélectionnée, sinon des premières instances (le centre d'une vis est souvent
+   * caché dans son trou, sa tête ne l'est pas). Faux si tout est caché.
    */
   private visibleAnchor(info: PartInfo, anchor: THREE.Vector3, out: THREE.Vector3): boolean {
-    if (this.rayToPart(info.part, anchor, out, info.part.anchorExplicit)) return true;
-    if (info.part.anchorExplicit || info.part.instanced) return false;
+    const part = info.part;
+    if (this.rayToPart(part, anchor, out, part.anchorExplicit)) return true;
+    if (part.anchorExplicit) return false;
     const a = this.assembly!;
-    a.worldBounds(info.part.id, _box);
-    if (_box.isEmpty()) return false;
-    _box.getCenter(_center);
-    _box.getSize(_size).multiplyScalar(0.45);
+    const inst = part.instanced;
+    if (!inst) {
+      a.worldBounds(part.id, _box);
+      return this.facingPoint(part, _box, out);
+    }
+    const selected = this.state.selectedId === part.id ? this.state.selectedInstance : null;
+    const tries = selected !== null ? 1 : Math.min(inst.count, MAX_INSTANCE_TRIES);
+    for (let n = 0; n < tries; n++) {
+      const index = selected ?? n;
+      _box.copy(inst.instanceBox).applyMatrix4(a.instanceWorldMatrix(part.id, index, _matrix));
+      if (this.facingPoint(part, _box, out)) return true;
+    }
+    return false;
+  }
+
+  /** Centre d'une face de `box` tournée vers la caméra, visible sur la pièce ? */
+  private facingPoint(part: PartRuntime, box: THREE.Box3, out: THREE.Vector3): boolean {
+    if (box.isEmpty()) return false;
+    box.getCenter(_center);
+    box.getSize(_size).multiplyScalar(0.45);
     for (const axis of AXES) {
       if (this.rayBudget <= 0) return false;
       const side = this.camera.position[axis] > _center[axis] ? 1 : -1;
       _target.copy(_center);
       _target[axis] += side * _size[axis];
-      if (this.rayToPart(info.part, _target, out, false)) return true;
+      if (this.rayToPart(part, _target, out, false)) return true;
     }
     return false;
   }
 
   /** Rayon caméra → `target` : la première surface touchée appartient-elle à la pièce ? */
-  private rayToPart(part: PartRuntime, target: THREE.Vector3, out: THREE.Vector3, keepTarget: boolean): boolean {
+  private rayToPart(
+    part: PartRuntime,
+    target: THREE.Vector3,
+    out: THREE.Vector3,
+    keepTarget: boolean,
+  ): boolean {
     const a = this.assembly!;
     this.rayBudget--;
     _ray.origin.copy(this.camera.position);

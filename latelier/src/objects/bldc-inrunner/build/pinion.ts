@@ -193,7 +193,8 @@ export function buildSetScrew(ctx: Ctx): THREE.Object3D {
   const d = dims(ctx);
   const p = d.pinion;
   const geo = setScrewGeometry(ctx, p.setScrewL);
-  const top = Math.sqrt(p.hubR * p.hubR - HOLE_R * HOLE_R) - 0.12;
+  // Bout cuvette en appui sur le méplat de l'arbre (cote dérivée, voir `params.ts`).
+  const top = p.setScrewTop;
   const o = new THREE.Group();
   o.name = 'Vis sans tête M3';
   const m = mesh(geo, ctx.materials.get('steel.blackoxide'), 'pinion.setscrew');

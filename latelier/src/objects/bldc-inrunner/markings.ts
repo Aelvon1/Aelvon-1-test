@@ -8,7 +8,7 @@
  */
 import type * as THREE from 'three/webgpu';
 import type { DrawOp, TextureService } from '../../textures/types';
-import { OBJECT_ID, fr, type BldcDims } from './params';
+import { MAX_RPM, OBJECT_ID, fr, type BldcDims } from './params';
 
 const FONT = "'DejaVu Sans', 'Liberation Sans', Arial, sans-serif";
 const MONO = "'DejaVu Sans Mono', 'Liberation Mono', monospace";
@@ -66,6 +66,9 @@ function emblem(cx: number, cy: number, r: number, stroke: string): DrawOp[] {
   return ops;
 }
 
+/** Milliers séparés par une espace ordinaire (l'espace fine insécable manque à certaines polices). */
+const thousands = (v: number) => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
 /** Dimensions de la zone gravée du carter (mm) : longueur axiale × développé. */
 export function canLabelSize(d: BldcDims): { length: number; arc: number; halfAngle: number; x0: number } {
   const length = 2 * (d.tubeHalf - 3.2 * d.s);
@@ -94,9 +97,15 @@ export function canLabelTexture(
   const serial = `S/N 2609-${String((p.kv * 7 + p.format.charCodeAt(1) * 13) % 10000).padStart(4, '0')}`;
   const ops: DrawOp[] = [
     // Micro-texte (lisible seulement au zoom macro).
-    text('NE PAS DÉPASSER 60 000 TR/MIN · AIMANTS NdFeB 150 °C MAX', 1.2 * k, 2.4 * k, 0.55 * k, {
-      spacing: 0.05 * k,
-    }),
+    text(
+      `NE PAS DÉPASSER ${thousands(MAX_RPM)} TR/MIN · AIMANTS NdFeB 150 °C MAX`,
+      1.2 * k,
+      2.4 * k,
+      0.55 * k,
+      {
+        spacing: 0.05 * k,
+      },
+    ),
     // Rangée 1 : emblème, marque et gamme ; modèle et configuration à droite.
     ...emblem(4.2 * k, 7.6 * k, 2.9 * k, '#ffffff'),
     text('VELKOR', 8.2 * k, 9.2 * k, 3.5 * k, { bold: true, spacing: 0.28 * k }),
@@ -107,7 +116,7 @@ export function canLabelTexture(
     // Rangée 2 : KV en grand ; caractéristiques et numéro de série à droite.
     text(`${p.kv} KV`, 1.2 * k, 19.6 * k, 4.6 * k, { bold: true }),
     text(
-      `Ø ${fr(d.format.shaftD, 3)} mm · ${d.format.cells}–${d.format.cells * 2}S LiPo`,
+      `Ø ${fr(d.format.shaftD, 3)} mm · ${w.maxCells > 2 ? `2–${w.maxCells}S` : '2S'} LiPo`,
       right,
       15.9 * k,
       0.9 * k,
@@ -119,7 +128,8 @@ export function canLabelTexture(
       align: 'right',
     }),
     text(serial, right, 19.5 * k, 0.85 * k, { align: 'right', mono: true }),
-    text('Ⓐ Ⓑ Ⓒ  ROTATION ↻', right, 22.4 * k, 0.55 * k, { align: 'right' }),
+    // Glyphes courants uniquement (polices système variables selon la plateforme).
+    text('PHASES A-B-C · SENS HORAIRE CÔTÉ ARBRE', right, 22.4 * k, 0.55 * k, { align: 'right' }),
   ];
   return textures.get({
     key: `${OBJECT_ID}/can-label/${p.format}/${p.kv}/${p.slotPole}/${p.sensors ? 1 : 0}/${quality}`,
@@ -242,16 +252,20 @@ export function pcbTexture(
       const [cx, cy] = map(connY, z);
       ops.push({ op: 'rect', x: cx - 0.45, y: cy - 0.6, w: 0.9, h: 1.2, radius: 0.2, fill: pad });
     }
-    const labels = ['GND', 'TEMP', 'C', 'B', 'A', '+5V'];
+    // Repères de broches courts (pas de 1,5 mm), juste au-dessus du connecteur.
+    const labels = ['G', 'T', 'C', 'B', 'A', '5V'];
     labels.forEach((l, j) => {
-      const [cx, cy] = map(connY + d.connector.depth / 2 + 1.1 * k, (j - 2.5) * d.connector.pitch);
-      ops.push(text(l, cx, cy, 0.62 * k, { align: 'center', fill: silk }));
+      const [cx, cy] = map(connY + d.connector.depth / 2 + 0.55, (j - 2.5) * d.connector.pitch);
+      ops.push(text(l, cx, cy, 0.55 * k, { align: 'center', fill: silk, bold: true }));
     });
-    const [tx, ty] = map(-d.pcb.rIn - 2.2 * k, 0);
+    // Désignation et date dans une zone libre (entre découpe, vis et capteurs) : lobe supérieur,
+    // ou lobe inférieur en 2 pôles (capteur à 60°) ; emblème dans le lobe opposé.
+    const low = d.winding.spec.polePairs === 1;
+    const [tx, ty] = low ? map(-6 * k, 6.8 * k) : map(3.4 * k, 8.3 * k);
     ops.push(text('VK-HS3 REV B', tx, ty, 0.9 * k, { align: 'center', fill: silk, bold: true }));
-    const [sx, sy] = map(-d.pcb.rIn - 3.4 * k, 0);
-    ops.push(text('2609  ⚠ ESD', sx, sy, 0.55 * k, { align: 'center', fill: silk }));
-    ops.push(...emblem(...map(d.pcb.rIn + 2.2 * k, -6.4 * k), 1.1 * k, silk));
+    const [sx, sy] = low ? map(-7 * k, 6.8 * k) : map(2.3 * k, 8.3 * k);
+    ops.push(text('2609 · ESD', sx, sy, 0.55 * k, { align: 'center', fill: silk }));
+    ops.push(...emblem(...map(3.9 * k, -8.3 * k), 1.1 * k, silk));
   } else {
     d.hall.angles.forEach((a, i) => {
       const [cx, cy] = polar(hallR + 2.3 * k, a);

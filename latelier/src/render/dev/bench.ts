@@ -3,6 +3,10 @@
  * (`PostPipeline`), paramètres par l'URL :
  *   ?view=none|ao|aoraw|depth|focus  &quality=low|medium|high|ultra  &backend=webgl
  *   &dof=1 (profondeur de champ)  &dim=0.5  &outline=hover|selected|blocked  &grain=0.03
+ *   &post=0 (référence : rendu direct sans post-traitement)
+ *
+ * Mesure : `window.__timing` = durée moyenne d'une image (ms) sur les 12 dernières images,
+ * hors 4 premières (compilation). Comparer avec `post=0` donne le coût propre du pipeline.
  */
 import * as THREE from 'three/webgpu';
 import { installWebGPUCompat } from '../../core/webgpuCompat';
@@ -106,14 +110,28 @@ if (outlineKind) {
   pipeline.outline.setObjects(outlineKind, [cap]);
   if (params.get('hover2') === '1') pipeline.outline.setObjects('hover', [body]);
 }
+const usePost = params.get('post') !== '0';
+const WARMUP_FRAMES = 4;
+const WINDOW = 12;
+const intervals: number[] = [];
 let frames = 0;
-renderer.setAnimationLoop(() => {
+let last = 0;
+const benchWindow = window as unknown as { __frames: number; __timing: number | null };
+benchWindow.__timing = null;
+renderer.setAnimationLoop((now: number) => {
   pipeline.ao?.update(camera, 0.05, renderer.domElement.width, renderer.domElement.height);
   uniforms.aspect.value = renderer.domElement.width / renderer.domElement.height;
   uniforms.outlineOn.value = pipeline.outline.active ? 1 : 0;
-  pipeline.render();
+  if (usePost) pipeline.render();
+  else renderer.render(scene, camera);
   frames++;
-  (window as unknown as { __frames: number }).__frames = frames;
+  if (frames > WARMUP_FRAMES) {
+    intervals.push(now - last);
+    if (intervals.length > WINDOW) intervals.shift();
+    if (intervals.length === WINDOW) benchWindow.__timing = intervals.reduce((a, b) => a + b, 0) / WINDOW;
+  }
+  last = now;
+  benchWindow.__frames = frames;
 });
 (window as unknown as { __info: unknown }).__info = {
   reversed: renderer.reversedDepthBuffer,

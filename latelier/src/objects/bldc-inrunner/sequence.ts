@@ -81,7 +81,7 @@ export function bldcSteps(p: BldcParams): StepDef[] {
       id: 'bearings-out',
       title: 'Extraire les roulements de leurs flasques',
       description:
-        'Extracteur à griffes en appui sur la bague extérieure : sortir chaque roulement de sa portée.',
+        'Chauffer chaque flasque (dilatation de l’aluminium), puis extraire le roulement vers l’intérieur avec un extracteur à pinces expansibles pris derrière la bague intérieure. L’effort passe par les billes : le roulement n’est plus réutilisable.',
       parts: ['rearBell.bearing', 'frontBell.bearing'],
       tool: 'bearing-puller',
     },
@@ -89,7 +89,7 @@ export function bldcSteps(p: BldcParams): StepDef[] {
       id: 'bearings-strip',
       title: 'Démonter les roulements jusqu’aux billes',
       description:
-        'Déposer les deux flasques de protection, cisailler la cage à ruban, dégager la bague extérieure puis libérer les billes (les deux roulements).',
+        'Déposer les deux flasques de protection, cisailler les rivets de la cage à ruban, dégager la bague extérieure puis libérer les billes (les deux roulements).',
       parts: ['#bearingpart'],
       tool: 'screwdriver-precision',
     },

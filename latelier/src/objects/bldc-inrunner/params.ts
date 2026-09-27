@@ -201,9 +201,14 @@ interface FormatSpec {
   endTurnBase: number;
   /** Diamètre de brin préféré (mm). */
   strandPref: number;
-  /** Tension nominale typique (V) pour les vitesses indicatives. */
+  /** Nombre d'éléments LiPo nominal du format (réduit si le KV ferait dépasser la vitesse limite). */
   cells: number;
+  /** Nombre d'éléments maximal admis par le format. */
+  maxCells: number;
 }
+
+/** Vitesse à vide maximale admise (gravée sur le carter), tr/min. */
+export const MAX_RPM = 60_000;
 
 const M25: ScrewSpec = {
   name: 'M2,5',
@@ -247,6 +252,7 @@ const FORMATS: Record<FormatId, FormatSpec> = {
     endTurnBase: 3.9,
     strandPref: 0.35,
     cells: 2,
+    maxCells: 3,
   },
   '3650': {
     id: '3650',
@@ -268,6 +274,7 @@ const FORMATS: Record<FormatId, FormatSpec> = {
     endTurnBase: 5,
     strandPref: 0.4,
     cells: 2,
+    maxCells: 3,
   },
   '3660': {
     id: '3660',
@@ -289,6 +296,7 @@ const FORMATS: Record<FormatId, FormatSpec> = {
     endTurnBase: 5,
     strandPref: 0.4,
     cells: 4,
+    maxCells: 4,
   },
 };
 
@@ -497,6 +505,10 @@ export interface WindingDims {
   /** Vitesse à vide indicative sous la tension nominale (tr/min). */
   noLoadRpm: number;
   nominalVoltage: number;
+  /** Éléments LiPo de la tension nominale (vitesse à vide ≤ `MAX_RPM`). */
+  cells: number;
+  /** Plage d'emploi gravée : 2 à `maxCells` éléments. */
+  maxCells: number;
 }
 
 export interface BldcDims {
@@ -573,6 +585,8 @@ export interface BldcDims {
     gearX1: number;
     setScrewX: number;
     setScrewL: number;
+    /** Rayon (depuis l'axe) de la face six pans de la vis sans tête, bout cuvette sur le méplat. */
+    setScrewTop: number;
   };
   // Capteurs
   hall: { angles: number[]; r0: number; r1: number; width: number; x0: number; x1: number };
@@ -779,7 +793,8 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
     x: [shimX0, shimX0 + shimT + 0.01],
   };
   const circlip = {
-    d2: f.shaftD - (f.shaftD >= 4 ? 0.2 : 0.2),
+    // Gorge : DIN 471 pour Ø 5 (d2 = 4,7) ; arbre 1/8 po : gorge de 0,1 mm de profondeur (typique).
+    d2: f.shaftD - (f.shaftD >= 4 ? 0.3 : 0.2),
     s: circlipS,
     x: shims.x[1]! + shimT / 2 + circlipS / 2 + 0.03,
     outerR: shaftR + (f.shaftD >= 4 ? 1.9 : 1.45),
@@ -803,8 +818,15 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
     gearX1: pinionX0 + f.pinion.hubL + f.pinion.width,
     setScrewX: pinionX0 + f.pinion.hubL / 2,
     setScrewL: f.pinion.setScrewL,
+    setScrewTop: 0,
   };
   const flat = { depth: 0.22 * f.shaftD * 0.5 + 0.1, x0: half + 1.2, x1: shaftX1 - 0.6, angle: 0 };
+  // Vis sans tête : bout cuvette en appui sur le méplat (mord de 0,03 mm), face six pans noyée
+  // sous la surface du moyeu (trou taraudé M3 : rayon 1,5 mm).
+  pinion.setScrewTop = Math.min(
+    Math.sqrt(pinion.hubR ** 2 - 1.5 ** 2) - 0.08,
+    shaftR - flat.depth + pinion.setScrewL - 0.03,
+  );
 
   // --- Capteurs à effet Hall -------------------------------------------------------------------
   const p = sp.polePairs;
@@ -886,7 +908,11 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
   const wirePerPhase = sp.coilsPerPhase * turns * meanTurnLength + 70 * s;
   const rho = 0.0172; // Ω·mm²/m à 20 °C
   const phaseResistance = (rho * (wirePerPhase / 1000)) / strands.area;
-  const nominalVoltage = f.cells * 3.7;
+  // Tension d'emploi : un KV élevé impose moins d'éléments pour rester sous la vitesse limite
+  // gravée sur le carter (frette, roulements).
+  const maxCells = Math.max(2, Math.min(f.maxCells, Math.floor(MAX_RPM / (params.kv * 3.7))));
+  const cells = Math.min(f.cells, maxCells);
+  const nominalVoltage = cells * 3.7;
   const winding: WindingDims = {
     spec: sp,
     turnsExact,
@@ -910,6 +936,8 @@ export function deriveDimensions(input: Partial<Record<keyof BldcParams, unknown
     keVperKrpm: 1000 / params.kv,
     noLoadRpm: params.kv * nominalVoltage,
     nominalVoltage,
+    cells,
+    maxCells,
   };
 
   // Angle de référence : l'axe de la phase A (1re bobine) tombe sur le capteur H1.

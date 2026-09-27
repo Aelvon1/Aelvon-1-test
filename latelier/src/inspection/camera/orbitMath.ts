@@ -147,8 +147,11 @@ export interface ClipInput {
  * - Profondeur inversée (tampon flottant) : near peut descendre à 1e-5 m avec un far de
  *   plusieurs mètres, la précision relative restant ~1e-7 à toute profondeur.
  * - Profondeur standard : le rapport far/near est plafonné à 1e4 ; near ne descend donc pas
- *   sous far / 1e4 (≈ 1,2 mm pour 12 m). Compromis documenté : en vue rasante très proche, la
- *   surface la plus proche peut alors être rognée au bord bas de l'image.
+ *   sous far / 1e4 (≈ 1,2 mm pour 12 m). Approximation (repli WebGL2 sans EXT_clip_control) :
+ *   la distance minimale à la surface est relevée en conséquence (`effectiveMinSurfaceDistance`,
+ *   < 1 mm dans la pièce, donc sans effet sur les 1,5–2 mm des objets), et la précision au fond
+ *   de la pièce tombe à ~1 mm à 5 m en macro : des surfaces décollées de moins d'un millimètre
+ *   (autocollants muraux) peuvent y scintiller, l'objet examiné jamais.
  */
 export function computeClipRange(input: ClipInput): { near: number; far: number } {
   const far = Math.max(1, input.farDistance);

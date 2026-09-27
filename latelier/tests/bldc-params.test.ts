@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import def from '../src/objects/bldc-inrunner/index';
 import {
   DEFAULT_PARAMS,
+  MAX_RPM,
   PRESETS,
   chooseStrands,
   deriveDimensions,
@@ -16,6 +17,7 @@ import {
   turnsForKv,
   type BldcParams,
 } from '../src/objects/bldc-inrunner/params';
+import { inchFraction } from '../src/objects/bldc-inrunner/infos';
 import { resolveObject, partQuantity } from '../src/objects/resolve';
 import { DisassemblyGraph } from '../src/inspection/graph';
 import type { ObjectParams } from '../src/objects/types';
@@ -92,9 +94,11 @@ describe('bldc-inrunner : cotes dérivées', () => {
         expect(r - h.r).toBeGreaterThan(d.spigotInnerR + 0.2);
         expect(r + h.r).toBeLessThan(d.spigotR - 0.2);
       }
-      // Pignon : vis sans tête noyée dans le moyeu, contre le méplat.
-      const top = Math.sqrt(d.pinion.hubR ** 2 - 1.5 ** 2) - 0.12;
-      expect(top - d.pinion.setScrewL).toBeGreaterThan(d.shaftR - d.flat.depth - 0.1);
+      // Pignon : vis sans tête noyée dans le moyeu, bout cuvette en appui sur le méplat.
+      const top = d.pinion.setScrewTop;
+      expect(top).toBeLessThanOrEqual(Math.sqrt(d.pinion.hubR ** 2 - 1.5 ** 2) - 0.05);
+      const tip = top - d.pinion.setScrewL;
+      expect(Math.abs(tip - (d.shaftR - d.flat.depth))).toBeLessThan(0.06);
     }
   });
 
@@ -105,6 +109,22 @@ describe('bldc-inrunner : cotes dérivées', () => {
     expect(d.bearing.ballCount).toBe(7);
     expect(deriveDimensions({ format: '3660' }).bearing.ref).toBe('685ZZ');
     expect(d.bearing.d).toBeCloseTo(d.format.shaftD, 6);
+    // Billes : fraction de pouce exacte (3/64 po en R2-5, 1/16 po en R2-6).
+    expect(inchFraction(deriveDimensions({ format: '2848' }).bearing.ballD)).toBe('3/64 po');
+    expect(inchFraction(d.bearing.ballD)).toBe('1/16 po');
+  });
+
+  it('tension d’emploi : vitesse à vide sous la limite gravée, quel que soit le KV', () => {
+    for (const format of ['2848', '3650', '3660'] as const)
+      for (let kv = 3000; kv <= 6000; kv += 250) {
+        const w = deriveDimensions({ format, kv }).winding;
+        expect(w.noLoadRpm).toBeLessThanOrEqual(MAX_RPM);
+        expect(w.cells).toBeGreaterThanOrEqual(2);
+        expect(w.maxCells).toBeGreaterThanOrEqual(w.cells);
+        expect(kv * w.maxCells * 3.7).toBeLessThanOrEqual(MAX_RPM);
+      }
+    expect(deriveDimensions({ format: '3660', kv: 3200 }).winding.cells).toBe(4);
+    expect(deriveDimensions({ format: '3660', kv: 6000 }).winding.cells).toBe(2);
   });
 });
 

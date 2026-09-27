@@ -3,9 +3,21 @@
  * paramètres. Valeurs incertaines marquées « typique ».
  */
 import type { PartInfo } from '../types';
-import { fr, PHASE_COLORS_FR, type BldcDims } from './params';
+import { fr, MAX_RPM, PHASE_COLORS_FR, type BldcDims } from './params';
 
 const mm = (v: number, digits = 1) => `${fr(v, digits)} mm`;
+
+/** Fraction de pouce la plus simple (dénominateur ≤ 64) d'une cote en mm, ex. 1,191 → « 3/64 po ». */
+export function inchFraction(valueMm: number): string {
+  const n64 = Math.round((valueMm / 25.4) * 64);
+  let num = n64;
+  let den = 64;
+  while (num % 2 === 0 && den > 1) {
+    num /= 2;
+    den /= 2;
+  }
+  return den === 1 ? `${num} po` : `${num}/${den} po`;
+}
 
 export function infos(d: BldcDims): Record<string, PartInfo> {
   const p = d.params;
@@ -32,7 +44,7 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
 
   const phaseInfo = (k: 0 | 1 | 2): PartInfo => ({
     role: `Phase ${'ABC'[k]} : ${sp.coilsPerPhase} bobines en série qui créent, avec les deux autres phases alimentées à tour de rôle par le variateur, le champ tournant qui entraîne les aimants.`,
-    material: `Cuivre émaillé grade 2 (classe thermique 180–200 °C, typique), ${w.strands} brin${w.strands > 1 ? 's' : ''} en parallèle de Ø ${fr(w.strandD, 2)} mm. Émail teinté ${PHASE_COLORS_FR[k]} : repère du simulateur (en réalité, fil identique, repéré par gaine).`,
+    material: `Cuivre émaillé grade 2 (classe thermique 180–200 °C, typique), ${w.strands} brin${w.strands > 1 ? 's' : ''} en parallèle de Ø ${fr(w.strandD, 2)} mm. Repère : gaine de sortie ${PHASE_COLORS_FR[k]}${k === 0 ? ', émail naturel (cuivré)' : `, émail teinté ${PHASE_COLORS_FR[k]} (convention du simulateur : le fil émaillé coloré existe, mais on bobine souvent les trois phases avec le même fil)`}.`,
     dimensions: `${turnsTxt}, ${w.conductorsPerSlot} conducteurs par encoche, environ ${fr(w.wirePerPhase / 1000, 2)} m de faisceau par phase`,
     reference: `${sp.slots}N${sp.poles}P, ${schema}`,
     tip: 'Court-circuit entre spires : un émail brûlé par une surchauffe relie deux spires voisines ; la spire en court-circuit se comporte comme le secondaire d’un transformateur, chauffe fortement et fait « cogner » le moteur. Contrôle : les trois résistances phase-phase doivent être égales à ±2 %.',
@@ -44,7 +56,7 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
       },
       {
         label: 'KV ↔ spires',
-        value: `La FCEM par spire vaut ω·kw·B·π·D·L/2 : elle ne dépend pas du nombre de pôles (flux par pôle ∝ 1/p, fréquence électrique ∝ p). Pour ${p.kv} KV, il faut donc N·c = ${fr(w.turns * sp.coilsPerPhase, 1)} spires en série par phase (c = ${sp.coilsPerPhase} bobines, kw = ${fr(sp.windingFactor, 3)}, Ø rotor ${mm(2 * d.rotorR)}, paquet ${mm(st.stackLength)}). Doubler le KV divise les spires par deux.`,
+        value: `La FCEM par spire vaut ω·kw·B·π·D·L/2 (ω vitesse mécanique, B induction moyenne d’entrefer, D et L diamètre et longueur du rotor) : elle ne dépend pas du nombre de pôles (flux par pôle ∝ 1/p, fréquence électrique ∝ p). Pour ${p.kv} KV, il faut donc N·c = ${fr(w.turns * sp.coilsPerPhase, 1)} spires en série par phase (c = ${sp.coilsPerPhase} bobines, kw = ${fr(sp.windingFactor, 3)}, Ø rotor ${mm(2 * d.rotorR)}, paquet ${mm(st.stackLength)}). Doubler le KV divise les spires par deux.`,
       },
       {
         label: 'Section constante',
@@ -56,7 +68,7 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
       },
       {
         label: 'KV obtenu',
-        value: `≈ ${Math.round(w.kvEffective)} tr/min/V avec le nombre de spires arrondi`,
+        value: `≈ ${Math.round(w.kvEffective)} tr/min/V avec le nombre de spires arrondi (étalonnage typique : 5 spires en 3650 12N4P pour 4300 KV ; l’arrondi au demi-tour décale le KV de quelques pour cent)`,
       },
     ],
   });
@@ -99,7 +111,7 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
         return {
           role: 'Billes : éléments roulants entre les deux bagues ; elles transmettent la charge radiale et une partie de la charge axiale.',
           material: 'Acier 100Cr6 poli, grade G10 (sphéricité ≈ 0,25 µm, typique)',
-          dimensions: `${b.ballCount} billes de Ø ${fr(b.ballD, 3)} mm (1/${Math.round(25.4 / b.ballD)} po)`,
+          dimensions: `${b.ballCount} billes (nombre typique) de Ø ${fr(b.ballD, 3)} mm (${inchFraction(b.ballD)})`,
           reference: b.ref,
           tip: 'Graisse évaporée ou polluée : les billes glissent au lieu de rouler, s’échauffent, bleuissent puis le roulement grippe. Un moteur haut KV use ses roulements en quelques dizaines d’heures de fonctionnement (ordre de grandeur).',
         };
@@ -121,7 +133,7 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
         },
         {
           label: 'Vitesse à vide',
-          value: `≈ ${Math.round(rpm).toLocaleString('fr-FR')} tr/min sous ${fr(w.nominalVoltage, 1)} V (${d.format.cells}S)`,
+          value: `≈ ${Math.round(rpm).toLocaleString('fr-FR')} tr/min sous ${fr(w.nominalVoltage, 1)} V (${w.cells}S) ; emploi ${w.maxCells > 2 ? `2 à ${w.maxCells}S` : '2S'} pour rester sous ${MAX_RPM.toLocaleString('fr-FR')} tr/min`,
         },
       ],
     },
@@ -181,7 +193,7 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
       material: 'Puce silicium, boîtier époxy SIP-3 (TO-92S)',
       dimensions: '4 × 3 × 1,5 mm, 3 pattes au pas de 1,27 mm',
       reference:
-        'Capteur Hall bipolaire à verrouillage, type SS41F (marquage « 41F »), sortie collecteur ouvert',
+        'Capteur Hall bipolaire à verrouillage, marquage « 41F » (référence générique), sortie collecteur ouvert',
       tip: 'Diagnostic : alimenter en 5 V et tourner le rotor à la main ; chaque sortie doit basculer à chaque passage de pôle (LED + résistance de tirage, ou oscilloscope). Un capteur mort fait démarrer le moteur par à-coups.',
     },
     'sensors.screws': {
@@ -265,7 +277,10 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
       role: 'Circlip : arrête axialement l’arbre derrière le rotor (il tient les cales et la rondelle ondulée).',
       material: 'Acier à ressort phosphaté (bruni)',
       dimensions: `Pour arbre Ø ${fr(d.format.shaftD, 2)} mm, gorge Ø ${fr(d.circlip.d2, 2)} mm, épaisseur ${fr(d.circlip.s, 1)} mm`,
-      reference: `DIN 471 — ${fr(d.format.shaftD, 0)}`,
+      reference:
+        d.format.shaftD < 4
+          ? 'Circlip extérieur type DIN 471 pour arbre 1/8 po (gorge et épaisseur typiques)'
+          : 'DIN 471 — 5 × 0,6',
       tip: 'Ouvert au-delà de sa limite élastique, un circlip ne serre plus dans sa gorge : toujours le remplacer s’il est déformé.',
     },
     rotor: {
@@ -320,15 +335,15 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
     },
     'stator.core': {
       role: 'Paquet de tôles : canalise le flux magnétique ; les dents concentrent le champ vers le rotor, la culasse statorique le referme.',
-      material: `Acier électrique non orienté Fe-Si 3 %, ${fr(st.lamThickness, 2)} mm, isolé par vernis (typique M${st.lamThickness < 0.3 ? '235-20' : '270-35'}A)`,
+      material: `Acier électrique non orienté Fe-Si 3 %, ${fr(st.lamThickness, 2)} mm, isolé par vernis (nuance typique : ${st.lamThickness < 0.3 ? 'NO20, norme EN 10303 des tôles minces' : 'M270-35A, norme EN 10106'})`,
       dimensions: `${st.lamCount} tôles de ${fr(st.lamThickness, 2)} mm (paquet de ${mm(st.stackLength)}), Ø ${mm(2 * st.Ro)}`,
       reference: `${st.slots} encoches semi-fermées, ouverture ${mm(st.slotOpening, 2)}`,
       tip: `Les pertes par courants de Foucault croissent comme (épaisseur × fréquence)². Ici la fréquence électrique atteint ${fr(fElec, 0)} Hz à vide : d’où des tôles fines, isolées entre elles. La tranche bleuie vient du recuit après découpe.`,
     },
     'stator.insulators': {
       role: 'Isolants d’encoche : protègent l’émail du fil contre les arêtes des tôles et isolent le bobinage de la masse.',
-      material: 'Papier aramide (type Nomex 410)',
-      dimensions: `Épaisseur ${mm(st.liner, 2)}, dépassement de 0,8 mm de chaque côté du paquet`,
+      material: 'Papier aramide calandré, classe thermique H (180 °C), typique',
+      dimensions: `Épaisseur ${mm(st.liner, 2)}, dépassement de ${mm(0.8 * d.s)} de chaque côté du paquet`,
       reference: `${st.slots} isolants en U`,
       tip: 'Un isolant déchiré au bobinage = court-circuit franc entre une phase et la masse (le carter devient « sous tension ») : le variateur se met en défaut dès la mise sous tension.',
     },
@@ -338,7 +353,7 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
     'stator.neutral': {
       role: 'Point neutre : les trois fins de phase sont soudées ensemble (couplage en étoile).',
       material: 'Soudure étain sous gaine tressée en fibre de verre',
-      dimensions: `Gaine Ø ${mm(2 * 1.2, 1)} environ × ${mm(3.6 * d.s)}`,
+      dimensions: `Gaine Ø ${mm(2 * 2.3 * w.bundleR, 1)} environ × ${mm(3.6 * d.s)}, trois faisceaux de ${w.strands} brin${w.strands > 1 ? 's' : ''}`,
       reference: 'Couplage étoile (Y)',
       tip:
         'Le même bobinage couplé en triangle (Δ) donnerait un KV √3 fois plus élevé (≈ ' +

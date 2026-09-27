@@ -9,7 +9,7 @@
 import { Engine, UpdatePriority } from './Engine';
 import { EventBus } from './EventBus';
 import type { AppEvents } from './events';
-import { createAppStore, pushToast, type AppStore } from './store';
+import { createAppStore, patchInspection, pushToast, type AppStore, type PartDependencies } from './store';
 import { StateMachine } from './StateMachine';
 import { Input } from './Input';
 import { Physics } from './Physics';
@@ -286,6 +286,19 @@ export class App {
       if (machine.go('transition')) void this.openObject(objectId, params);
     });
     bus.on('inventory:thumbnails', ({ objectIds }) => void this.inspection.renderThumbnails(objectIds));
+
+    // Dépendances de démontage copiées du graphe dès que l'objet construit publie ses données
+    // statiques : la fiche de l'interface affiche « Bloqué par : … » avant toute tentative.
+    store.subscribe((state, previous) => {
+      const insp = state.inspection;
+      if (!insp || insp.dependencies || insp.partStatic === previous.inspection?.partStatic) return;
+      const graph = this.inspection.sequencer?.graph;
+      if (!graph || !this.inspection.assembly) return;
+      const dependencies: Record<string, PartDependencies> = {};
+      for (const id of Object.keys(insp.partStatic))
+        dependencies[id] = { requires: [...graph.requires(id)], dependents: [...graph.dependents(id)] };
+      patchInspection(store, { dependencies });
+    });
 
     bus.on('inspection:exit', () => void this.exitInspection());
 

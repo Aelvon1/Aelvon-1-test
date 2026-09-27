@@ -1,7 +1,7 @@
 /**
  * Rotor : arbre en acier rectifié (méplat de vis sans tête, gorge de circlip, chanfreins),
  * culasse (acier doux, moyeu avant jusqu'au roulement), aimants NdFeB nickelés en segments
- * d'arc (instanciés, un par pôle), frette de maintien en fibre de verre tissée.
+ * d'arc (instanciés, un par pôle), frette de maintien en fibre d’aramide tissée.
  */
 import * as THREE from 'three/webgpu';
 import type { PartBuild } from '../../types';
@@ -155,7 +155,7 @@ export function buildMagnets(ctx: Ctx): PartBuild {
   };
 }
 
-/** Frette : manchon mince en fibre de verre tissée imprégnée ; UV en mm pour le tissage. */
+/** Frette : manchon mince en fibre d’aramide tissée imprégnée d’époxy ; UV en mm pour le tissage. */
 export function buildSleeve(ctx: Ctx): THREE.Object3D {
   const d = dims(ctx);
   const geo = cachedGeometry(ctx, geoKey(ctx, 'sleeve'), () => {

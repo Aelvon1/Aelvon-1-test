@@ -28,6 +28,7 @@ import {
   damp,
   grainSeed,
   resolveBuildConfig,
+  selectBuildConfig,
   type FocusParams,
   type InspectionFocus,
   type ModeLook,
@@ -59,6 +60,14 @@ export interface PostFXDebugInfo {
   outlineMeshes: number;
   vignette: number;
   bokehPx: number;
+  /** Configurations refusées par le GPU (repli automatique). */
+  failedConfigs: string[];
+}
+
+/** Sous-ensemble de `GPUDevice` utilisé pour intercepter les erreurs de construction. */
+interface ErrorScopeDevice {
+  pushErrorScope(filter: 'validation' | 'internal' | 'out-of-memory'): void;
+  popErrorScope(): Promise<{ message: string } | null>;
 }
 
 export class PostFX {
@@ -92,6 +101,10 @@ export class PostFX {
   private debugView: PostDebugView = 'none';
   /** Prochaine mise à jour : valeurs amorties placées directement sur leur cible. */
   private settleNext = false;
+  /** Clés des configurations dont la construction a échoué (jamais retentées). */
+  private readonly failedKeys = new Set<string>();
+  /** Numéro de construction (ignore le verdict GPU d'un pipeline déjà remplacé). */
+  private buildToken = 0;
 
   constructor(
     protected readonly engine: Engine,
@@ -249,6 +262,7 @@ export class PostFX {
       outlineMeshes: this.pipeline?.outline.meshCount ?? 0,
       vignette: this.look.vignette,
       bokehPx: this.lastBokeh,
+      failedConfigs: [...this.failedKeys],
     };
   }
 
@@ -266,20 +280,83 @@ export class PostFX {
     else this.engine.renderer.render(this.engine.scene, this.engine.camera);
   }
 
-  /** (Re)construit le graphe pour un profil ; ne fait rien si la structure est inchangée. */
+  /**
+   * (Re)construit le graphe pour un profil ; ne fait rien si la structure est inchangée.
+   *
+   * Fiabilité : une erreur à la construction (exception) ou à la compilation des shaders
+   * (erreur GPU interceptée pendant le préchauffage, WebGPU) marque la configuration comme
+   * défaillante et reconstruit aussitôt en configuration de secours, puis sans post-traitement :
+   * jamais d'écran noir durable.
+   */
   private build(profile: QualityProfile, force = false): void {
-    const config = resolveBuildConfig(profile, this.engine.backend);
+    const requested = resolveBuildConfig(profile, this.engine.backend);
+    const config = selectBuildConfig(requested, this.failedKeys);
     const previous = this.pipeline;
-    if (!force && previous && buildConfigKey(previous.config) === buildConfigKey(config)) return;
-    const next = new PostPipeline(this.engine, config, this.uniforms, this.debugView);
+    if (!config) {
+      // Tout a échoué : rendu direct (le renderer applique lui-même AgX + sRGB).
+      if (previous) console.error('[PostFX] Post-traitement désactivé : aucune configuration valide.');
+      this.pipeline = null;
+      previous?.dispose();
+      return;
+    }
+    const key = buildConfigKey(config);
+    if (!force && previous && buildConfigKey(previous.config) === key) return;
+    let next: PostPipeline;
+    try {
+      next = new PostPipeline(this.engine, config, this.uniforms, this.debugView);
+    } catch (error) {
+      console.error(`[PostFX] Construction impossible (${key}) :`, error);
+      this.failedKeys.add(key);
+      this.build(profile, true);
+      return;
+    }
     for (const kind of OUTLINE_KINDS) next.outline.setObjects(kind, this.outlineLists[kind]);
     this.pipeline = next;
     previous?.dispose();
+    const token = ++this.buildToken;
+    const device = this.errorScopeDevice();
+    device?.pushErrorScope('validation');
+    device?.pushErrorScope('internal');
+    // WebGL 2 : les erreurs de liaison des programmes sont signalées de façon synchrone.
+    const glErrors: string[] = [];
+    const debug = this.engine.renderer.debug;
+    const previousHook = debug.onShaderError;
+    if (this.engine.backend === 'webgl2')
+      debug.onShaderError = (gl, program, vertex, fragment) =>
+        glErrors.push(describeGlError(gl, program, vertex, fragment));
     try {
       next.warmup(this.uniforms);
     } catch (error) {
       console.warn('[PostFX] Préchauffage incomplet :', error);
+    } finally {
+      if (this.engine.backend === 'webgl2') debug.onShaderError = previousHook;
     }
+    if (glErrors.length > 0) {
+      console.error(`[PostFX] Shader refusé par WebGL 2 (${key}) :\n${glErrors.join('\n')}`);
+      this.failedKeys.add(key);
+      this.build(profile, true);
+      return;
+    }
+    if (!device) return;
+    // Dépilement dans l'ordre inverse : « internal » puis « validation ». Un rejet (perte du
+    // périphérique) n'est pas imputable au pipeline : ignoré.
+    void Promise.all([device.popErrorScope(), device.popErrorScope()])
+      .then(([internal, validation]) => {
+        const failure = internal ?? validation;
+        if (!failure) return;
+        console.error(`[PostFX] Erreur GPU à la construction du pipeline (${key}) : ${failure.message}`);
+        this.failedKeys.add(key);
+        if (token === this.buildToken && this.pipeline === next) this.build(this.engine.quality, true);
+      })
+      .catch(() => undefined);
+  }
+
+  /** Périphérique WebGPU (erreurs de compilation interceptables) ; null en WebGL 2. */
+  private errorScopeDevice(): ErrorScopeDevice | null {
+    if (this.engine.backend !== 'webgpu') return null;
+    const backend = this.engine.renderer.backend as unknown as { device?: ErrorScopeDevice | null };
+    const device = backend.device;
+    return device && typeof device.pushErrorScope === 'function' ? device : null;
   }
 
   private resolveFocusTarget(camera: THREE.Camera): InspectionFocus | null {
@@ -300,4 +377,17 @@ export class PostFX {
     this.autoFocus.radius = AUTO_FOCUS_RADIUS;
     return this.autoFocus;
   }
+}
+
+/** Journaux d'un programme WebGL refusé (liaison puis compilation ; premières lignes seulement). */
+function describeGlError(
+  gl: WebGL2RenderingContext,
+  program: WebGLProgram,
+  vertex: WebGLShader,
+  fragment: WebGLShader,
+): string {
+  const logs = [gl.getProgramInfoLog(program), gl.getShaderInfoLog(vertex), gl.getShaderInfoLog(fragment)]
+    .map((log) => (log ?? '').trim())
+    .filter((log) => log !== '');
+  return logs.join('\n').split('\n').slice(0, 8).join('\n') || 'programme non lié (journaux vides)';
 }

@@ -7,9 +7,11 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LABEL_OPTIONS,
   columnCapacity,
+  labelsConflict,
   layoutLabels,
   layoutTags,
   resolveColumn,
+  segmentHitsRect,
   segmentsCross,
   type LabelArea,
   type LabelCandidate,
@@ -43,6 +45,24 @@ function candidates(seed: number, count: number): LabelCandidate[] {
 }
 
 function checkLayout(placed: readonly PlacedLabel[], area: LabelArea, height: number): void {
+  // Global : aucun trait croisé, aucun trait sur une étiquette (la sienne comprise), aucun
+  // chevauchement, y compris entre les deux colonnes.
+  for (let i = 0; i < placed.length; i++) {
+    const p = placed[i]!;
+    expect(
+      segmentHitsRect(
+        p.railX,
+        p.startY,
+        p.anchorX,
+        p.anchorY,
+        p.x + 1,
+        p.y + 1,
+        p.x + p.width - 1,
+        p.y + height - 1,
+      ),
+    ).toBe(false);
+    for (let j = i + 1; j < placed.length; j++) expect(labelsConflict(p, placed[j]!, height)).toBe(false);
+  }
   for (const side of ['left', 'right'] as const) {
     const column = placed.filter((p) => p.side === side).sort((a, b) => a.y - b.y);
     for (let i = 0; i < column.length; i++) {
@@ -110,6 +130,46 @@ describe('étiquettes — colonnes latérales', () => {
     );
     expect(placed.find((p) => p.id === 'g')!.side).toBe('left');
     expect(placed.find((p) => p.id === 'd')!.side).toBe('right');
+  });
+
+  it('zones étroites, ancres sous les colonnes : aucun conflit global, épinglée conservée', () => {
+    let total = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const r = rng(1000 + seed);
+      // Zone centrale réaliste : au moins 45 % de l'écran (voir `InspectionLabels.area`), écran
+      // de 960 à 2560 px ; les ancres peuvent tomber sous les colonnes d'étiquettes.
+      const width = 960 + r() * 1600;
+      const height = 540 + r() * 900;
+      const insets = width * 0.55 * r();
+      const leftInset = insets * r();
+      const area: LabelArea = {
+        left: leftInset,
+        top: 50,
+        right: width - (insets - leftInset),
+        bottom: height - 100,
+      };
+      const count = 3 + Math.floor(r() * 30);
+      const list: LabelCandidate[] = Array.from({ length: count }, (_, i) => ({
+        id: `q${i}`,
+        anchorX: area.left + (area.right - area.left) * (0.15 + 0.7 * r()),
+        anchorY: area.top + (area.bottom - area.top) * r(),
+        width: 60 + r() * 200,
+        score: r() * 100,
+        pinned: i === 0,
+      }));
+      const placed = layoutLabels(list, area, { maxCount: 18 });
+      checkLayout(placed, area, DEFAULT_LABEL_OPTIONS.height);
+      total += placed.length;
+    }
+    // Les conflits écartent des étiquettes, sans vider l'affichage.
+    expect(total / 400).toBeGreaterThan(4);
+  });
+
+  it('rectangle traversé par un segment (Liang–Barsky)', () => {
+    expect(segmentHitsRect(0, 5, 20, 5, 5, 0, 10, 10)).toBe(true);
+    expect(segmentHitsRect(0, 20, 20, 20, 5, 0, 10, 10)).toBe(false);
+    expect(segmentHitsRect(6, 6, 7, 7, 5, 0, 10, 10)).toBe(true);
+    expect(segmentHitsRect(0, 0, 4, 20, 5, 0, 10, 10)).toBe(false);
   });
 
   it('zone trop basse : capacité et rééquilibrage', () => {

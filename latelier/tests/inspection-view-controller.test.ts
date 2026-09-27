@@ -49,10 +49,11 @@ class FakeCanvas {
 
   removeEventListener(type: string, handler: Handler): void {
     const list = this.listeners.get(type);
-    if (list) this.listeners.set(
-      type,
-      list.filter((h) => h !== handler),
-    );
+    if (list)
+      this.listeners.set(
+        type,
+        list.filter((h) => h !== handler),
+      );
   }
 
   getBoundingClientRect(): { left: number; top: number; width: number; height: number } {
@@ -73,7 +74,14 @@ class FakeCanvas {
 
   /** Émet un événement (champs par défaut : pointeur 1, bouton gauche, molette en pixels). */
   dispatch(type: string, fields: Record<string, number>): void {
-    const event = { pointerId: 1, button: 0, deltaMode: 0, deltaY: 0, preventDefault: () => undefined, ...fields };
+    const event = {
+      pointerId: 1,
+      button: 0,
+      deltaMode: 0,
+      deltaY: 0,
+      preventDefault: () => undefined,
+      ...fields,
+    };
     for (const handler of this.listeners.get(type) ?? []) handler(event);
   }
 
@@ -367,9 +375,11 @@ describe('modes de rendu de la vue', () => {
     expect(modes.isGhost('terminal')).toBe(false);
     for (const part of assembly.order) {
       for (const mesh of part.ownMeshes) {
-        const material = mesh.material as THREE.Material;
         if (solid.has(part.id)) expect(mesh.material).toBe(original.get(mesh));
-        else expect(material.userData.viewMaterial).toBe('xray');
+        else {
+          const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const material of list) expect(material.userData.viewMaterial).toBe('xray');
+        }
       }
     }
     modes.setXray(false, new Set());
@@ -400,8 +410,10 @@ describe('modes de rendu de la vue', () => {
     const p = sectionPointLocal(local, 'y', 0.5, new THREE.Vector3());
     expect(p.toArray()).toEqual([0, 0.025, 0]);
     expect(sectionPointLocal(local, 'x', 1, new THREE.Vector3()).x).toBeCloseTo(0.04, 12);
-    expect(sectionNormalLocal('z', false, new THREE.Vector3()).toArray()).toEqual([0, 0, -1]);
-    expect(sectionNormalLocal('z', true, new THREE.Vector3()).toArray()).toEqual([0, 0, 1]);
+    expect(sectionNormalLocal('z', false, new THREE.Vector3()).distanceTo(new THREE.Vector3(0, 0, -1))).toBe(
+      0,
+    );
+    expect(sectionNormalLocal('z', true, new THREE.Vector3()).distanceTo(new THREE.Vector3(0, 0, 1))).toBe(0);
 
     const scene = new THREE.Scene();
     const section = new Section(scene);
