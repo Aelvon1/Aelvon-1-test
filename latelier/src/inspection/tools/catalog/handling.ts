@@ -11,6 +11,10 @@
  * - scalpel : incliné à ~30° de la surface, raclage par petits allers-retours ;
  * - levier : pointe glissée sous le bord, bascule autour d'un point d'appui ;
  * - doigts : pincement de part et d'autre de la pièce, puis accompagnement.
+ *
+ * Approximation : les prises se calent sur la boîte englobante de la pièce (flancs, extrémités) ;
+ * aucune détection de collision avec les pièces voisines. Les doigts sont volontairement
+ * stylisés (deux bouts gantés), pas une main articulée.
  */
 import * as THREE from 'three/webgpu';
 import type { ToolAnimState, ToolBuildContext } from '../../../objects/types';
@@ -367,7 +371,8 @@ export function animateHands(tool: THREE.Object3D, _state: ToolAnimState): void 
   const ctx = rigContext(tool);
   const contact = contactOf(ctx.approachK, ctx.retractK);
   const gap = 0.006 * (1 - contact);
-  const y = -clamp(ctx.depth * 0.5, 0.0005, 0.02);
+  // Prise près de la face de sortie (une pièce logée dans un carter n'est accessible que par là).
+  const y = -clamp(ctx.depth * 0.3, 0.0005, 0.006);
   rig.index.position.set(ctx.halfX + FINGER_RADIUS * 0.92 + gap, y, 0);
   rig.thumb.position.set(-(ctx.halfX + FINGER_RADIUS * 1.03 + gap), y, 0);
   rig.index.rotation.set(0, 0, 0.22);

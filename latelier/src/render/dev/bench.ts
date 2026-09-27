@@ -1,7 +1,7 @@
 /**
  * Banc d'essai isolé du post-traitement (développement uniquement) : petite scène, pipeline réel
  * (`PostPipeline`), paramètres par l'URL :
- *   ?view=none|ao|aoraw|aodepth|depth|focus  &quality=low|medium|high|ultra  &backend=webgl
+ *   ?view=none|ao|aoraw|depth|focus  &quality=low|medium|high|ultra  &backend=webgl
  *   &dof=1 (profondeur de champ)  &dim=0.5  &outline=hover|selected|blocked  &grain=0.03
  */
 import * as THREE from 'three/webgpu';

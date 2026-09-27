@@ -881,28 +881,5 @@ export function bldcParts(p: BldcParams): Part[] {
       label: { priority: 7 },
     },
   ];
-  return DEV_DETAIL ? parts.map(withDetail) : parts;
-}
-
-// TEMPORAIRE (mise au point, à retirer) : `?bldcdetail=1` construit aussi les détails dans le banc.
-const DEV_DETAIL =
-  import.meta.env.DEV &&
-  typeof location !== 'undefined' &&
-  new URLSearchParams(location.search).has('bldcdetail');
-function withDetail(part: Part): Part {
-  const build = part.build;
-  const detail = part.detail;
-  if (!build || !detail) return part;
-  return {
-    ...part,
-    build: (ctx) => {
-      const r = build(ctx);
-      const obj = (r as THREE.Object3D).isObject3D ? (r as THREE.Object3D) : (r as PartBuild).object;
-      obj.traverse((o) => {
-        if (detail.replaces?.includes(o.name)) o.visible = false;
-      });
-      obj.add(detail.build(ctx));
-      return r;
-    },
-  };
+  return parts;
 }

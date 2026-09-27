@@ -36,23 +36,35 @@ export function buildSoldering(kit: PropKit): void {
   onBench(kit, BENCH_ITEMS.tweezers, () => buildTweezers(kit));
   // Cordon du fer (silicone gris) : de la prise de la station à l'arrière du manche.
   const top = BENCH_TOP + 0.004;
-  kit.tube('world.props.plastic', [
-    [socket.x, socket.y, socket.z],
-    [socket.x + 0.01, socket.y - 0.02, socket.z + 0.04],
-    [socket.x + 0.03, top, socket.z + 0.1],
-    [ironEnd.x + 0.06, top, ironEnd.z + 0.04],
-    [ironEnd.x + 0.02, ironEnd.y - 0.03, ironEnd.z + 0.03],
-    [ironEnd.x, ironEnd.y, ironEnd.z],
-  ], 0.0028, 6, { perMeter: 50, tint: tint(0x5d6166, 0.55) });
+  kit.tube(
+    'world.props.plastic',
+    [
+      [socket.x, socket.y, socket.z],
+      [socket.x + 0.01, socket.y - 0.02, socket.z + 0.04],
+      [socket.x + 0.03, top, socket.z + 0.1],
+      [ironEnd.x + 0.06, top, ironEnd.z + 0.04],
+      [ironEnd.x + 0.02, ironEnd.y - 0.03, ironEnd.z + 0.03],
+      [ironEnd.x, ironEnd.y, ironEnd.z],
+    ],
+    0.0028,
+    6,
+    { perMeter: 50, tint: tint(0x5d6166, 0.55) },
+  );
   // Gaine de la poignée à air chaud (plus épaisse, annelée suggérée par la rugosité).
-  kit.tube('rubber.black', [
-    [hoseStart.x, hoseStart.y, hoseStart.z],
-    [hoseStart.x, hoseStart.y - 0.02, hoseStart.z + 0.05],
-    [hoseStart.x - 0.03, top + 0.004, hoseStart.z + 0.1],
-    [hoseEnd.x + 0.03, top + 0.004, hoseEnd.z - 0.05],
-    [hoseEnd.x + 0.01, hoseEnd.y - 0.02, hoseEnd.z - 0.02],
-    [hoseEnd.x, hoseEnd.y, hoseEnd.z],
-  ], 0.0062, 8, { perMeter: 40 });
+  kit.tube(
+    'rubber.black',
+    [
+      [hoseStart.x, hoseStart.y, hoseStart.z],
+      [hoseStart.x, hoseStart.y - 0.02, hoseStart.z + 0.05],
+      [hoseStart.x - 0.03, top + 0.004, hoseStart.z + 0.1],
+      [hoseEnd.x + 0.03, top + 0.004, hoseEnd.z - 0.05],
+      [hoseEnd.x + 0.01, hoseEnd.y - 0.02, hoseEnd.z - 0.02],
+      [hoseEnd.x, hoseEnd.y, hoseEnd.z],
+    ],
+    0.0062,
+    8,
+    { perMeter: 40 },
+  );
 }
 
 function caseFeet(kit: PropKit, W: number, D: number): void {
@@ -70,19 +82,33 @@ function buildSolderStation(kit: PropKit, socketOut: THREE.Vector3): void {
   const [W, H, D] = BENCH_ITEMS.solderStation.size;
   const P = SOLDER_PANEL;
   caseFeet(kit, W, D);
-  kit.box('world.props.paint', [0, FEET + H / 2, 0], [W, H, D], 0.008, { tint: TINTS.oliveDark }, [0, 0, 0], 2);
+  kit.box(
+    'world.props.paint',
+    [0, FEET + H / 2, 0],
+    [W, H, D],
+    0.008,
+    { tint: TINTS.oliveDark },
+    [0, 0, 0],
+    2,
+  );
   const faceZ = D / 2 + 0.0008;
   const cy = FEET + H / 2;
   kit.decal('solder', [0, cy, faceZ], [W - 0.004, H - 0.004]);
   const [kx, ky] = panelPoint(P, P.knob);
   // Bouton sur 350 °C (graduation 150 → 450 °C sur 270°).
-  knob(kit, [kx, cy + ky, faceZ], panelRadius(P, P.knobRadius), 0.018, Math.PI / 4, { skirt: TINTS.plasticBlack, metalCap: true });
+  knob(kit, [kx, cy + ky, faceZ], panelRadius(P, P.knobRadius), 0.018, Math.PI / 4, {
+    skirt: TINTS.plasticBlack,
+    metalCap: true,
+  });
   const [lx, ly] = panelPoint(P, P.led);
   kit.led([lx, cy + ly, faceZ], 0.0026, 0xff3a20, LED_CHANNEL.heater);
   const [swx, swy] = panelPoint(P, P.switch);
   rocker(kit, [swx, cy + swy, faceZ], 0.011, 0.016, true, TINTS.plasticRed);
   const [ox, oy] = panelPoint(P, P.socket);
-  kit.cylinder('world.props.plastic', [ox, cy + oy, faceZ], [ox, cy + oy, faceZ + 0.026], 0.0078, 16, { tint: TINTS.plasticBlack, radiusB: 0.0062 });
+  kit.cylinder('world.props.plastic', [ox, cy + oy, faceZ], [ox, cy + oy, faceZ + 0.026], 0.0078, 16, {
+    tint: TINTS.plasticBlack,
+    radiusB: 0.0062,
+  });
   kit.toWorld([ox, cy + oy, faceZ + 0.026], socketOut);
   // Boîte d'étameur de pannes sur le capot.
   kit.lathe(
@@ -97,25 +123,54 @@ function buildSolderStation(kit: PropKit, socketOut: THREE.Vector3): void {
     [0, 0, 0],
     22,
   );
-  kit.cylinder('world.props.plastic', [-0.03, FEET + H + 0.0136, -0.03], [-0.03, FEET + H + 0.0142, -0.03], 0.0125, 18, {
-    tint: tint(0x5f6a6e, 0.4),
-    castShadow: false,
-  });
+  kit.cylinder(
+    'world.props.plastic',
+    [-0.03, FEET + H + 0.0136, -0.03],
+    [-0.03, FEET + H + 0.0142, -0.03],
+    0.0125,
+    18,
+    {
+      tint: tint(0x5f6a6e, 0.4),
+      castShadow: false,
+    },
+  );
 }
 
 function buildIronHolder(kit: PropKit, ironEndOut: THREE.Vector3): void {
   // Socle en fonte peinte, bac à éponge et paille de laiton.
-  kit.box('world.props.paint', [0, 0.009, 0], [0.1, 0.018, 0.14], 0.006, { tint: TINTS.charcoal }, [0, 0, 0], 2);
-  kit.box('world.props.plastic', [-0.018, 0.02, 0.035], [0.055, 0.01, 0.052], 0.004, { tint: TINTS.sponge }, [0, 0, 0], 2);
+  kit.box(
+    'world.props.paint',
+    [0, 0.009, 0],
+    [0.1, 0.018, 0.14],
+    0.006,
+    { tint: TINTS.charcoal },
+    [0, 0, 0],
+    2,
+  );
+  kit.box(
+    'world.props.plastic',
+    [-0.018, 0.02, 0.035],
+    [0.055, 0.01, 0.052],
+    0.004,
+    { tint: TINTS.sponge },
+    [0, 0, 0],
+    2,
+  );
   const wool = new THREE.IcosahedronGeometry(0.014, 1);
   wool.scale(1, 0.62, 1);
-  kit.add('brass', wool, PropKit.place([0.03, 0.024, 0.04], [0.3, 0.8, 0]), { edge: 'none', castShadow: false });
+  kit.add('brass', wool, PropKit.place([0.03, 0.024, 0.04], [0.3, 0.8, 0]), {
+    edge: 'none',
+    castShadow: false,
+  });
   // Axe de la spirale (ouverture vers l'avant et le haut).
   const dir = new THREE.Vector3(0, 0.6, 0.8).normalize();
   const B = new THREE.Vector3(0, 0.03, -0.035);
   kit.box('world.props.paint', [0, 0.03, -0.035], [0.012, 0.03, 0.03], 0.003, { tint: TINTS.charcoal });
   kit.pushMatrix(PropKit.alongY([B.x, B.y, B.z], [dir.x, dir.y, dir.z]));
-  kit.add('steel.chrome', tubeAlong(new HelixCurve(0.017, 0.085, 7), 0.0012, 5, 130), null, { edge: 'none', castShadow: false });
+  kit.add('steel.chrome', tubeAlong(new HelixCurve(0.017, 0.085, 7), 0.0012, 5, 130), null, {
+    edge: 'none',
+    castShadow: false,
+  });
   kit.cylinder('steel.chrome', [0, 0.085, 0], [0, 0.0865, 0], 0.0185, 18, { open: true });
   kit.pop();
   // Fer : panne, fourreau, écrou, manche, serre-câble.
@@ -143,7 +198,18 @@ function buildIronHolder(kit: PropKit, ironEndOut: THREE.Vector3): void {
     { tint: tint(0x2f3336, 0.45) },
   );
   // Bague de préhension caoutchouc.
-  kit.lathe('rubber.black', [[0.0099, 0.014], [0.0101, 0.018], [0.0101, 0.045], [0.0094, 0.049]], [0, 0, 0], [0, 0, 0], 18);
+  kit.lathe(
+    'rubber.black',
+    [
+      [0.0099, 0.014],
+      [0.0101, 0.018],
+      [0.0101, 0.045],
+      [0.0094, 0.049],
+    ],
+    [0, 0, 0],
+    [0, 0, 0],
+    18,
+  );
   kit.pop();
   kit.cylinder('rubber.black', at(0.204), at(0.23), 0.004, 8, { radiusB: 0.003 });
   kit.toWorld(at(0.23), ironEndOut);
@@ -158,25 +224,42 @@ function buildHotAirStation(kit: PropKit, hoseOut: THREE.Vector3): void {
   const cy = FEET + H / 2;
   kit.decal('hotair', [0, cy, faceZ], [W - 0.006, H - 0.006]);
   const d = panelRect(P, P.display);
-  kit.quad('world.props.seg', [d.center[0], cy + d.center[1], faceZ + 0.0006], [d.size[0] * 0.9, d.size[1] * 0.84], [0, 0, 0], rawTint(2, 3));
+  kit.quad(
+    'world.props.seg',
+    [d.center[0], cy + d.center[1], faceZ + 0.0006],
+    [d.size[0] * 0.9, d.size[1] * 0.84],
+    [0, 0, 0],
+    rawTint(2, 3),
+  );
   const r = panelRadius(P, P.knobRadius);
   P.knobs.forEach((uv, k) => {
     const [x, y] = panelPoint(P, uv);
-    knob(kit, [x, cy + y, faceZ], r, 0.014, k === 0 ? -0.3 : 0.9, { skirt: TINTS.plasticBlack, metalCap: true });
+    knob(kit, [x, cy + y, faceZ], r, 0.014, k === 0 ? -0.3 : 0.9, {
+      skirt: TINTS.plasticBlack,
+      metalCap: true,
+    });
   });
   const [lx, ly] = panelPoint(P, P.led);
   kit.led([lx, cy + ly, faceZ], 0.0024, 0xffa11a, LED_CHANNEL.hotAir);
   const [swx, swy] = panelPoint(P, P.switch);
   rocker(kit, [swx, cy + swy, faceZ], 0.018, 0.01, true, TINTS.plasticRed);
   const [ox, oy] = panelPoint(P, P.outlet);
-  kit.cylinder('rubber.black', [ox, cy + oy, faceZ], [ox, cy + oy, faceZ + 0.02], 0.011, 16, { radiusB: 0.008 });
+  kit.cylinder('rubber.black', [ox, cy + oy, faceZ], [ox, cy + oy, faceZ + 0.02], 0.011, 16, {
+    radiusB: 0.008,
+  });
   kit.toWorld([ox, cy + oy, faceZ + 0.02], hoseOut);
   // Aérations sur le capot.
   for (let k = 0; k < 5; k++) {
-    kit.box('world.props.plastic', [-0.04 + k * 0.02, FEET + H + 0.0004, -0.03], [0.008, 0.0012, 0.08], 0.0005, {
-      tint: TINTS.plasticBlack,
-      castShadow: false,
-    });
+    kit.box(
+      'world.props.plastic',
+      [-0.04 + k * 0.02, FEET + H + 0.0004, -0.03],
+      [0.008, 0.0012, 0.08],
+      0.0005,
+      {
+        tint: TINTS.plasticBlack,
+        castShadow: false,
+      },
+    );
   }
 }
 
@@ -184,13 +267,18 @@ function buildHotAirHandpiece(kit: PropKit, hoseOut: THREE.Vector3): void {
   // Berceau : semelle et deux étriers en fil chromé.
   kit.box('world.props.paint', [0, 0.004, 0], [0.09, 0.008, 0.06], 0.003, { tint: TINTS.charcoal });
   for (const x of [-0.03, 0.03]) {
-    kit.tube('steel.chrome', [
-      [x, 0.008, -0.022],
-      [x, 0.04, -0.02],
-      [x, 0.028, 0],
-      [x, 0.04, 0.02],
-      [x, 0.008, 0.022],
-    ], 0.0018, 5);
+    kit.tube(
+      'steel.chrome',
+      [
+        [x, 0.008, -0.022],
+        [x, 0.04, -0.02],
+        [x, 0.028, 0],
+        [x, 0.04, 0.02],
+        [x, 0.008, 0.022],
+      ],
+      0.0018,
+      5,
+    );
   }
   // Poignée couchée selon X local (buse vers −X).
   const y = 0.044;
@@ -211,31 +299,90 @@ function buildHotAirHandpiece(kit: PropKit, hoseOut: THREE.Vector3): void {
     18,
     { tint: tint(0x303236, 0.5) },
   );
-  kit.lathe('steel.stainless', [[0.0112, 0.114], [0.0112, 0.165], [0.009, 0.172], [0.004, 0.178], [0.004, 0.195], [0, 0.195]], [0, 0, 0], [0, 0, 0], 16);
+  kit.lathe(
+    'steel.stainless',
+    [
+      [0.0112, 0.114],
+      [0.0112, 0.165],
+      [0.009, 0.172],
+      [0.004, 0.178],
+      [0.004, 0.195],
+      [0, 0.195],
+    ],
+    [0, 0, 0],
+    [0, 0, 0],
+    16,
+  );
   kit.pop();
-  kit.box('world.props.plastic', [0.02, y + 0.015, 0], [0.018, 0.004, 0.008], 0.0015, { tint: TINTS.plasticRed, castShadow: false });
+  kit.box('world.props.plastic', [0.02, y + 0.015, 0], [0.018, 0.004, 0.008], 0.0015, {
+    tint: TINTS.plasticRed,
+    castShadow: false,
+  });
   kit.toWorld([0.075, y, 0], hoseOut);
 }
 
 function buildSolderSpool(kit: PropKit): void {
   // Étrier du dévidoir, axe, bobine d'étain (flasques rouges).
   kit.box('world.props.paint', [0, 0.004, 0], [0.07, 0.008, 0.07], 0.003, { tint: TINTS.teal });
-  for (const x of [-0.029, 0.029]) kit.box('world.props.paint', [x, 0.03, 0], [0.004, 0.05, 0.02], 0.0015, { tint: TINTS.teal });
+  for (const x of [-0.029, 0.029])
+    kit.box('world.props.paint', [x, 0.03, 0], [0.004, 0.05, 0.02], 0.0015, { tint: TINTS.teal });
   const axleY = 0.046;
   kit.cylinder('steel.zinc', [-0.033, axleY, 0], [0.033, axleY, 0], 0.003, 8);
   kit.pushMatrix(PropKit.alongY([-0.021, axleY, 0], [1, 0, 0]));
-  kit.lathe('world.props.plastic', [[0.006, 0], [0.032, 0], [0.032, 0.003], [0.009, 0.003]], [0, 0, 0], [0, 0, 0], 24, { tint: TINTS.plasticRed });
-  kit.lathe('solder', [[0.009, 0.003], [0.024, 0.003], [0.0246, 0.021], [0.024, 0.039], [0.009, 0.039]], [0, 0, 0], [0, 0, 0], 24);
-  kit.lathe('world.props.plastic', [[0.009, 0.039], [0.032, 0.039], [0.032, 0.042], [0.006, 0.042]], [0, 0, 0], [0, 0, 0], 24, { tint: TINTS.plasticRed });
+  kit.lathe(
+    'world.props.plastic',
+    [
+      [0.006, 0],
+      [0.032, 0],
+      [0.032, 0.003],
+      [0.009, 0.003],
+    ],
+    [0, 0, 0],
+    [0, 0, 0],
+    24,
+    { tint: TINTS.plasticRed },
+  );
+  kit.lathe(
+    'solder',
+    [
+      [0.009, 0.003],
+      [0.024, 0.003],
+      [0.0246, 0.021],
+      [0.024, 0.039],
+      [0.009, 0.039],
+    ],
+    [0, 0, 0],
+    [0, 0, 0],
+    24,
+  );
+  kit.lathe(
+    'world.props.plastic',
+    [
+      [0.009, 0.039],
+      [0.032, 0.039],
+      [0.032, 0.042],
+      [0.006, 0.042],
+    ],
+    [0, 0, 0],
+    [0, 0, 0],
+    24,
+    { tint: TINTS.plasticRed },
+  );
   kit.pop();
   // Fil d'étain déroulé qui retombe vers l'avant.
-  kit.tube('solder', [
-    [0, axleY + 0.024, 0.004],
-    [0.004, axleY + 0.02, 0.03],
-    [0.01, 0.01, 0.05],
-    [0.02, 0.002, 0.075],
-    [0.05, 0.0012, 0.09],
-  ], 0.0006, 4, { perMeter: 80 });
+  kit.tube(
+    'solder',
+    [
+      [0, axleY + 0.024, 0.004],
+      [0.004, axleY + 0.02, 0.03],
+      [0.01, 0.01, 0.05],
+      [0.02, 0.002, 0.075],
+      [0.05, 0.0012, 0.09],
+    ],
+    0.0006,
+    4,
+    { perMeter: 80 },
+  );
 }
 
 function buildFlux(kit: PropKit): void {
@@ -254,31 +401,91 @@ function buildFlux(kit: PropKit): void {
     18,
     { tint: tint(0xa8641e, 0.25) },
   );
-  kit.cylinder('world.props.plastic', [0, 0.054, 0], [0, 0.07, 0], 0.005, 12, { tint: TINTS.plasticCream, radiusB: 0.002 });
+  kit.cylinder('world.props.plastic', [0, 0.054, 0], [0, 0.07, 0], 0.005, 12, {
+    tint: TINTS.plasticCream,
+    radiusB: 0.002,
+  });
   kit.cylinder('steel.stainless', [0, 0.07, 0], [0, 0.084, 0.004], 0.0006, 5, { castShadow: false });
-  kit.cylinder('world.props.plastic', [0, 0.02, 0], [0, 0.036, 0], 0.0163, 18, { tint: TINTS.plasticCream, open: true });
+  kit.cylinder('world.props.plastic', [0, 0.02, 0], [0, 0.036, 0], 0.0163, 18, {
+    tint: TINTS.plasticCream,
+    open: true,
+  });
 }
 
 function buildPump(kit: PropKit): void {
   const r = 0.0115;
   const y = r;
   kit.cylinder('alu.anodized.blue', [-0.07, y, 0], [0.06, y, 0], r, 18);
-  kit.cylinder('world.props.plastic', [0.06, y, 0], [0.095, y, 0], 0.0075, 14, { tint: TINTS.plasticCream, radiusB: 0.0028 });
+  kit.cylinder('world.props.plastic', [0.06, y, 0], [0.095, y, 0], 0.0075, 14, {
+    tint: TINTS.plasticCream,
+    radiusB: 0.0028,
+  });
   kit.cylinder('steel.chrome', [-0.07, y, 0], [-0.1, y, 0], 0.003, 8);
   kit.cylinder('world.props.plastic', [-0.1, y, 0], [-0.112, y, 0], 0.0095, 14, { tint: TINTS.plasticBlack });
-  kit.cylinder('world.props.plastic', [0.025, y + r - 0.002, 0], [0.025, y + r + 0.004, 0], 0.0042, 10, { tint: TINTS.plasticBlack });
+  kit.cylinder('world.props.plastic', [0.025, y + r - 0.002, 0], [0.025, y + r + 0.004, 0], 0.0042, 10, {
+    tint: TINTS.plasticBlack,
+  });
 }
 
 function buildBraid(kit: PropKit): void {
-  kit.lathe('world.props.plastic', [[0.006, 0], [0.024, 0], [0.024, 0.003], [0.008, 0.003]], [0, 0, 0], [0, 0, 0], 22, { tint: TINTS.plasticGreen });
-  kit.lathe('copper.bare', [[0.008, 0.003], [0.019, 0.003], [0.019, 0.01], [0.008, 0.01]], [0, 0, 0], [0, 0, 0], 22);
-  kit.lathe('world.props.plastic', [[0.008, 0.01], [0.024, 0.01], [0.024, 0.013], [0.006, 0.013]], [0, 0, 0], [0, 0, 0], 22, { tint: TINTS.plasticGreen });
-  kit.box('copper.bare', [0.028, 0.0008, 0.006], [0.02, 0.0012, 0.0025], 0, { edge: 'none', castShadow: false }, [0, 0.3, 0]);
+  kit.lathe(
+    'world.props.plastic',
+    [
+      [0.006, 0],
+      [0.024, 0],
+      [0.024, 0.003],
+      [0.008, 0.003],
+    ],
+    [0, 0, 0],
+    [0, 0, 0],
+    22,
+    { tint: TINTS.plasticGreen },
+  );
+  kit.lathe(
+    'copper.bare',
+    [
+      [0.008, 0.003],
+      [0.019, 0.003],
+      [0.019, 0.01],
+      [0.008, 0.01],
+    ],
+    [0, 0, 0],
+    [0, 0, 0],
+    22,
+  );
+  kit.lathe(
+    'world.props.plastic',
+    [
+      [0.008, 0.01],
+      [0.024, 0.01],
+      [0.024, 0.013],
+      [0.006, 0.013],
+    ],
+    [0, 0, 0],
+    [0, 0, 0],
+    22,
+    { tint: TINTS.plasticGreen },
+  );
+  kit.box(
+    'copper.bare',
+    [0.028, 0.0008, 0.006],
+    [0.02, 0.0012, 0.0025],
+    0,
+    { edge: 'none', castShadow: false },
+    [0, 0.3, 0],
+  );
 }
 
 function buildTweezers(kit: PropKit): void {
   for (const side of [-1, 1]) {
-    kit.box('steel.stainless', [side * 0.0022, 0.0022, 0], [0.0016, 0.0008, 0.118], 0.0003, { edge: 'none', castShadow: false }, [0, side * 0.035, 0]);
+    kit.box(
+      'steel.stainless',
+      [side * 0.0022, 0.0022, 0],
+      [0.0016, 0.0008, 0.118],
+      0.0003,
+      { edge: 'none', castShadow: false },
+      [0, side * 0.035, 0],
+    );
   }
   kit.box('steel.stainless', [0, 0.0022, -0.058], [0.0055, 0.0012, 0.008], 0.0005, { castShadow: false });
 }

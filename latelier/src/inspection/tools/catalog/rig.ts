@@ -62,7 +62,8 @@ export function createRigContext(): ToolRigContext {
     approachK: 1,
     retractK: 0,
     travel: 0,
-    helpersVisible: true,
+    // Hors geste (vitrine, rangée d'outils), les outils d'appoint restent cachés.
+    helpersVisible: false,
   };
 }
 

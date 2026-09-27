@@ -162,9 +162,8 @@ export class AmbientOcclusion {
   readonly gtao: ResolvedGTAONode;
   /** Facteur d'occlusion filtré (flottant 0..1) à la résolution de l'AO, rééchantillonné bilinéairement. */
   readonly factor: FloatNode;
-  /** Facteur brut de GTAO et profondeur de vue recopiée (vues de contrôle). */
+  /** Facteur brut de GTAO, avant débruitage (vue de contrôle). */
   readonly rawFactor: FloatNode;
-  readonly resolvedViewZ: FloatNode;
   private readonly mirror: AoCameraMirror;
   private readonly resolve: DepthResolvePass;
   private readonly blurH: THREE.RTTNode;
@@ -199,11 +198,6 @@ export class AmbientOcclusion {
     this.blurV = rtt(bilateralBlur(this.blurH, depth, options.camera, this.stepV), null, null, rttOptions);
     this.factor = this.blurV.r;
     this.rawFactor = aoTexture.r;
-    this.resolvedViewZ = standardDepthToViewZ(
-      depth.r,
-      reference('near', 'float', options.camera),
-      reference('far', 'float', options.camera),
-    );
   }
 
   /**

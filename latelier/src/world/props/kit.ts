@@ -87,7 +87,12 @@ export class PropKit {
   }
 
   /** Ajoute une géométrie (consommée) placée par `local` dans le repère courant. */
-  add(material: string, geometry: THREE.BufferGeometry, local: THREE.Matrix4 | null = null, o: PropPieceOptions = {}): void {
+  add(
+    material: string,
+    geometry: THREE.BufferGeometry,
+    local: THREE.Matrix4 | null = null,
+    o: PropPieceOptions = {},
+  ): void {
     const matrix = local ? this.frame.clone().multiply(local) : this.frame.clone();
     this.main.add(material, geometry, matrix, o);
   }
@@ -106,7 +111,14 @@ export class PropKit {
   }
 
   /** Boîte arrondie par bornes (repère local). */
-  boxMinMax(material: string, min: Vec3Tuple, max: Vec3Tuple, radius = 0.004, o: PropPieceOptions = {}, segments = 1): void {
+  boxMinMax(
+    material: string,
+    min: Vec3Tuple,
+    max: Vec3Tuple,
+    radius = 0.004,
+    o: PropPieceOptions = {},
+    segments = 1,
+  ): void {
     this.box(
       material,
       [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2],
@@ -132,7 +144,14 @@ export class PropKit {
     const dir = _v.subVectors(vb, va);
     const length = dir.length();
     if (length < 1e-6) return;
-    const g = new THREE.CylinderGeometry(o.radiusB ?? radius, radius, length, this.seg(segments), 1, o.open ?? false);
+    const g = new THREE.CylinderGeometry(
+      o.radiusB ?? radius,
+      radius,
+      length,
+      this.seg(segments),
+      1,
+      o.open ?? false,
+    );
     _q.setFromUnitVectors(_up, dir.normalize());
     const m = new THREE.Matrix4().compose(va.add(vb).multiplyScalar(0.5), _q, new THREE.Vector3(1, 1, 1));
     this.add(material, g, m, { edge: 'none', ...o });
@@ -147,7 +166,10 @@ export class PropKit {
     segments = 24,
     o: PropPieceOptions = {},
   ): void {
-    this.add(material, latheGeometry(profile, this.seg(segments)), place(position, rotation), { edge: 'none', ...o });
+    this.add(material, latheGeometry(profile, this.seg(segments)), place(position, rotation), {
+      edge: 'none',
+      ...o,
+    });
   }
 
   /** Tube lisse passant par des points locaux (câbles, cordons, fils). */
@@ -230,6 +252,24 @@ export class PropKit {
     this.decals.add('world.props.decal', g, m, { uv: 'keep', edge: 'none', castShadow: false });
   }
 
+  /** Quadrilatère texturé par une région de l'atlas avec un matériau propre (cadran rétroéclairé). */
+  atlasQuad(
+    material: string,
+    region: string,
+    center: Vec3Tuple,
+    size: readonly [number, number],
+    rotation: Vec3Tuple = [0, 0, 0],
+  ): void {
+    const r = atlasRect(region);
+    const g = new THREE.PlaneGeometry(size[0], size[1]);
+    const uv = g.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) {
+      const [u, v] = atlasUV(r, uv.getX(i), uv.getY(i));
+      uv.setXY(i, u, v);
+    }
+    this.add(material, g, place(center, rotation), { uv: 'keep', edge: 'none', castShadow: false });
+  }
+
   /** Décalque enroulé sur un cylindre d'axe Y local (étiquettes de bidons, bombes, extincteur). */
   wrapDecal(
     region: string,
@@ -241,7 +281,16 @@ export class PropKit {
     material = 'world.props.decal',
   ): void {
     const r = atlasRect(region);
-    const g = new THREE.CylinderGeometry(radius, radius, height, this.seg(16), 1, true, facing - arc / 2, arc);
+    const g = new THREE.CylinderGeometry(
+      radius,
+      radius,
+      height,
+      this.seg(16),
+      1,
+      true,
+      facing - arc / 2,
+      arc,
+    );
     const uv = g.getAttribute('uv');
     for (let i = 0; i < uv.count; i++) {
       const [u, v] = atlasUV(r, uv.getX(i), uv.getY(i));
@@ -252,13 +301,25 @@ export class PropKit {
   }
 
   /** Quadrilatère aux UV 0..1 (écrans, afficheurs) dans le lot principal. */
-  quad(material: string, center: Vec3Tuple, size: readonly [number, number], rotation: Vec3Tuple, tint?: Tint): void {
+  quad(
+    material: string,
+    center: Vec3Tuple,
+    size: readonly [number, number],
+    rotation: Vec3Tuple,
+    tint?: Tint,
+  ): void {
     const g = new THREE.PlaneGeometry(size[0], size[1]);
     this.add(material, g, place(center, rotation), { uv: 'keep', edge: 'none', castShadow: false, tint });
   }
 
   /** Voyant (demi-sphère émissive) : `color` hexadécimal, `channel` voir `LED_CHANNEL`. */
-  led(center: Vec3Tuple, radius: number, color: number, channel: number, rotation: Vec3Tuple = [0, 0, 0]): void {
+  led(
+    center: Vec3Tuple,
+    radius: number,
+    color: number,
+    channel: number,
+    rotation: Vec3Tuple = [0, 0, 0],
+  ): void {
     const c = new THREE.Color(color);
     const g = new THREE.SphereGeometry(radius, this.seg(10), this.seg(6), 0, Math.PI * 2, 0, Math.PI / 2);
     g.rotateX(Math.PI / 2);

@@ -16,7 +16,7 @@ export interface InspectionFocus {
 export type OutlineKind = 'hover' | 'selected' | 'blocked';
 
 /** Vues de contrôle du pipeline (développement, captures de vérification). */
-export type PostDebugView = 'none' | 'ao' | 'aoraw' | 'aodepth' | 'depth' | 'focus';
+export type PostDebugView = 'none' | 'ao' | 'aoraw' | 'depth' | 'focus';
 
 /** Ordre des canaux du masque de contour (R = survol, V = sélection, B = bloqué). */
 export const OUTLINE_KINDS: readonly OutlineKind[] = ['hover', 'selected', 'blocked'];

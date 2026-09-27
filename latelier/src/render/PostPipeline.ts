@@ -210,8 +210,6 @@ export class PostPipeline {
         output = this.ao ? vec4(vec3(this.ao.factor), 1) : vec4(1);
       } else if (debugView === 'aoraw') {
         output = this.ao ? vec4(vec3(this.ao.rawFactor), 1) : vec4(1);
-      } else if (debugView === 'aodepth') {
-        output = this.ao ? vec4(vec3(clamp(this.ao.resolvedViewZ.negate().div(6), 0, 1)), 1) : vec4(0);
       } else if (debugView === 'depth') {
         // Distance linéaire 0..6 m (contrôle de la profondeur inversée).
         output = vec4(vec3(clamp(viewZ.negate().div(6), 0, 1)), 1);

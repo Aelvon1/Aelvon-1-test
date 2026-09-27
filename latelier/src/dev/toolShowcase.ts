@@ -14,6 +14,7 @@
  * - `dir=-1`     : geste de remontage ;
  * - `cam=stage|row` : cadrage initial (défaut : poste) ; `view=dx,dy,dz,distance` le complète ;
  * - `speed=k`    : vitesse de lecture ;
+ * - `row=0`      : sans la rangée d'outils (captures du poste plus légères) ;
  * - `post=0`     : rendu direct, sans post-traitement.
  */
 import * as THREE from 'three/webgpu';
@@ -40,6 +41,10 @@ export interface ToolShowcaseHandle {
   controls: OrbitControls;
   /** Outil en démonstration. */
   current(): ToolId;
+  /** Démontre un outil (captures automatisées) ; le cadrage « poste » suit sa distance. */
+  select(id: ToolId): void;
+  /** Fige le geste à la progression `t` (0..1), ou reprend la lecture (null). */
+  freeze(t: number | null): void;
   dispose(): void;
 }
 
@@ -192,25 +197,11 @@ export async function startToolShowcase(ctx: AppContext, _world: World): Promise
   const labelGeo = new THREE.PlaneGeometry(0.084, 0.0185);
   geometries.push(labelGeo);
   const labelMaterials = new Map<ToolId, THREE.MeshBasicNodeMaterial>();
+  // `row=0` : pas de rangée (captures du poste plus légères).
+  const showRow = q.get('row') !== '0';
   TOOL_IDS.forEach((id, i) => {
     const def = getTool(id);
     if (!def) return;
-    const model = def.build(buildCtx);
-    def.animate?.(model, rest);
-    const holder = new THREE.Group();
-    holder.name = `Rangée : ${def.name}`;
-    holder.add(model);
-    holder.quaternion.copy(lying);
-    holder.updateMatrixWorld(true);
-    box.setFromObject(holder);
-    const width = box.max.x - box.min.x;
-    const x = cursor - box.min.x;
-    cursor += width + 0.022;
-    const y = (onMat(x, zTips - 0.1) ? matY : benchY) - box.min.y + 0.0002;
-    holder.position.set(x, y, zTips);
-    root.add(holder);
-    rowTools.set(id, holder);
-    collectOwned(model, geometries, ownMaterials);
     // Plaquette de nom (générateur `label` du worker de textures), en quinconce.
     const map = textures.get({
       key: `dev/tools/${id}`,
@@ -231,6 +222,31 @@ export async function startToolShowcase(ctx: AppContext, _world: World): Promise
     const labelMat = new THREE.MeshBasicNodeMaterial({ map, transparent: true });
     labelMaterials.set(id, labelMat);
     ownMaterials.push(labelMat);
+    if (!showRow) return;
+    const model = def.build(buildCtx);
+    def.animate?.(model, rest);
+    const holder = new THREE.Group();
+    holder.name = `Rangée : ${def.name}`;
+    holder.add(model);
+    holder.quaternion.copy(lying);
+    // Couchés sur l'établi : câbles masqués (ils traverseraient le plateau), fondus actifs.
+    model.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (mesh.name === 'câble') mesh.visible = false;
+      const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of list) m.alphaHash = true;
+    });
+    holder.updateMatrixWorld(true);
+    visibleBox(holder, box);
+    const width = box.max.x - box.min.x;
+    const x = cursor - box.min.x;
+    cursor += width + 0.022;
+    const y = (onMat(x, zTips - 0.1) ? matY : benchY) - box.min.y + 0.0002;
+    holder.position.set(x, y, zTips);
+    root.add(holder);
+    rowTools.set(id, holder);
+    collectOwned(model, geometries, ownMaterials);
     const label = new THREE.Mesh(labelGeo, labelMat);
     label.rotation.x = -Math.PI / 2 + 0.45;
     label.position.set(x + (box.min.x + box.max.x) / 2, benchY + 0.012, zTips + (i % 2 === 0 ? 0.03 : 0.056));
@@ -253,8 +269,9 @@ export async function startToolShowcase(ctx: AppContext, _world: World): Promise
     labelGeo,
     labelMaterials.get('hands') ?? new THREE.MeshBasicNodeMaterial(),
   );
-  stageLabel.rotation.x = -Math.PI / 2 + 0.45;
-  stageLabel.position.set(0, 0.012, 0.055);
+  // Plaquette derrière le poste (hors champ des gros plans), inclinée vers l'opérateur.
+  stageLabel.rotation.x = -Math.PI / 2 + 0.9;
+  stageLabel.position.set(0, 0.012, -0.06);
   stage.add(stageLabel);
   const top = 0.008;
   const factory = new DemoFactory(materials, geometries, top);
@@ -297,7 +314,7 @@ export async function startToolShowcase(ctx: AppContext, _world: World): Promise
   const firstTool = q.get('tool');
   const firstView =
     firstTool && firstTool in DEMOS ? DEMOS[firstTool as ToolId].view : DEMOS[TOOL_IDS[0]].view;
-  const distance = view && view.length >= 4 ? view[3]! : rowView ? 1.3 : firstView;
+  const distance = view && view.length >= 4 ? view[3]! : rowView ? 1.8 : firstView;
   camera.fov = 35;
   camera.position.copy(target).addScaledVector(dir, distance);
   camera.lookAt(target);
@@ -311,9 +328,10 @@ export async function startToolShowcase(ctx: AppContext, _world: World): Promise
 
   // --- Boucle de démonstration ---------------------------------------------------------------------
   const only = q.get('tool');
-  const sequence: ToolId[] =
+  let sequence: ToolId[] =
     only && (TOOL_IDS as readonly string[]).includes(only) ? [only as ToolId] : [...TOOL_IDS];
-  const frozen = q.get('t') !== null && Number.isFinite(Number(q.get('t'))) ? Number(q.get('t')) : null;
+  let frozen: number | null =
+    q.get('t') !== null && Number.isFinite(Number(q.get('t'))) ? Number(q.get('t')) : null;
   const direction: 1 | -1 = q.get('dir') === '-1' ? -1 : 1;
   const speedParam = Number(q.get('speed'));
   const speed = Number.isFinite(speedParam) && speedParam > 0 ? speedParam : 1;
@@ -429,6 +447,21 @@ export async function startToolShowcase(ctx: AppContext, _world: World): Promise
     presenter,
     controls,
     current: () => sequence[index]!,
+    select: (id) => {
+      if (!sequence.includes(id)) sequence = [id];
+      index = sequence.indexOf(id);
+      setupDemo(id);
+      if (!rowView) {
+        const d = engine.camera.position.distanceTo(controls.target);
+        engine.camera.position
+          .sub(controls.target)
+          .multiplyScalar(DEMOS[id].view / d)
+          .add(controls.target);
+      }
+    },
+    freeze: (t) => {
+      frozen = t;
+    },
     dispose: () => {
       removeUpdate();
       controls.dispose();
@@ -444,6 +477,23 @@ export async function startToolShowcase(ctx: AppContext, _world: World): Promise
   };
   (window as unknown as { __tools?: ToolShowcaseHandle }).__tools = handle;
   return handle;
+}
+
+/** Boîte englobante monde des seuls maillages visibles. */
+function visibleBox(object: THREE.Object3D, target: THREE.Box3): THREE.Box3 {
+  target.makeEmpty();
+  const tmp = new THREE.Box3();
+  const visit = (o: THREE.Object3D) => {
+    if (!o.visible) return;
+    const mesh = o as THREE.Mesh;
+    if (mesh.isMesh) {
+      mesh.geometry.computeBoundingBox();
+      target.union(tmp.copy(mesh.geometry.boundingBox!).applyMatrix4(mesh.matrixWorld));
+    }
+    for (const c of o.children) visit(c);
+  };
+  visit(object);
+  return target;
 }
 
 /** Géométries et matériaux propres d'un modèle (libérés avec le banc). */

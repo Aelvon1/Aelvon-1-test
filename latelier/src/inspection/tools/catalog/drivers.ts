@@ -8,6 +8,9 @@
  *
  * Geste : l'outil s'engage dans l'empreinte le long de l'axe et tourne avec la vis (`spin`) ;
  * sans rotation de la pièce (déclipsage, extraction), le tournevis fait levier.
+ *
+ * Approximation : l'enfoncement dans l'empreinte est déduit de la profondeur de la pièce
+ * (l'empreinte réelle n'est pas décrite par les données).
  */
 import * as THREE from 'three/webgpu';
 import type { ToolAnimState, ToolBuildContext } from '../../../objects/types';

@@ -10,6 +10,11 @@
  *   libéré (déclic) ;
  * - tresse : posée sur la soudure, pressée par le fer ; l'extrémité s'imbibe d'étain (teinte) ;
  * - air chaud : buse à 5 mm de la pièce décrivant de petits cercles, puis recul pendant la levée.
+ *
+ * Approximation : la soudure visée est supposée au pied de la pièce, sur le flanc extérieur
+ * (l'emplacement réel des joints n'est pas décrit par les données) ; la tresse est un ruban de
+ * cuivre lisse (brins tressés non modélisés) dont l'extrémité change de teinte en s'imbibant ;
+ * le flux d'air chaud et l'aspiration de l'étain ne sont pas visualisés (seul le piston bouge).
  */
 import * as THREE from 'three/webgpu';
 import type { ToolAnimState, ToolBuildContext } from '../../../objects/types';

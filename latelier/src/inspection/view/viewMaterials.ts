@@ -131,7 +131,7 @@ export function createSectionPlaneMaterial(): {
   const gd = abs(fract(g.sub(0.5)).sub(0.5)).div(fw);
   const gridLine = float(1).sub(smoothstep(0.4, 1.3, min(gd.x, gd.y)));
   const gridFade = float(1).sub(smoothstep(0.12, 0.35, max(fw.x, fw.y)));
-  const alpha = float(0.05).add(border.mul(0.85)).add(glow).add(gridLine.mul(gridFade).mul(0.1));
+  const alpha = float(0.035).add(border.mul(0.85)).add(glow).add(gridLine.mul(gridFade).mul(0.07));
   m.colorNode = color(PLANE_TINT).mul(float(1).add(border.mul(0.6)));
   m.opacityNode = alpha.mul(strength).clamp(0, 1);
   m.userData = { viewMaterial: 'sectionPlane' };

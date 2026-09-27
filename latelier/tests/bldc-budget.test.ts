@@ -3,7 +3,7 @@
  * géométries fines construites) — < 1,5 M triangles et < 400 appels de dessin.
  */
 import { describe, expect, it } from 'vitest';
-import * as THREE from 'three/webgpu';
+import type * as THREE from 'three/webgpu';
 import def from '../src/objects/bldc-inrunner/index';
 import { PRESETS } from '../src/objects/bldc-inrunner/params';
 import { resolveObject } from '../src/objects/resolve';

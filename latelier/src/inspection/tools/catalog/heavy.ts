@@ -11,6 +11,11 @@
  *   course / rayon primitif du pignon. Au démontage, le poussoir appuie sur la face ARRIÈRE de
  *   la pièce (il la chasse vers sa sortie) ; au remontage, sur sa face avant.
  * - Maillet : tête à embouts caoutchouc/nylon, manche bois ; trois frappes pivotant au poignet.
+ *
+ * Approximation : les griffes de l'extracteur se placent sous la face arrière de la pièce d'après
+ * sa boîte englobante (sans tenir compte d'un logement borgne), et le rayon de la vis est réduit
+ * pour passer dans l'alésage ; la presse n'est représentée que par sa tête, sa colonne tronquée
+ * et son levier (ni table ni socle), le poussoir étant placé d'après la boîte de la pièce.
  */
 import * as THREE from 'three/webgpu';
 import type { ToolAnimState, ToolBuildContext } from '../../../objects/types';

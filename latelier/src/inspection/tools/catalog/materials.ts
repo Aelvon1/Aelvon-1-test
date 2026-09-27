@@ -70,9 +70,10 @@ export function toolMaterials(ctx: ToolBuildContext): ToolMaterials {
   const v = ctx.materials;
   return {
     chrome: () =>
-      once('chrome', () => v.variant('steel.chrome', { roughness: 0.2, name: 'outil/chrome satiné' })),
+      once('chrome', () => v.variant('steel.chrome', { roughness: 0.3, name: 'outil/chrome satiné' })),
     polished: () => once('polished', () => v.variant('steel.chrome', { name: 'outil/chrome' })),
-    stainless: () => once('stainless', () => v.variant('steel.stainless', { name: 'outil/inox' })),
+    stainless: () =>
+      once('stainless', () => v.variant('steel.stainless', { roughness: 0.3, name: 'outil/inox' })),
     blackOxide: () => once('blackoxide', () => v.variant('steel.blackoxide', { name: 'outil/acier bruni' })),
     plastic: (color, roughness = 0.4) =>
       once(`plastic.${color}.${roughness}`, () =>

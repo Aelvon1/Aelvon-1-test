@@ -102,11 +102,18 @@ export class OccupancyGrid {
 
   /** Marque les cellules dont le centre est dans l'emprise. */
   rasterize(footprints: readonly Footprint[]): void {
+    const { bounds, cell } = this;
     for (const f of footprints) {
-      for (let j = 0; j < this.rows; j++) {
-        for (let i = 0; i < this.cols; i++) {
-          const c = this.cellCenter(i, j);
-          if (contains(f, c.x, c.z)) this.occupied[j * this.cols + i] = 1;
+      // Rectangle englobant de l'emprise (rayon du cercle circonscrit pour les boîtes orientées).
+      const r = f.kind === 'circle' ? f.radius : Math.hypot(f.hx, f.hz);
+      const i0 = Math.max(0, Math.floor((f.cx - r - bounds.x[0]) / cell));
+      const i1 = Math.min(this.cols - 1, Math.ceil((f.cx + r - bounds.x[0]) / cell));
+      const j0 = Math.max(0, Math.floor((f.cz - r - bounds.z[0]) / cell));
+      const j1 = Math.min(this.rows - 1, Math.ceil((f.cz + r - bounds.z[0]) / cell));
+      for (let j = j0; j <= j1; j++) {
+        const z = bounds.z[0] + (j + 0.5) * cell;
+        for (let i = i0; i <= i1; i++) {
+          if (contains(f, bounds.x[0] + (i + 0.5) * cell, z)) this.occupied[j * this.cols + i] = 1;
         }
       }
     }
@@ -177,21 +184,20 @@ export class OccupancyGrid {
     let tail = 0;
     queue[tail++] = s;
     seen[s] = 1;
+    const cols = this.cols;
+    const visit = (n: number) => {
+      if (seen[n] || dist[n]! < radius) return;
+      seen[n] = 1;
+      queue[tail++] = n;
+    };
     while (head < tail) {
       const k = queue[head++]!;
-      const i = k % this.cols;
-      const j = (k - i) / this.cols;
-      const next = [
-        i > 0 ? k - 1 : -1,
-        i < this.cols - 1 ? k + 1 : -1,
-        j > 0 ? k - this.cols : -1,
-        j < this.rows - 1 ? k + this.cols : -1,
-      ];
-      for (const n of next) {
-        if (n < 0 || seen[n] || dist[n]! < radius) continue;
-        seen[n] = 1;
-        queue[tail++] = n;
-      }
+      const i = k % cols;
+      const j = (k - i) / cols;
+      if (i > 0) visit(k - 1);
+      if (i < cols - 1) visit(k + 1);
+      if (j > 0) visit(k - cols);
+      if (j < this.rows - 1) visit(k + cols);
     }
     return seen;
   }
@@ -200,7 +206,8 @@ export class OccupancyGrid {
   anyIn(mask: Uint8Array, zone: { x: readonly [number, number]; z: readonly [number, number] }): boolean {
     const a = this.cellOf({ x: zone.x[0], z: zone.z[0] });
     const b = this.cellOf({ x: zone.x[1], z: zone.z[1] });
-    for (let j = a.j; j <= b.j; j++) for (let i = a.i; i <= b.i; i++) if (mask[j * this.cols + i]) return true;
+    for (let j = a.j; j <= b.j; j++)
+      for (let i = a.i; i <= b.i; i++) if (mask[j * this.cols + i]) return true;
     return false;
   }
 

@@ -87,7 +87,11 @@ export function knob(
   const len = r * 0.7;
   kit.box(
     'world.props.plastic',
-    [center[0] + Math.sin(angle) * len * 0.62, center[1] + Math.cos(angle) * len * 0.62, center[2] + depth * 1.02],
+    [
+      center[0] + Math.sin(angle) * len * 0.62,
+      center[1] + Math.cos(angle) * len * 0.62,
+      center[2] + depth * 1.02,
+    ],
     [r * 0.14, len, depth * 0.06],
     0,
     { tint: o.cap ?? tint(0xe8e0c8, 0.5), castShadow: false, edge: 'none' },
@@ -101,8 +105,18 @@ export function foot(kit: PropKit, x: number, z: number, r = 0.009, h = 0.012): 
 }
 
 /** Interrupteur à bascule rectangulaire (face +Z locale). */
-export function rocker(kit: PropKit, center: Vec3Tuple, w: number, h: number, on = true, color: Tint = TINTS.plasticBlack): void {
-  kit.box('world.props.plastic', [center[0], center[1], center[2] + 0.002], [w, h, 0.004], 0.0012, { tint: TINTS.plasticBlack, castShadow: false });
+export function rocker(
+  kit: PropKit,
+  center: Vec3Tuple,
+  w: number,
+  h: number,
+  on = true,
+  color: Tint = TINTS.plasticBlack,
+): void {
+  kit.box('world.props.plastic', [center[0], center[1], center[2] + 0.002], [w, h, 0.004], 0.0012, {
+    tint: TINTS.plasticBlack,
+    castShadow: false,
+  });
   kit.box(
     'world.props.plastic',
     [center[0], center[1], center[2] + 0.006],
@@ -116,7 +130,18 @@ export function rocker(kit: PropKit, center: Vec3Tuple, w: number, h: number, on
 /** Borne de raccordement (embase hexagonale + capuchon coloré), axe +Z. */
 export function bindingPost(kit: PropKit, center: Vec3Tuple, color: Tint): void {
   kit.at(center, [Math.PI / 2, 0, 0], () => {
-    kit.lathe('brass', [[0.0035, 0], [0.0035, 0.004], [0, 0.004]], [0, 0, 0], [0, 0, 0], 6, { castShadow: false });
+    kit.lathe(
+      'brass',
+      [
+        [0.0035, 0],
+        [0.0035, 0.004],
+        [0, 0.004],
+      ],
+      [0, 0, 0],
+      [0, 0, 0],
+      6,
+      { castShadow: false },
+    );
     kit.lathe(
       'world.props.plastic',
       [
@@ -153,13 +178,32 @@ export function bnc(kit: PropKit, center: Vec3Tuple): void {
       { castShadow: false },
     );
   });
-  kit.cylinder('steel.chrome', [center[0] - 0.0065, center[1], center[2] + 0.008], [center[0] + 0.0065, center[1], center[2] + 0.008], 0.0009, 5, { castShadow: false });
+  kit.cylinder(
+    'steel.chrome',
+    [center[0] - 0.0065, center[1], center[2] + 0.008],
+    [center[0] + 0.0065, center[1], center[2] + 0.008],
+    0.0009,
+    5,
+    { castShadow: false },
+  );
 }
 
 /** Tête de vis cruciforme bombée (axe +Z). */
 export function screwHead(kit: PropKit, center: Vec3Tuple, r = 0.0028): void {
   kit.at(center, [Math.PI / 2, 0, 0], () => {
-    kit.lathe('steel.zinc', [[r, 0], [r * 0.9, r * 0.35], [r * 0.5, r * 0.6], [0, r * 0.62]], [0, 0, 0], [0, 0, 0], 8, { castShadow: false });
+    kit.lathe(
+      'steel.zinc',
+      [
+        [r, 0],
+        [r * 0.9, r * 0.35],
+        [r * 0.5, r * 0.6],
+        [0, r * 0.62],
+      ],
+      [0, 0, 0],
+      [0, 0, 0],
+      8,
+      { castShadow: false },
+    );
   });
 }
 

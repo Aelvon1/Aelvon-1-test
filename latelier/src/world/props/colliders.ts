@@ -39,10 +39,20 @@ export function propColliderSpecs(): StaticColliderSpec[] {
   const vise = BENCH_ITEMS.vise;
   const viseFront = vise.center[1] + vise.size[2] / 2;
   return [
-    boxSpec('étagères', [SHELF_UNIT.x[0], 0, SHELF_UNIT.z[0]], [SHELF_UNIT.x[1], SHELF_UNIT.height, SHELF_UNIT.z[1]]),
-    boxSpec('servante', [CART.x[0], 0, CART.z[0]], [CART.x[1] + CART.handleOut, CART.height + 0.04, CART.z[1]]),
-    boxSpec('bureau électronique', [DESK.x[0], 0, DESK.z[0]], [DESK.x[1], DESK.height + 0.26, DESK.z[1]]),
-    boxSpec('table RC', [RC.x[0], 0, RC.z[0]], [RC.x[1], RC.height + 0.12, RC.z[1]]),
+    boxSpec(
+      'étagères',
+      [SHELF_UNIT.x[0], 0, SHELF_UNIT.z[0]],
+      [SHELF_UNIT.x[1], SHELF_UNIT.height, SHELF_UNIT.z[1]],
+    ),
+    boxSpec(
+      'servante',
+      [CART.x[0], 0, CART.z[0]],
+      [CART.x[1] + CART.handleOut, CART.height + 0.04, CART.z[1]],
+    ),
+    // Bureau et table : volume limité au plateau. La radio posée en retrait reste visable (le
+    // test d'occultation du réticule lance ses rayons contre ces volumes).
+    boxSpec('bureau électronique', [DESK.x[0], 0, DESK.z[0]], [DESK.x[1], DESK.height + 0.01, DESK.z[1]]),
+    boxSpec('table RC', [RC.x[0], 0, RC.z[0]], [RC.x[1], RC.height + 0.01, RC.z[1]]),
     // Étau : mors en saillie du chant avant de l'établi.
     boxSpec(
       'étau',
@@ -54,8 +64,16 @@ export function propColliderSpecs(): StaticColliderSpec[] {
     cylinderSpec('poubelle', TRASH.base[0], TRASH.base[2], TRASH.radius + 0.01, TRASH.height + 0.02),
     boxSpec(
       'extincteur',
-      [EXTINGUISHER.x - EXTINGUISHER.radius - 0.01, EXTINGUISHER.bottom - 0.05, EXTINGUISHER.z - EXTINGUISHER.radius],
-      [EXTINGUISHER.x + EXTINGUISHER.radius + 0.01, EXTINGUISHER.bottom + EXTINGUISHER.height + 0.1, ROOM.maxZ],
+      [
+        EXTINGUISHER.x - EXTINGUISHER.radius - 0.01,
+        EXTINGUISHER.bottom - 0.05,
+        EXTINGUISHER.z - EXTINGUISHER.radius,
+      ],
+      [
+        EXTINGUISHER.x + EXTINGUISHER.radius + 0.01,
+        EXTINGUISHER.bottom + EXTINGUISHER.height + 0.1,
+        ROOM.maxZ,
+      ],
     ),
   ];
 }

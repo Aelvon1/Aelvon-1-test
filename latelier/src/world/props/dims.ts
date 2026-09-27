@@ -129,8 +129,8 @@ export const DESK = {
 export const RADIO = {
   /** Centre de la base. */
   base: SPOTS.radio,
-  /** Largeur (Z), hauteur, profondeur (X). */
-  size: [0.44, 0.235, 0.12] as const,
+  /** Largeur, hauteur du boîtier (poignée non comprise), profondeur. */
+  size: [0.44, 0.2, 0.11] as const,
   /** Lacet : légère orientation vers le centre de la pièce. */
   yaw: -0.18,
 } as const;

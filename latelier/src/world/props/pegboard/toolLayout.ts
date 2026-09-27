@@ -100,12 +100,14 @@ function rectsSilhouette(
 
 /** Coin supérieur gauche de la monture de la scie (accrochée par le tube supérieur). */
 export function hacksawOrigin(): [number, number] {
-  return [holeX(PEG_LAYOUT.hacksaw.i[0]) - 0.055, holeY(PEG_LAYOUT.hacksaw.j) - 0.004];
+  // Le tube supérieur (Ø 15 mm) repose sur les chevilles (Ø 4,4 mm).
+  return [holeX(PEG_LAYOUT.hacksaw.i[0]) - 0.055, holeY(PEG_LAYOUT.hacksaw.j) + 0.0022 + 2 * HACKSAW.tube];
 }
 
 /** Haut de la règle du pied à coulisse (accroché par le bec supérieur). */
 export function caliperOrigin(): [number, number] {
-  return [holeX(PEG_LAYOUT.caliper.i), holeY(PEG_LAYOUT.caliper.j) + 0.012];
+  // Le bec fixe (dessous à 34 mm du haut de la règle) repose sur la cheville, 20 mm à droite de la règle.
+  return [holeX(PEG_LAYOUT.caliper.i) - 0.02, holeY(PEG_LAYOUT.caliper.j) + 0.0022 + 0.034];
 }
 
 /** Accroche d'une pince : la cheville passe dans l'entrejambe, juste au-dessus de l'axe. */
@@ -141,15 +143,19 @@ export function silhouetteSpecs(): SilhouetteSpec[] {
     const x = (holeX(L.mallet.i[0]) + holeX(L.mallet.i[1])) / 2;
     const top = holeY(L.mallet.j) + 0.004 + 2 * MALLET.headRadius;
     out.push(
-      rectsSilhouette('sil.mallet', [x, top], [
-        [-MALLET.headLength / 2, -2 * MALLET.headRadius, MALLET.headLength, 2 * MALLET.headRadius],
+      rectsSilhouette(
+        'sil.mallet',
+        [x, top],
         [
-          -MALLET.handleRadius - 0.002,
-          -2 * MALLET.headRadius - MALLET.handleLength,
-          2 * MALLET.handleRadius + 0.004,
-          MALLET.handleLength,
+          [-MALLET.headLength / 2, -2 * MALLET.headRadius, MALLET.headLength, 2 * MALLET.headRadius],
+          [
+            -MALLET.handleRadius - 0.002,
+            -2 * MALLET.headRadius - MALLET.handleLength,
+            2 * MALLET.handleRadius + 0.004,
+            MALLET.handleLength,
+          ],
         ],
-      ]),
+      ),
     );
   }
   {

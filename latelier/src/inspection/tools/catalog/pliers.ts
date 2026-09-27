@@ -7,6 +7,9 @@
  * Gestes : pince plate — serrage puis traction dans l'axe avec un léger dandinement ; pince à
  * circlips — ergots dans les œillets, écartement, puis dégagement ; coupante — mors ouverts
  * autour du fil, fermeture sèche à l'instant de la coupe.
+ *
+ * Approximation : l'ouverture des mors est calée sur la boîte englobante de la pièce (largeur
+ * perpendiculaire à l'axe), les ergots de la pince à circlips visent des œillets supposés à mi-rayon.
  */
 import * as THREE from 'three/webgpu';
 import type { ToolAnimState, ToolBuildContext } from '../../../objects/types';

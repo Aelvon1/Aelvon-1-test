@@ -5,7 +5,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import { formatDisplay, formatText, GLYPHS, segmentOn, SEGMENT_BITS } from '../../src/world/props/sevenSeg';
-import { blink, FanSpin, heaterLed, hotAirTemperature, multimeterReading, psuReadings } from '../../src/world/props/live';
+import {
+  blink,
+  FanSpin,
+  heaterLed,
+  hotAirTemperature,
+  multimeterReading,
+  psuReadings,
+} from '../../src/world/props/live';
 import { ATLAS_SIZE, atlasDrawParams, atlasLayout, atlasRect, atlasUV } from '../../src/world/props/atlas';
 import { dialPositionPO, RADIO_STATION, regionDefs } from '../../src/world/props/atlas/regions';
 import { pliersOutline, wrenchOutline, type P2 } from '../../src/world/props/pegboard/outlines';

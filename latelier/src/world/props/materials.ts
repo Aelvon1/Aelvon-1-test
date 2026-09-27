@@ -127,7 +127,9 @@ function sevenSegment(p: Vec2Node, code: FloatNode, dpOn: FloatNode): { lit: Flo
   const segment = (cx: number, cy: number, hx: number, hy: number): FloatNode => {
     const r = 0.035;
     const d = abs(q.sub(vec2(cx, cy))).sub(vec2(hx - r, hy - r));
-    const dist = length(max(d, vec2(0, 0))).add(min(max(d.x, d.y), 0)).sub(r);
+    const dist = length(max(d, vec2(0, 0)))
+      .add(min(max(d.x, d.y), 0))
+      .sub(r);
     return smoothstep(0.018, -0.018, dist);
   };
   // Bits : a = 1, b = 2, c = 4, d = 8, e = 16, f = 32, g = 64 (voir `sevenSeg.ts`).
@@ -164,11 +166,7 @@ export class PropMaterials {
   private drawerFull: THREE.Material | null = null;
   private drawerSimple: THREE.Material | null = null;
 
-  constructor(
-    ctx: AppContext,
-    world: World,
-    atlas: THREE.Texture,
-  ) {
+  constructor(ctx: AppContext, world: World, atlas: THREE.Texture) {
     this.world = world;
     this.atlas = atlas;
     this.env = { textures: ctx.textures, quality: ctx.engine.quality.level };
@@ -344,9 +342,14 @@ export class PropMaterials {
       .mul(step(positionWorld.y, PEGBOARD.y[1]));
     const q = positionWorld.xy.sub(vec2(PEGBOARD.x[0], PEGBOARD.y[0])).div(spacing);
     const d = length(fract(q).sub(0.5)).mul(spacing);
-    const footprint = abs(dFdx(q.x)).add(abs(dFdy(q.x))).mul(spacing);
+    const footprint = abs(dFdx(q.x))
+      .add(abs(dFdy(q.x)))
+      .mul(spacing);
     const far = smoothstep(spacing * 0.18, spacing * 0.3, footprint);
-    const hole = d.lessThan(PEGBOARD.holeDiameter / 2).and(onBoard.greaterThan(0.5)).and(far.lessThan(0.5));
+    const hole = d
+      .lessThan(PEGBOARD.holeDiameter / 2)
+      .and(onBoard.greaterThan(0.5))
+      .and(far.lessThan(0.5));
     m.maskNode = s.a.greaterThan(0.5).and(hole.not());
     return m;
   }
@@ -377,21 +380,29 @@ export class PropMaterials {
     const gx = abs(fract(p.x.mul(10)).sub(0.5));
     const gy = abs(fract(p.y.mul(8)).sub(0.5));
     const grid = max(smoothstep(0.465, 0.5, gx), smoothstep(0.46, 0.5, gy));
-    const ticksX = smoothstep(0.012, 0.0, abs(p.y.sub(0.5))).mul(smoothstep(0.4, 0.5, abs(fract(p.x.mul(50)).sub(0.5))));
-    const ticksY = smoothstep(0.01, 0.0, abs(p.x.sub(0.5))).mul(smoothstep(0.4, 0.5, abs(fract(p.y.mul(40)).sub(0.5))));
+    const ticksX = smoothstep(0.012, 0.0, abs(p.y.sub(0.5))).mul(
+      smoothstep(0.4, 0.5, abs(fract(p.x.mul(50)).sub(0.5))),
+    );
+    const ticksY = smoothstep(0.01, 0.0, abs(p.x.sub(0.5))).mul(
+      smoothstep(0.4, 0.5, abs(fract(p.y.mul(40)).sub(0.5))),
+    );
     const graticule = max(grid, max(ticksX, ticksY));
     // Trace 1 : sinusoïde + harmonique qui défilent.
     const ph1 = p.x.mul(3).sub(time.mul(0.23)).mul(tau);
     const ph2 = p.x.mul(11).sub(time.mul(0.9)).mul(tau);
     const f1 = sin(ph1).mul(0.15).add(sin(ph2).mul(0.03)).add(0.64);
-    const s1 = cos(ph1).mul(0.15 * 3 * tau).add(cos(ph2).mul(0.03 * 11 * tau));
+    const s1 = cos(ph1)
+      .mul(0.15 * 3 * tau)
+      .add(cos(ph2).mul(0.03 * 11 * tau));
     const d1 = abs(p.y.sub(f1)).div(sqrt(s1.div(aspect).mul(s1.div(aspect)).add(1)));
     // Trace 2 : créneau arrondi (voie 2), transitions verticales atténuées (spot plus rapide).
     const ph3 = p.x.mul(2).sub(time.mul(0.23)).mul(tau);
     const sq = clamp(sin(ph3).mul(5), -1, 1);
     const f2 = sq.mul(0.075).add(0.27);
     const steep = step(abs(sin(ph3)), 0.2);
-    const s2 = cos(ph3).mul(0.075 * 5 * 2 * tau).mul(steep);
+    const s2 = cos(ph3)
+      .mul(0.075 * 5 * 2 * tau)
+      .mul(steep);
     const d2 = abs(p.y.sub(f2)).div(sqrt(s2.div(aspect).mul(s2.div(aspect)).add(1)));
     const trace = (d: FloatNode): FloatNode => smoothstep(0.011, 0.002, d).add(exp(d.mul(-55)).mul(0.28));
     // Balayage : le spot parcourt l'écran en ~1,4 s, la trace s'estompe derrière lui.
@@ -402,11 +413,18 @@ export class PropMaterials {
     // Les fronts du créneau, balayés plus vite par le spot, sont plus pâles (comme sur un vrai tube).
     const brightness = trace(d1)
       .mul(persist.add(spot))
-      .add(trace(d2).mul(0.55).mul(persist.add(spot.mul(0.5))).mul(float(1).sub(steep.mul(0.5))));
+      .add(
+        trace(d2)
+          .mul(0.55)
+          .mul(persist.add(spot.mul(0.5)))
+          .mul(float(1).sub(steep.mul(0.5))),
+      );
     // Vignettage (courbure du tube) et grain du phosphore.
     const c = p.sub(0.5).mul(vec2(1, 0.8));
     const vignette = smoothstep(0.56, 0.34, length(c));
-    const grain = hash12(floor(p.mul(vec2(420, 330))).add(floor(time.mul(24)))).mul(0.06).add(0.97);
+    const grain = hash12(floor(p.mul(vec2(420, 330))).add(floor(time.mul(24))))
+      .mul(0.06)
+      .add(0.97);
     const phosphor = vec3(0.3, 1.0, 0.52);
     const glow = brightness.mul(2.6).add(graticule.mul(0.16)).add(0.018).mul(vignette).mul(grain);
     m.colorNode = vec3(0.012, 0.022, 0.018);
@@ -424,7 +442,11 @@ export class PropMaterials {
     const x = p.x.mul(digits);
     const idx = floor(x);
     const [c0, c1, c2, c3] = this.u.segCodes;
-    const codes = select(id.lessThan(0.5), c0, select(id.lessThan(1.5), c1, select(id.lessThan(2.5), c2, c3)));
+    const codes = select(
+      id.lessThan(0.5),
+      c0,
+      select(id.lessThan(1.5), c1, select(id.lessThan(2.5), c2, c3)),
+    );
     const code = pick4(codes, idx);
     const dpIndex = pick4(this.u.segDp, id);
     const dpOn = step(abs(idx.sub(dpIndex)), 0.5);
@@ -479,7 +501,9 @@ export class PropMaterials {
     const p = uv().sub(0.5).mul(2);
     const r = length(p);
     // Densité radiale : les pales sont plus larges vers l'extérieur ; moyeu masqué.
-    const density = smoothstep(0.2, 0.3, r).mul(smoothstep(1.0, 0.9, r)).mul(pow(r, 0.4));
+    const density = smoothstep(0.2, 0.3, r)
+      .mul(smoothstep(1.0, 0.9, r))
+      .mul(pow(r, 0.4));
     m.opacityNode = density.mul(this.u.fanBlur);
     return m;
   }

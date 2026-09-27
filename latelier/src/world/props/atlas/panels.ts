@@ -98,8 +98,8 @@ export const METER_PANEL = {
 } as const;
 
 export const RADIO_PANEL = {
-  px: [720, 385],
-  meters: [0.44, 0.235],
+  px: [720, 327],
+  meters: [0.44, 0.2],
   grilles: [
     [0.165, 0.62],
     [0.835, 0.62],

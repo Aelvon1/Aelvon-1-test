@@ -81,6 +81,6 @@ export function heaterLed(time: number): number {
 
 /** Clignotement périodique (0/1) : période (s), rapport cyclique, déphasage (s). */
 export function blink(time: number, period: number, duty = 0.5, phase = 0): number {
-  const u = (((time + phase) / period) % 1 + 1) % 1;
+  const u = ((((time + phase) / period) % 1) + 1) % 1;
   return u < duty ? 1 : 0;
 }

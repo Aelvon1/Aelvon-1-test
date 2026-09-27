@@ -76,11 +76,7 @@ export function translate(x: number, y: number): DrawOp {
 export function rotateAbout(angle: number, x: number, y: number): DrawOp[] {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
-  return [
-    translate(x, y),
-    { op: 'transform', a: c, b: s, c: -s, d: c, e: 0, f: 0 },
-    translate(-x, -y),
-  ];
+  return [translate(x, y), { op: 'transform', a: c, b: s, c: -s, d: c, e: 0, f: 0 }, translate(-x, -y)];
 }
 
 /**
@@ -94,7 +90,14 @@ export function dialScale(
   a0: number,
   a1: number,
   n: number,
-  o: { major?: number; len?: number; color?: string; width?: number; labels?: string[]; labelSize?: number } = {},
+  o: {
+    major?: number;
+    len?: number;
+    color?: string;
+    width?: number;
+    labels?: string[];
+    labelSize?: number;
+  } = {},
 ): DrawOp[] {
   const ops: DrawOp[] = [];
   const color = o.color ?? '#1d1b18';
@@ -108,7 +111,9 @@ export function dialScale(
     const r1 = r + (big ? len * 1.7 : len);
     const c = Math.cos(a);
     const s = Math.sin(a);
-    ops.push(line([cx + c * r0, cy + s * r0, cx + c * r1, cy + s * r1], color, (o.width ?? 1.6) * (big ? 1.4 : 1)));
+    ops.push(
+      line([cx + c * r0, cy + s * r0, cx + c * r1, cy + s * r1], color, (o.width ?? 1.6) * (big ? 1.4 : 1)),
+    );
     if (big && o.labels && label < o.labels.length) {
       const rl = r1 + (o.labelSize ?? 10) * 0.95;
       ops.push(
@@ -142,7 +147,8 @@ export function aging(
     const y = rand() * h;
     ops.push(circle(x, y, r, `rgba(${color}, ${0.03 + rand() * 0.06})`));
     // Auréole (tache d'eau ou de tasse) : anneau plus sombre.
-    if (rand() < 0.35) ops.push(circle(x, y, r * 0.95, undefined, { stroke: `rgba(${color}, 0.12)`, lineWidth: 1.5 }));
+    if (rand() < 0.35)
+      ops.push(circle(x, y, r * 0.95, undefined, { stroke: `rgba(${color}, 0.12)`, lineWidth: 1.5 }));
   }
   // Bords jaunis / salis.
   const e = o.edges ?? 0.18;
