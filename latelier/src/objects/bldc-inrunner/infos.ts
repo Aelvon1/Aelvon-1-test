@@ -305,7 +305,7 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
     },
     'rotor.sleeve': {
       role: 'Frette : manchon enroulé sous tension qui retient les aimants contre la force centrifuge.',
-      material: 'Fibre de verre (ou aramide) tissée, imprégnée époxy',
+      material: 'Fibre d’aramide tissée (toile 1/1), imprégnée époxy ; parfois fibre de verre ou de carbone',
       dimensions: `Ø ${mm(2 * d.rotorR)}, épaisseur ${mm(d.sleeveT, 2)}`,
       reference: 'Frette composite',
       tip: `À ${Math.round(rpm).toLocaleString('fr-FR')} tr/min, la surface du rotor file à ${fr(tipSpeed, 0)} m/s et chaque aimant « tire » sur la frette avec environ ${fr(centrifugal, 0)} N. En survitesse (moteur à vide sous trop de tension), la frette éclate et les aimants arrachent les dents : destruction immédiate.`,

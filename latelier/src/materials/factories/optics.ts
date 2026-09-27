@@ -120,16 +120,17 @@ export function createGlass(env: MaterialEnv, o: GlassOptions = {}): THREE.MeshP
   });
   const grunge = kit.grunge();
   const amount = o.dirt ?? 0.25;
-  const prints = fingerprintMask(grunge, amount * 1.6);
+  // Verre propre dans l'ensemble : quelques traces de doigts et un voile de poussière par plaques.
+  const prints = fingerprintMask(grunge, amount);
   const dust = saturate(
-    grunge.g
-      .mul(0.6)
-      .add(smoothstep(0.5, 0.9, grunge.r).mul(0.5))
-      .mul(amount),
+    smoothstep(0.55, 0.95, grunge.g)
+      .mul(0.35)
+      .add(smoothstep(0.62, 0.92, grunge.r).mul(0.4))
+      .mul(amount * 2),
   );
-  m.roughnessNode = clampRoughness(materialRoughness.add(prints.mul(0.35)).add(dust.mul(0.5)), 0.02);
-  m.transmissionNode = float(1).sub(dust.mul(0.55));
-  m.colorNode = mix(materialColor, vec3(0.62, 0.6, 0.55), dust.mul(0.8));
+  m.roughnessNode = clampRoughness(materialRoughness.add(prints.mul(0.2)).add(dust.mul(0.3)), 0.02);
+  m.transmissionNode = float(1).sub(dust.mul(0.4));
+  m.colorNode = mix(materialColor, vec3(0.62, 0.6, 0.55), dust.mul(0.5));
   return m;
 }
 
@@ -155,7 +156,7 @@ export function createWindowGlass(
   const m = createGlass(env, {
     thickness: 0.004,
     attenuation: { color: 0xd8efe4, distance: 0.08 },
-    dirt: 0.35,
+    dirt: 0.3,
     space: 'world',
     scale: 2,
     ...o,
@@ -191,7 +192,7 @@ export function createLed(
   o: { color: THREE.ColorRepresentation; intensity?: number; glow?: number; name?: string },
 ): THREE.MeshPhysicalNodeMaterial {
   const c = new THREE.Color(o.color);
-  const body = c.clone().lerp(new THREE.Color(0xffffff), 0.35);
+  const body = c.clone().lerp(new THREE.Color(0xffffff), 0.25);
   const m = physical(o.name, {
     color: body,
     roughness: 0.18,
@@ -208,7 +209,7 @@ export function createLed(
   // Cœur plus lumineux que le bord (puce au centre de la lentille).
   const facing = pow(saturate(abs(normalWorldGeometry.y)), float(2));
   m.emissiveNode = materialEmissive.mul(facing.mul(0.6).add(0.4));
-  makeGlowable(m, o.intensity ?? 6, o.glow ?? 0);
+  makeGlowable(m, o.intensity ?? 3.5, o.glow ?? 0);
   return m;
 }
 

@@ -113,3 +113,4 @@ export {
   type EdgeWearOptions,
   type OcclusionOptions,
 } from './geometry/edgeWear';
+export { createBevelledBox, type BevelledBoxOptions } from './geometry/bevelledBox';

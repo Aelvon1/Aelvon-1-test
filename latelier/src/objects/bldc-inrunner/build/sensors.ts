@@ -2,6 +2,10 @@
  * Platine capteurs : circuit imprimé FR4 (deux faces texturées : vernis épargne, cuivre,
  * pastilles dorées, sérigraphie), trois capteurs à effet Hall en boîtier SIP-3 (face marquée
  * lisible), connecteur 6 points au pas de 1,5 mm, vis de fixation, câble plat et sa fiche.
+ *
+ * Approximation : les capteurs sont debout dans des fenêtres de la flasque, face marquée tournée
+ * vers l'axe, et lisent le champ de fuite du débord arrière des aimants (disposition courante,
+ * simplifiée : pas de capot ni de composants passifs sur la platine).
  */
 import * as THREE from 'three/webgpu';
 import { float, mix, smoothstep, texture, uv, vec3 } from 'three/tsl';

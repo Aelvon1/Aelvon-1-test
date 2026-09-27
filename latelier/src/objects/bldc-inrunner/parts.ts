@@ -92,7 +92,11 @@ function flangeScrews(ctx: Ctx, side: 1 | -1): PartBuild {
   };
 }
 
-/** Sous-pièces d'un roulement (flasques, cage, bague extérieure, billes, bague intérieure). */
+/**
+ * Sous-pièces d'un roulement (flasques, cage, bague extérieure, billes, bague intérieure).
+ * Approximation : en réalité on regroupe les billes d'un côté pour décentrer la bague intérieure
+ * et la sortir ; ici la bague extérieure est dégagée d'abord, puis les billes sont écartées.
+ */
 function bearingParts(
   id: 'rearBell.bearing' | 'frontBell.bearing',
   info: ReturnType<typeof infos>,
@@ -679,7 +683,7 @@ export function bldcParts(p: BldcParams): Part[] {
       id: 'rotor.sleeve',
       name: 'Frette en fibre',
       parent: 'rotor',
-      material: 'fiber.glass',
+      material: 'bldc-inrunner/sleeveWeave',
       build: buildSleeve,
       info: info['rotor.sleeve']!,
       explode: { direction: Y_PLUS, distance: MMm(18 * s) },
@@ -779,7 +783,7 @@ export function bldcParts(p: BldcParams): Part[] {
       id: 'stator.varnish',
       name: 'Vernis d’imprégnation',
       parent: 'stator',
-      material: 'varnish.impregnation',
+      material: 'bldc-inrunner/varnishShell',
       build: buildVarnish,
       info: info['stator.varnish']!,
       explode: { direction: [0, 0, 0], distance: 0 },

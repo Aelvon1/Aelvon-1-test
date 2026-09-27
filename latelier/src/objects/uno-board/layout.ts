@@ -12,7 +12,6 @@
  * USB/VIN par comparateur LMV358 et transistor FDN340P. Sérigraphie générique « ATELIER-328 ».
  */
 import type { FootprintId } from './footprints';
-import { BOARD_H, BOARD_W } from './constants';
 
 /** Blocs fonctionnels (sous-ensembles de l'arborescence des pièces). */
 export type BlockId = 'power' | 'usb' | 'mcu' | 'ui' | 'io';
@@ -416,7 +415,7 @@ export const COMPONENTS: readonly ComponentPlacement[] = [
     value: '100 nF',
     block: 'usb',
     nets: pins('+5V', GND),
-    refAt: [1.3, 0],
+    refAt: [-1.3, 0],
     refRot: 90,
   },
   {
@@ -469,7 +468,8 @@ export const COMPONENTS: readonly ComponentPlacement[] = [
       'A4',
       'A5',
     ),
-    refAt: [-15.6, -6.1],
+    refAt: [-19.2, 0],
+    refRot: 90,
   },
   {
     ref: 'Y2',
@@ -786,6 +786,3 @@ export const SILK_TEXTS: readonly SilkText[] = [
   { text: 'DIGITAL (PWM~)', x: 54.6, y: 43.9, size: 1.1, bold: true, align: 'center', face: 'bottom' },
 ];
 
-/** Vérifie qu'un point (mm) est dans le rectangle englobant de la carte. */
-export const insideBoardBox = (x: number, y: number): boolean =>
-  x >= 0 && x <= BOARD_W && y >= 0 && y <= BOARD_H;

@@ -82,18 +82,6 @@ export function cachedGeometry(ctx: Ctx, key: string, make: () => MeshBuilder): 
   return ctx.geometry.get(key, () => make().build());
 }
 
-/** Vecteur (mm) → mètres. */
-export const m3 = (x: number, y: number, z: number): THREE.Vector3 =>
-  new THREE.Vector3(x * MM, y * MM, z * MM);
-
-/** Matrice d'instance : rotation autour de X (angle θ du moteur) puis translation (mm). */
-export function instanceAt(x: number, r: number, theta: number, extra?: THREE.Matrix4): THREE.Matrix4 {
-  const m = new THREE.Matrix4().makeRotationX(theta);
-  m.setPosition(x * MM, r * Math.cos(theta) * MM, r * Math.sin(theta) * MM);
-  if (extra) m.multiply(extra);
-  return m;
-}
-
 /** Matériau de l'anodisation choisie. */
 export function anodized(ctx: Ctx): THREE.Material {
   return ctx.materials.get(`alu.anodized.${ctx.params.anodize}`);

@@ -40,7 +40,7 @@ import {
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { AppContext } from '../../core/context';
-import { BENCH, DOOR, ROOM, SPOTS, WINDOW } from '../layout';
+import { BENCH, DOOR, PEGBOARD, ROOM, SPOTS, WINDOW } from '../layout';
 import type { WorldUniforms } from '../uniforms';
 import { fbm2, valueNoise2, type FloatNode, type Vec2Node, type Vec3Node } from './tslNoise';
 
@@ -435,9 +435,10 @@ export class WorldMaterials {
   /** Panneau perforé : trous réels (masque TSL, aussi dans les ombres), cernes sales autour. */
   private pegboard(): StandardLike {
     const m = this.variant('wood.pegboard', 'world.pegboard');
-    const spacing = 0.0254;
-    const radius = 0.0033;
-    const q = positionWorld.xy.sub(vec2(-1.8 + spacing / 2, 1.08 + spacing / 2)).div(spacing);
+    const spacing = PEGBOARD.holeSpacing;
+    const radius = PEGBOARD.holeDiameter / 2;
+    // Trou (i, j) centré en x[0] + (i + ½)·pas, y[0] + (j + ½)·pas (voir layout.ts).
+    const q = positionWorld.xy.sub(vec2(PEGBOARD.x[0], PEGBOARD.y[0])).div(spacing);
     const cell = q.sub(q.floor()).sub(0.5);
     const d = length(cell).mul(spacing);
     // Empreinte d'un pixel (m) : au-delà d'un quart de pas, les trous deviennent sous-pixel →

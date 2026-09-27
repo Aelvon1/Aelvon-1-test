@@ -531,7 +531,7 @@ export class Sequencer {
     }
     const overall = Math.min(1, elapsedMotion / Math.max(1e-6, g.motion));
     this.callRemovalHook(g.part, removalProgress(overall, g.direction), g.direction);
-    this.o.composer.markDirty();
+    this.o.composer.markDirty(g.part.id);
   }
 
   private updateHeat(g: GestureRun, u: number, anchor: THREE.Vector3): void {
@@ -597,7 +597,7 @@ export class Sequencer {
     pose.placementOpacity = 1;
     this.tweens.delete(pose.part.id);
     this.o.composer.refreshVisibilityDeep(pose.part.id);
-    this.o.composer.markDirty();
+    this.o.composer.markDirty(pose.part.id);
   }
 
   private startTween(id: string, kind: 'park' | 'hide', to: number, duration: number): void {
@@ -624,7 +624,7 @@ export class Sequencer {
         pose.placementOpacity = value;
         this.o.composer.refreshVisibilityDeep(id);
       }
-      this.o.composer.markDirty();
+      this.o.composer.markDirty(id);
       if (k >= 1) {
         this.tweens.delete(id);
         if (tw.kind === 'park' && tw.to === 1)
@@ -677,7 +677,7 @@ export class Sequencer {
       pose.placementOpacity = 0;
       this.o.composer.refreshVisibilityDeep(id);
     }
-    this.o.composer.markDirty();
+    this.o.composer.markDirty(id);
   }
 
   /** Interrompt l'animation en cours (l'état des pièces déjà traitées est conservé). */

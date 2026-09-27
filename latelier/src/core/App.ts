@@ -148,6 +148,8 @@ export class App {
     // Salle.
     this.world = new World(ctx);
     await this.world.build((p, label) => this.progress(0.15 + p * 0.65, label));
+    // Mise au point automatique de l'inspection (tant que setFocus n'est pas appelé).
+    postfx.setFocusAnchor(this.world.bench.matCenter);
     this.progress(0.82, 'Génération des textures…');
     await textures.whenIdle();
 

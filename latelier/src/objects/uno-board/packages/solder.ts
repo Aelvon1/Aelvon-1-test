@@ -24,14 +24,8 @@ export interface FilletSpec {
   hSide: number;
 }
 
-/** Intersection d'un rayon (depuis c, direction d) avec le bord d'un rectangle qui contient c. */
-function rayRect(
-  cx: number,
-  cz: number,
-  dx: number,
-  dz: number,
-  r: readonly [number, number, number, number],
-): number {
+/** Distance, le long d'un rayon (depuis c, direction d), jusqu'au bord d'un rectangle qui contient c. */
+function rayRect(cx: number, cz: number, dx: number, dz: number, r: readonly [number, number, number, number]): number {
   let t = Infinity;
   if (dx > 1e-12) t = Math.min(t, (r[2] - cx) / dx);
   if (dx < -1e-12) t = Math.min(t, (r[0] - cx) / dx);
@@ -41,43 +35,55 @@ function rayRect(
 }
 
 /**
- * Congé autour d'un pied : `segments` directions autour du pied, `rings` rangées radiales
- * (resserrées près du pied, où la courbure est la plus forte).
+ * Congé autour d'un pied. Paramétrage par la normale (application de Gauss) du contour du pied
+ * arrondi : chaque génératrice part du bord du pied, perpendiculairement à celui-ci, jusqu'au bord
+ * de la pastille ; les angles du pied sont des arcs (congés d'angle lisses), les côtés droits des
+ * surfaces réglées exactes (profil constant). `segments` règle la finesse des angles, `rings` celle
+ * du profil concave (rangées resserrées près du pied, où la courbure est la plus forte).
  */
 export function filletRing(spec: FilletSpec, segments: number, rings: number): THREE.BufferGeometry {
   const [fx0, fz0, fx1, fz1] = spec.foot;
   const cx = (fx0 + fx1) / 2;
   const cz = (fz0 + fz1) / 2;
+  const rc = Math.max(1e-6, Math.min(0.25 * Math.min(fx1 - fx0, fz1 - fz0), 0.04e-3));
+  const hx = Math.max(0, (fx1 - fx0) / 2 - rc);
+  const hz = Math.max(0, (fz1 - fz0) / 2 - rc);
+  const corner = Math.max(2, Math.round(segments / 5));
   const pos: number[] = [];
   const uv: number[] = [];
   const index: number[] = [];
   const cols = rings + 1;
-  for (let i = 0; i < segments; i++) {
-    const a = (i / segments) * Math.PI * 2;
-    // Direction « carrée » (répartition plus régulière le long des côtés d'un rectangle).
-    const dx = Math.cos(a);
-    const dz = Math.sin(a);
-    const tf = rayRect(cx, cz, dx, dz, spec.foot);
-    const tp = Math.max(tf + 1e-6, rayRect(cx, cz, dx, dz, spec.pad));
-    // Hauteur au bord du pied : pointe / talon / côtés, raccordés en douceur.
-    const wx = Math.abs(dx) ** 4 / (Math.abs(dx) ** 4 + Math.abs(dz) ** 4 + 1e-12);
-    const hEnd = dx >= 0 ? spec.hToe : spec.hHeel;
-    const h = spec.hSide + (hEnd - spec.hSide) * wx;
-    for (let k = 0; k <= rings; k++) {
-      const s = (k / rings) ** 1.35;
-      const t = tf + (tp - tf) * s;
-      const y = h * (1 - s) * (1 - s);
-      pos.push(cx + dx * t, y, cz + dz * t);
-      uv.push(0.002, 0.002);
+  let count = 0;
+  // Quatre quarts : normale de 0 à 2π (de +X vers +Z), extrémités incluses (côtés droits entre deux).
+  for (let q = 0; q < 4; q++) {
+    const sx = q === 0 || q === 3 ? 1 : -1;
+    const sz = q < 2 ? 1 : -1;
+    for (let k = 0; k <= corner; k++) {
+      const a = ((q + k / corner) * Math.PI) / 2;
+      const nx = Math.cos(a);
+      const nz = Math.sin(a);
+      const fx = cx + sx * hx + rc * nx;
+      const fz = cz + sz * hz + rc * nz;
+      const tp = Math.max(1e-7, rayRect(fx, fz, nx, nz, spec.pad));
+      const wx = Math.abs(nx) ** 4 / (Math.abs(nx) ** 4 + Math.abs(nz) ** 4 + 1e-12);
+      const hEnd = nx >= 0 ? spec.hToe : spec.hHeel;
+      const h = spec.hSide + (hEnd - spec.hSide) * wx;
+      for (let r = 0; r <= rings; r++) {
+        const s = (r / rings) ** 1.35;
+        const y = h * (1 - s) * (1 - s);
+        pos.push(fx + nx * tp * s, y, fz + nz * tp * s);
+        uv.push(0.002, 0.002);
+      }
+      count++;
     }
   }
-  for (let i = 0; i < segments; i++) {
-    const i1 = (i + 1) % segments;
-    for (let k = 0; k < rings; k++) {
-      const a = i * cols + k;
-      const b = i1 * cols + k;
-      const c = i1 * cols + k + 1;
-      const d = i * cols + k + 1;
+  for (let i = 0; i < count; i++) {
+    const i1 = (i + 1) % count;
+    for (let r = 0; r < rings; r++) {
+      const a = i * cols + r;
+      const b = i1 * cols + r;
+      const c = i1 * cols + r + 1;
+      const d = i * cols + r + 1;
       // Orientation : normale vers le haut et l'extérieur.
       index.push(a, b, c, a, c, d);
     }

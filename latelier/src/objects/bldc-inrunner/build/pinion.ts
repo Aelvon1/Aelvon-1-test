@@ -6,6 +6,9 @@
  * polaire posé sur le cylindre (anneaux interpolés entre le bord du trou — intersection de deux
  * cylindres — et un carré raccordé aux bandes de révolution voisines), puis la paroi du trou
  * relie le moyeu à l'alésage. Le filetage intérieur réel est en géométrie fine.
+ *
+ * Approximation : la surface de l'alésage n'est pas percée à l'endroit du trou (elle est cachée par
+ * l'arbre ; pignon seul, le trou paraît borgne).
  */
 import * as THREE from 'three/webgpu';
 import { gearContour } from '../sections';
@@ -20,7 +23,6 @@ import {
   revolveInner,
   roundedProfile,
   threadSurface,
-  type V3,
 } from './geom';
 import { SECTION_TO_MOTOR } from './can';
 import { setScrewGeometry } from './fasteners';
@@ -77,7 +79,6 @@ function hubWithHole(mb: MeshBuilder, ctx: Ctx): void {
   const sx = p.setScrewX;
   const a = Math.max(HOLE_R * 1.45, R * Math.sin(beta));
   const K = 2 * m; // points par côté axial du patch
-  const ch = 0.2;
   // Bande arrière (face d'extrémité arrondie) et bande avant (jusqu'à la face de la denture).
   revolve(
     mb,
@@ -158,7 +159,6 @@ function hubWithHole(mb: MeshBuilder, ctx: Ctx): void {
       const a1 = wall + r * M + ((j + 1) % M);
       mb.quad(a0, a1, a1 + M, a0 + M);
     }
-  void ch;
 }
 
 /** Détail du pignon : filetage M3 réel du trou de vis sans tête. */
@@ -204,4 +204,3 @@ export function buildSetScrew(ctx: Ctx): THREE.Object3D {
   return o;
 }
 
-export type { V3 };

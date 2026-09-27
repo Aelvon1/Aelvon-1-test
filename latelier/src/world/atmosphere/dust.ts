@@ -13,7 +13,6 @@
  */
 import * as THREE from 'three/webgpu';
 import {
-  abs,
   cameraPosition,
   clamp,
   cos,
@@ -37,7 +36,8 @@ import {
 } from 'three/tsl';
 import type { WorldUniforms } from '../uniforms';
 import type { WindowShaft } from './shaft';
-import { hash11, type FloatNode, type Vec3Node } from '../materials/tslNoise';
+import { shaftMaskAt } from './shaftNode';
+import { hash11, type Vec3Node } from '../materials/tslNoise';
 import { BENCH, ROOM, SPOTS } from '../layout';
 
 interface Region {
@@ -115,19 +115,7 @@ export class Dust {
 
     // Éclairage de chaque grain (étage des sommets → varying).
     const [ldx, ldy, ldz] = shaft.dir;
-    const s = position.x.sub(shaft.planeX).div(ldx);
-    const qy = position.y.sub(s.mul(ldy));
-    const qz = position.z.sub(s.mul(ldz));
-    const soft = s.mul(0.03).add(0.01);
-    let inShaft: FloatNode = smoothstep(float(shaft.z[0]), soft.add(shaft.z[0]), qz)
-      .mul(smoothstep(float(shaft.z[1]), float(shaft.z[1]).sub(soft), qz))
-      .mul(smoothstep(float(shaft.y[0]), soft.add(shaft.y[0]), qy))
-      .mul(smoothstep(float(shaft.y[1]), float(shaft.y[1]).sub(soft), qy))
-      .mul(smoothstep(-0.01, 0.05, s));
-    for (const bz2 of shaft.barsZ)
-      inShaft = inShaft.mul(smoothstep(shaft.barWidth * 0.3, shaft.barWidth * 0.7, abs(qz.sub(bz2))));
-    for (const by2 of shaft.barsY)
-      inShaft = inShaft.mul(smoothstep(shaft.barWidth * 0.3, shaft.barWidth * 0.7, abs(qy.sub(by2))));
+    const { s, mask: inShaft } = shaftMaskAt(position, shaft, 0.01, 0.03);
     const toCam = normalize(cameraPosition.sub(position));
     const forward = max(dot(toCam, vec3(ldx, ldy, ldz)), 0);
     const phase = forward.mul(forward).mul(forward).mul(3.5).add(0.35);

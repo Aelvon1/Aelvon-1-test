@@ -84,41 +84,34 @@ export function canLabelTexture(
   const ppm = pxPerMm(quality);
   const width = pow2(L * ppm, quality >= 3 ? 4096 : 2048);
   const height = pow2(H * ppm, quality >= 3 ? 2048 : 1024);
-  const k = d.s;
+  // Mise en page en rangées, tailles proportionnelles à la hauteur développée (24 mm en Ø 36).
+  const k = H / 24;
   const w = d.winding;
   const sp = w.spec;
   const model = `VK-${p.format}`;
   const cfg = `${sp.slots}N${sp.poles}P`;
+  const right = L - 1.2 * k;
+  const serial = `S/N 2609-${String((p.kv * 7 + p.format.charCodeAt(1) * 13) % 10000).padStart(4, '0')}`;
   const ops: DrawOp[] = [
-    ...emblem(4.6 * k, H / 2, 3.4 * k, '#ffffff'),
-    text('VELKOR', 9.4 * k, H / 2 - 1.6 * k, 4.3 * k, { bold: true, spacing: 0.35 * k }),
-    text('BRUSHLESS INRUNNER', 9.6 * k, H / 2 + 1.9 * k, 1.35 * k, { spacing: 0.22 * k }),
-    text(`${p.kv} KV`, L - 1.2 * k, H / 2 - 0.9 * k, 4.6 * k, { bold: true, align: 'right' }),
-    text(`${model} · ${cfg}${p.sensors ? ' · SENSORED' : ''}`, L - 1.2 * k, H / 2 + 2.3 * k, 1.6 * k, {
-      align: 'right',
-    }),
-    { op: 'rect', x: 9.6 * k, y: H / 2 + 3.6 * k, w: L - 10.8 * k, h: 0.12 * k, fill: '#ffffff' },
-    text(
-      `Ø ${fr(d.format.shaftD, 3)} mm · ${d.format.cells}–${d.format.cells * 2}S LiPo · ${fr(w.turns, 1)} T × ${w.strands} × Ø ${fr(w.strandD, 2)}`,
-      9.6 * k,
-      H / 2 + 5.3 * k,
-      1.05 * k,
-    ),
-    text(
-      `S/N 2609-${String((p.kv * 7 + p.format.charCodeAt(1) * 13) % 10000).padStart(4, '0')}`,
-      L - 1.2 * k,
-      H / 2 + 5.3 * k,
-      0.95 * k,
-      {
-        align: 'right',
-        mono: true,
-      },
-    ),
     // Micro-texte (lisible seulement au zoom macro).
-    text('NE PAS DÉPASSER 60 000 TR/MIN · AIMANTS NdFeB 150 °C MAX', 9.6 * k, H / 2 - 5.2 * k, 0.55 * k, {
+    text('NE PAS DÉPASSER 60 000 TR/MIN · AIMANTS NdFeB 150 °C MAX', 1.2 * k, 2.4 * k, 0.55 * k, {
       spacing: 0.05 * k,
     }),
-    text('Ⓐ Ⓑ Ⓒ  ROTATION ↻', L - 1.2 * k, H / 2 - 5.2 * k, 0.55 * k, { align: 'right' }),
+    // Rangée 1 : emblème, marque et gamme ; modèle et configuration à droite.
+    ...emblem(4.2 * k, 7.6 * k, 2.9 * k, '#ffffff'),
+    text('VELKOR', 8.2 * k, 9.2 * k, 3.5 * k, { bold: true, spacing: 0.28 * k }),
+    text('BRUSHLESS INRUNNER', 8.4 * k, 11.5 * k, 1.1 * k, { spacing: 0.16 * k }),
+    text(model, right, 7.6 * k, 1.9 * k, { bold: true, align: 'right' }),
+    text(`${cfg}${p.sensors ? ' · SENSORED' : ''}`, right, 10.2 * k, 1.05 * k, { align: 'right' }),
+    { op: 'rect', x: 1.2 * k, y: 13 * k, w: L - 2.4 * k, h: 0.12 * k, fill: '#ffffff' },
+    // Rangée 2 : KV en grand ; caractéristiques et numéro de série à droite.
+    text(`${p.kv} KV`, 1.2 * k, 19.6 * k, 4.6 * k, { bold: true }),
+    text(`Ø ${fr(d.format.shaftD, 3)} mm · ${d.format.cells}–${d.format.cells * 2}S LiPo`, right, 15.9 * k, 0.9 * k, {
+      align: 'right',
+    }),
+    text(`${fr(w.turns, 1)} T · ${w.strands} × Ø ${fr(w.strandD, 2)} mm`, right, 17.6 * k, 0.9 * k, { align: 'right' }),
+    text(serial, right, 19.5 * k, 0.85 * k, { align: 'right', mono: true }),
+    text('Ⓐ Ⓑ Ⓒ  ROTATION ↻', right, 22.4 * k, 0.55 * k, { align: 'right' }),
   ];
   return textures.get({
     key: `${OBJECT_ID}/can-label/${p.format}/${p.kv}/${p.slotPole}/${p.sensors ? 1 : 0}/${quality}`,

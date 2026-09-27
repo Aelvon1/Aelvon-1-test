@@ -11,7 +11,13 @@ import { BASE_RECIPES, registerBaseMaterials } from '../src/materials/library';
 import { BASE_MATERIAL_IDS } from '../src/materials/types';
 import { LIB_TEXTURES, libTextureSize } from '../src/materials/libTextures';
 import { setMaterialGlow } from '../src/materials/factories/optics';
-import { computeEdgeWear, computeOcclusion, weldByPosition } from '../src/materials/geometry/edgeWear';
+import {
+  applyEdgeWear,
+  computeEdgeWear,
+  computeOcclusion,
+  weldByPosition,
+} from '../src/materials/geometry/edgeWear';
+import { createBevelledBox } from '../src/materials/geometry/bevelledBox';
 import { FakeTextureService } from './helpers/fakeServices';
 
 function createLibrary(quality: 0 | 1 | 2 | 3 = 2) {
@@ -109,14 +115,67 @@ describe('attributs géométriques d’usure', () => {
 
   it('arêtes convexes d’un cube subdivisé : 1 sur les arêtes, 0 au centre des faces', () => {
     const box = new THREE.BoxGeometry(1, 1, 1, 4, 4, 4);
-    const { edgeWear, cavity } = computeEdgeWear(box, { spread: 0 });
+    const { edgeWear, cavity } = computeEdgeWear(box);
     const pos = box.getAttribute('position');
+    let centers = 0;
     for (let i = 0; i < pos.count; i++) {
       const coords = [Math.abs(pos.getX(i)), Math.abs(pos.getY(i)), Math.abs(pos.getZ(i))];
       const onEdge = coords.filter((c) => Math.abs(c - 0.5) < 1e-6).length >= 2;
+      const faceCenter = coords.filter((c) => c < 1e-6).length === 2;
       if (onEdge) expect(edgeWear[i]).toBeCloseTo(1, 5);
-      else expect(edgeWear[i]).toBe(0);
+      if (faceCenter) {
+        expect(edgeWear[i]).toBe(0);
+        centers++;
+      }
       expect(cavity[i]).toBe(0);
+    }
+    expect(centers).toBe(6);
+  });
+
+  it('reconnaît un congé finement segmenté (angles dièdres faibles)', () => {
+    // Boîte arrondie : 9 segments par face, chaque segment du congé ne tourne que de ~10°.
+    const rounded = roundedBox(1, 0.1, 4);
+    const { edgeWear } = computeEdgeWear(rounded, { radius: 0.12 });
+    const pos = rounded.getAttribute('position');
+    let onBevel = 0;
+    let worn = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const ax = Math.abs(pos.getX(i));
+      const ay = Math.abs(pos.getY(i));
+      // Sommets au milieu d'un congé entre les faces +x et +y.
+      if (ax > 0.44 && ay > 0.44 && Math.abs(pos.getZ(i)) < 0.42) {
+        onBevel++;
+        if (edgeWear[i]! > 0.9) worn++;
+      }
+    }
+    expect(onBevel).toBeGreaterThan(0);
+    expect(worn / onBevel).toBeGreaterThan(0.9);
+  });
+
+  it('boîte biseautée : usure sur les congés, faces propres au centre', () => {
+    const box = applyEdgeWear(createBevelledBox(0.1, 0.1, 0.1, { radius: 0.01 }), { radius: 0.012 });
+    const pos = box.getAttribute('position');
+    const wear = box.getAttribute('edgeWear');
+    let center = 0;
+    let bevel = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const c = [Math.abs(pos.getX(i)), Math.abs(pos.getY(i)), Math.abs(pos.getZ(i))].sort((a, b) => b - a);
+      // Centre de face : deux coordonnées proches de 0 ; congé : deux coordonnées > demi-côté − rayon.
+      if (c[1]! < 0.012 && c[2]! < 0.012) {
+        expect(wear.getX(i), 'centre').toBe(0);
+        center++;
+      }
+      if (c[1]! > 0.043 && c[0]! > 0.043) {
+        expect(wear.getX(i), 'congé').toBeGreaterThan(0.5);
+        bevel++;
+      }
+    }
+    expect(center).toBeGreaterThan(0);
+    expect(bevel).toBeGreaterThan(0);
+    // Normales unitaires.
+    const nor = box.getAttribute('normal');
+    for (let i = 0; i < nor.count; i += 17) {
+      expect(Math.hypot(nor.getX(i), nor.getY(i), nor.getZ(i))).toBeCloseTo(1, 5);
     }
   });
 
@@ -152,6 +211,28 @@ describe('attributs géométriques d’usure', () => {
     expect(open).toBeGreaterThan(0.8);
   });
 });
+
+/**
+ * Boîte arrondie (même principe que `RoundedBoxGeometry` des addons, sans dépendre de 'three') :
+ * sommets d'une boîte subdivisée projetés sur la surface arrondie.
+ */
+function roundedBox(size: number, radius: number, segments: number): THREE.BufferGeometry {
+  const total = segments * 2 + 1;
+  const g = new THREE.BoxGeometry(1, 1, 1, total, total, total);
+  const pos = g.getAttribute('position');
+  const half = size / 2 - radius;
+  const n = new THREE.Vector3();
+  const halfSegment = 0.5 / total;
+  for (let i = 0; i < pos.count; i++) {
+    n.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+    const sx = Math.sign(n.x);
+    const sy = Math.sign(n.y);
+    const sz = Math.sign(n.z);
+    n.set(n.x - sx * halfSegment, n.y - sy * halfSegment, n.z - sz * halfSegment).normalize();
+    pos.setXYZ(i, half * sx + n.x * radius, half * sy + n.y * radius, half * sz + n.z * radius);
+  }
+  return g;
+}
 
 /** Fusion minimale de deux géométries indexées (position + normale). */
 function mergeTwo(a: THREE.BufferGeometry, b: THREE.BufferGeometry): THREE.BufferGeometry {

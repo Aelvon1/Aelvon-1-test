@@ -12,6 +12,12 @@ import {
 } from '../../src/world/camera/homeCamera';
 import { solveTwoLink } from '../../src/world/room/lampIK';
 import { BENCH, MAT, PEGBOARD, ROOM, SPOTS, WINDOW } from '../../src/world/layout';
+import {
+  createWindowShaft,
+  shaftContains,
+  shaftFloorFootprint,
+  toShaftSpace,
+} from '../../src/world/atmosphere/shaft';
 
 describe('néon (scintillement)', () => {
   it('démarre avec des claquements puis se stabilise en moins de 3 s', () => {
@@ -177,5 +183,50 @@ describe('plan de la salle', () => {
       expect(y).toBeGreaterThanOrEqual(0);
       expect(y).toBeLessThanOrEqual(ROOM.height);
     }
+  });
+});
+
+describe('faisceau de la fenêtre', () => {
+  const shaft = createWindowShaft();
+
+  it('entre dans la pièce vers le bas, depuis le carreau', () => {
+    expect(shaft.dir[0]).toBeGreaterThan(0);
+    expect(shaft.dir[1]).toBeLessThan(0);
+    expect(Math.hypot(...shaft.dir)).toBeCloseTo(1, 6);
+    expect(shaft.z[0]).toBeGreaterThan(WINDOW.z[0]);
+    expect(shaft.z[1]).toBeLessThan(WINDOW.z[1]);
+  });
+
+  it('dessine la fenêtre au sol dans la pièce, sans toucher l’établi', () => {
+    const f = shaftFloorFootprint(shaft);
+    expect(f.x[0]).toBeGreaterThan(ROOM.minX);
+    expect(f.x[1]).toBeLessThan(ROOM.maxX);
+    expect(f.z[0]).toBeGreaterThan(BENCH.z[1]);
+    expect(f.z[1]).toBeLessThan(ROOM.maxZ);
+  });
+
+  it('exclut les petits bois et l’extérieur du prisme', () => {
+    const zMid = (shaft.z[0] + shaft.z[1]) / 2;
+    const yMid = (shaft.y[0] + shaft.y[1]) / 2;
+    // Point sur l'axe d'un carreau, 1 m dans la pièce.
+    const paneZ = (shaft.z[0] + shaft.barsZ[0]!) / 2;
+    const s = 1;
+    const inside: [number, number, number] = [
+      shaft.planeX + s * shaft.dir[0],
+      yMid + 0.1 + s * shaft.dir[1],
+      paneZ + s * shaft.dir[2],
+    ];
+    expect(shaftContains(shaft, inside)).toBe(true);
+    const onBar: [number, number, number] = [
+      shaft.planeX + s * shaft.dir[0],
+      shaft.barsY[0]! + s * shaft.dir[1],
+      zMid + s * shaft.dir[2],
+    ];
+    expect(shaftContains(shaft, onBar)).toBe(false);
+    expect(shaftContains(shaft, [0, 2.5, 1.5])).toBe(false);
+    // Derrière la vitre (dehors) : exclu.
+    expect(shaftContains(shaft, [shaft.planeX - 0.5, yMid, zMid])).toBe(false);
+    const [sBack] = toShaftSpace(shaft, [shaft.planeX, yMid, zMid]);
+    expect(sBack).toBeCloseTo(0, 6);
   });
 });

@@ -21,7 +21,8 @@ const HIDE_FACTOR = 1.6;
 /** Délai de libération d'un détail masqué (s). */
 const FREE_AFTER = 20;
 
-type DetailState = 'none' | 'queued' | 'shown' | 'hidden';
+/** `failed` : la construction a échoué, elle n'est pas retentée (erreur signalée une fois). */
+type DetailState = 'none' | 'queued' | 'shown' | 'hidden' | 'failed';
 
 interface DetailEntry {
   part: PartRuntime;
@@ -41,6 +42,8 @@ export class DetailManager {
   private timer = 0;
   private clock = 0;
   private generation = 0;
+  /** Les maillages d'une pièce ont changé (détail affiché, masqué ou libéré) : vue à resynchroniser. */
+  onChange: ((partId: string) => void) | null = null;
 
   constructor(
     private readonly assembly: Assembly,
@@ -103,7 +106,7 @@ export class DetailManager {
       object = spec.build(createBuildContext(part.def, a.params, a.services, a.geometryCache, a.shared));
     } catch (error) {
       console.error(`[detail] construction du détail de « ${part.id} » :`, error);
-      entry.state = 'none';
+      entry.state = 'failed';
       return;
     }
     object.userData.detailOf = part.id;
@@ -155,6 +158,7 @@ export class DetailManager {
     for (const m of entry.meshes) if (!entry.part.ownMeshes.includes(m)) entry.part.ownMeshes.push(m);
     for (const m of entry.replaced) m.userData.detailReplaced = true;
     this.composer.refreshVisibility(entry.part.id);
+    this.onChange?.(entry.part.id);
   }
 
   private hide(entry: DetailEntry): void {
@@ -163,6 +167,7 @@ export class DetailManager {
     this.detachMeshes(entry);
     for (const m of entry.meshes) m.visible = false;
     this.composer.refreshVisibility(entry.part.id);
+    this.onChange?.(entry.part.id);
   }
 
   private detachMeshes(entry: DetailEntry): void {
@@ -176,6 +181,8 @@ export class DetailManager {
 
   private free(entry: DetailEntry): void {
     this.detachMeshes(entry);
+    // Avant libération : la vue restitue les matériaux d'origine des maillages qui partent.
+    this.onChange?.(entry.part.id);
     if (entry.object) {
       entry.object.removeFromParent();
       disposeObjectTree(entry.object);

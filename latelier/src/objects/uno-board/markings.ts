@@ -267,7 +267,7 @@ function markingMaterial(id: string, quality: 0 | 1 | 2 | 3): MaterialFactory {
         // Boîtier métallique nickelé, marquage à l'encre noire.
         m.colorNode = mix(color(0xd4d6d8), color(0x1b1b1b), t.r);
         m.metalnessNode = mix(float(1), float(0), t.r);
-        m.roughnessNode = mix(float(0.18), float(0.6), t.r);
+        m.roughnessNode = mix(float(0.3), float(0.6), t.r);
         break;
       case 'alu':
         // Aluminium du godet, encre noire (valeur, bande −), rainures d'évent plus sombres.

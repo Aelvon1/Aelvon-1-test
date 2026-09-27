@@ -307,14 +307,16 @@ export function createPaintedMetal(env: MaterialEnv, o: PaintedMetalOptions): TH
   const wear = o.wear ?? 0.45;
 
   // Peinture : vibration de teinte par touche, arêtes éclaircies (DA : lecture des volumes).
-  const tone = paint.g.sub(0.5).mul(0.3 * brush);
+  const tone = paint.g.sub(0.5).mul(0.45 * brush);
   let color: Vec3Node = materialColor.mul(vec3(tone.mul(1.1).add(1), tone.add(1), tone.mul(0.85).add(1)));
   color = color.mul(edges.mul(0.35 * (0.4 + wear)).add(1)).add(edges.mul(0.015));
   let roughness: FloatNode = materialRoughness.add(paint.b.sub(0.5).mul(0.12)).sub(edges.mul(0.1));
 
   // Éclats : sous-couche autour, métal nu au cœur.
-  const chip = wearMask(edges, wear, paint.a);
-  const bare = wearMask(edges, wear * 0.72, paint.a, 0.04);
+  // Rupture : grandes plages (peinture) × éclats plus fins (salissures), pour des bords déchiquetés.
+  const breakup = paint.a.mul(0.45).add(grunge.a.mul(0.55));
+  const chip = wearMask(edges, wear, breakup);
+  const bare = wearMask(edges, wear * 0.72, breakup, 0.04);
   const primer = rgb(o.primer ?? PALETTE.primerRed);
   const metal = rgb(o.metal ?? PALETTE.bareSteel);
   color = mix(color, primer.mul(paint.g.mul(0.2).add(0.9)), chip);
@@ -355,7 +357,7 @@ export function createPaintedMetal(env: MaterialEnv, o: PaintedMetalOptions): TH
 
   // Relief : touches de pinceau, marche des éclats, boursouflures de rouille.
   const height = paint.r
-    .mul(6e-5 * brush)
+    .mul(1.2e-4 * brush)
     .sub(chip.mul(4e-5))
     .sub(scratch.b.mul(wear * 3e-5))
     .add(rust.a.mul(rusty).mul(1.5e-4));

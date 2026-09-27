@@ -4,6 +4,9 @@
  * serties dans les chambrages de la bague extérieure, cage à ruban (deux demi-cages ondulées
  * rivetées) et billes (instanciées, nombre réel).
  * Repère local : axe X, centre du roulement à l'origine.
+ *
+ * Approximation : les alvéoles des demi-cages sont cylindriques (et non sphériques) ; le
+ * lubrifiant n'est pas représenté.
  */
 import * as THREE from 'three/webgpu';
 import { cachedGeometry, dims, geoKey, group, instanced, mesh, segs, type Ctx } from './common';

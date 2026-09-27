@@ -93,6 +93,11 @@ function grains(
   const times: number[] = [];
   for (let i = 0; i < count; i++) times.push(rng() * duration);
   times.sort((a, b) => a - b);
+  // Écart minimal de 3 ms : les automatisations restent strictement ordonnées dans le temps.
+  let w = 0;
+  for (let i = 0; i < times.length; i++)
+    if (w === 0 || times[i]! - times[w - 1]! >= 0.003) times[w++] = times[i]!;
+  times.length = w;
   const n = v.noise('white', t, t + duration + 0.05);
   const g = v.gain(0);
   g.gain.setValueAtTime(0, t);

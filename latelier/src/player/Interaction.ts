@@ -88,8 +88,9 @@ export class Interaction {
     } catch (error) {
       console.error(`[Interaction] Échec de l'action « ${target.id} » :`, error);
     }
-    // Le libellé change souvent après l'action (« Allumer » → « Éteindre »).
-    this.publish(this.safePrompt(target), true);
+    // Le libellé change souvent après l'action (« Allumer » → « Éteindre »). Si l'action a
+    // désactivé le joueur (ex. l'établi ouvre l'inventaire), la cible a été retirée : rien à publier.
+    if (this.current === target) this.publish(this.safePrompt(target), true);
     return true;
   }
 

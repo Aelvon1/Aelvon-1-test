@@ -650,6 +650,9 @@ function stackLength(f: FormatSpec, sp: SlotPoleSpec): number {
 }
 
 /**
+ * Approximation : induction d'entrefer identique pour toutes les combinaisons (mêmes aimants),
+ * couplage étoile, KV assimilé à vitesse à vide / tension (pertes et avance négligées).
+ *
  * Spires par bobine pour un KV visé. La FCEM par spire vaut ω·kw·B·π·D·L/2 : elle ne dépend
  * PAS du nombre de pôles (flux par pôle ∝ 1/p, fréquence électrique ∝ p). Le KV impose donc les
  * spires en série par phase N·c : N ∝ 1 / (KV · kw · D · L · c).

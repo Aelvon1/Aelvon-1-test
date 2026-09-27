@@ -380,7 +380,7 @@ function buildRearLegend(ctx: Ctx): THREE.Mesh {
       ),
     ];
     // Canvas vu de l'arrière : x = z + half, y = −y + half.
-    planarFace(mb, circle(0, 0, b.faceOuter - 0.1, N), holes, planeX(-d.half - 0.012, -1), (p) => [
+    planarFace(mb, circle(0, 0, b.faceOuter - 0.1, N), holes, planeX(-d.half - 0.015, -1), (p) => [
       (p[1] + half) / (2 * half),
       (-p[0] + half) / (2 * half),
     ]);
@@ -392,9 +392,6 @@ function buildRearLegend(ctx: Ctx): THREE.Mesh {
     roughness: 0.62,
     transparent: true,
     depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
   });
   m.name = 'Gravure laser (flasque)';
   m.colorNode = silver ? vec3(0.16, 0.17, 0.18) : vec3(0.86, 0.88, 0.9);
@@ -450,7 +447,6 @@ export function buildTabs(ctx: Ctx): {
   const d = dims(ctx);
   const t = d.tabs;
   const geo = cachedGeometry(ctx, geoKey(ctx, 'tab'), () => {
-    const len = t.x0 - t.x1 + 1.2;
     const w = t.width;
     // Contour dans le plan (x, z) : rectangle à bout arrondi, centré en x sur l'œillet.
     const x0 = t.x0 + 1.2 - t.eyeletX;
@@ -462,7 +458,6 @@ export function buildTabs(ctx: Ctx): {
       const a = Math.PI / 2 + (k / 12) * Math.PI;
       pts.push([x1 + tip + tip * Math.cos(a), tip * Math.sin(a)]);
     }
-    void len;
     const hole = circle(0, 0, 0.7 * d.s, 20);
     const local = new MeshBuilder();
     extrude(local, pts.reverse(), [hole], -t.t / 2, t.t / 2, { round0: 0.08, round1: 0.08, segments: 2 });

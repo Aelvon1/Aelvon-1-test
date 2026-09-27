@@ -151,9 +151,9 @@ const coreMaterial: MaterialFactory = () => {
   m.name = 'Âme FR4 (verre-époxy)';
   const p = positionLocal.mul(1000); // mm
   const n = normalLocal;
-  const resin = color(0x9a8f4c);
-  const glass = color(0xdcd7c0);
-  const face = color(0xb9ae72);
+  const resin = color(0x6e6530);
+  const glass = color(0xb5ae8c);
+  const face = color(0x9f955a);
   // Tranche et parois des trous : coordonnée le long de la paroi et hauteur dans l'épaisseur.
   const s = select(abs(n.x).greaterThan(abs(n.z)), p.z, p.x);
   const y = p.y.sub(Y_CORE_B * 1000);

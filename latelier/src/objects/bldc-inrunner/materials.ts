@@ -8,7 +8,7 @@
  * Les UV de la frette sont exprimés en millimètres (u = circonférence, v = axe).
  */
 import * as THREE from 'three/webgpu';
-import { abs, float, floor, fract, mix, mod, mx_noise_float, positionLocal, sin, uv, vec3 } from 'three/tsl';
+import { abs, float, floor, fract, mix, mod, mx_noise_float, positionLocal, pow, sin, uv, vec3 } from 'three/tsl';
 import type { MaterialFactory } from '../../materials/types';
 import { OBJECT_ID } from './params';
 
@@ -45,31 +45,36 @@ const laminationEdge: MaterialFactory = () => {
 };
 
 /**
- * Frette en fibre de verre imprégnée époxy : toile (armure 1/1) de période 0,6 mm, fils
- * légèrement bombés (luminance et rugosité suivent le fil du dessus), vernis époxy (clearcoat).
+ * Frette en fibre d'aramide imprégnée époxy : toile (armure 1/1) de période 0,6 mm. Dans chaque
+ * case, le fil du dessus est bombé (profil transversal en sinus) et plonge sous le fil croisé à
+ * ses extrémités ; fibres élémentaires en stries fines le long du fil ; vernis époxy (clearcoat).
  */
 const sleeveWeave: MaterialFactory = () => {
   const period = 0.6;
   const m = new THREE.MeshPhysicalNodeMaterial({
-    color: 0xd9cfa4,
+    color: 0xc99a3a,
     metalness: 0,
     roughness: 0.45,
-    clearcoat: 0.7,
-    clearcoatRoughness: 0.18,
-    sheen: 0.4,
-    sheenColor: new THREE.Color(0xfff4d8),
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.12,
+    sheen: 0.5,
+    sheenColor: new THREE.Color(0xffe2a0),
   });
-  m.name = 'Fibre de verre tissée (frette)';
+  m.name = 'Fibre d’aramide tissée (frette)';
   const U = uv().x.div(period);
   const V = uv().y.div(period);
+  const fu = fract(U);
+  const fv = fract(V);
   const parity = mod(floor(U).add(floor(V)), 2);
-  const warp = sin(fract(U).mul(Math.PI));
-  const weft = sin(fract(V).mul(Math.PI));
-  const top = mix(warp, weft, parity);
-  const fibre = mx_noise_float(vec3(U.mul(9), V.mul(0.6), 0)).mul(0.06);
-  const shade = float(0.62).add(top.mul(0.38)).add(fibre);
-  m.colorNode = vec3(0.85, 0.81, 0.64).mul(shade);
-  m.roughnessNode = float(0.62).sub(top.mul(0.22));
+  const warpTop = sin(fv.mul(Math.PI)).mul(pow(sin(fu.mul(Math.PI)), 0.35));
+  const weftTop = sin(fu.mul(Math.PI)).mul(pow(sin(fv.mul(Math.PI)), 0.35));
+  const top = mix(warpTop, weftTop, parity);
+  const streakWarp = mx_noise_float(vec3(V.mul(38), U.mul(1.5), 0));
+  const streakWeft = mx_noise_float(vec3(U.mul(38), V.mul(1.5), 7));
+  const fibre = mix(streakWarp, streakWeft, parity).mul(0.08);
+  const shade = float(0.42).add(top.mul(0.58)).add(fibre);
+  m.colorNode = vec3(0.8, 0.6, 0.2).mul(shade);
+  m.roughnessNode = float(0.58).sub(top.mul(0.26));
   return m;
 };
 
@@ -110,7 +115,8 @@ function braidedSleeve(tint: number): MaterialFactory {
 }
 
 export const MATERIALS: Record<string, MaterialFactory> = {
-  // Repère de phase du simulateur : A émail naturel, B émail rouge, C émail bleu.
+  // Approximation (convention du simulateur) : émail teinté par phase pour le repérage — A naturel,
+  // B rouge, C bleu. En réalité le fil est identique pour les trois phases (repère par gaine).
   enamelA: enamel(0xe08a45, 0.24),
   enamelB: enamel(0xb2442c, 0.26),
   enamelC: enamel(0x4f6f9c, 0.26),

@@ -103,7 +103,10 @@ export function createPlastic(env: MaterialEnv, o: PlasticOptions): THREE.MeshPh
   } else if (texture === 'wrinkled') {
     // Plis de rétreint : stries larges et douces (texture `brushed` très agrandie).
     const wrinkles = kit.sample('brushed', 0.05);
-    height = wrinkles.r.mul(relief * 1.5).add(wrinkles.a.mul(relief)).add(noise.b.mul(relief * 0.4));
+    height = wrinkles.r
+      .mul(relief * 1.5)
+      .add(wrinkles.a.mul(relief))
+      .add(noise.b.mul(relief * 0.4));
     roughness = roughness.sub(wrinkles.r.sub(0.5).mul(0.1));
   }
 
@@ -412,7 +415,7 @@ export function createSiliconDie(
     color: 0x55586a,
     roughness: 0.12,
     metalness: 0.65,
-    iridescence: 0.55,
+    iridescence: 0.85,
     iridescenceIOR: 1.45,
     iridescenceThicknessRange: [250, 650],
   });
@@ -423,7 +426,9 @@ export function createSiliconDie(
   m.colorNode = materialColor.mul(grid.mul(0.35).add(0.85)).mul(noise.r.sub(0.5).mul(0.2).add(1));
   m.roughnessNode = clampRoughness(materialRoughness.add(grid.mul(0.1)));
   m.metalnessNode = materialMetalness;
-  m.iridescenceThicknessNode = mix(float(250), float(650), noise.g.mul(0.7).add(grid.mul(0.3)));
+  // Épaisseur d'oxyde variant lentement (bandes irisées larges) + motif d'interconnexions.
+  const slow = kit.sample('noise', 0.02);
+  m.iridescenceThicknessNode = mix(float(250), float(650), slow.r.mul(0.8).add(grid.mul(0.2)));
   return m;
 }
 

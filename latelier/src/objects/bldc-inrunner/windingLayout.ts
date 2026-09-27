@@ -13,6 +13,12 @@
  *   au sommet des têtes de bobines.
  *
  * Unités : mm, repère du moteur (x axial, y = r cos θ, z = r sin θ).
+ *
+ * Approximation : dans les têtes de bobines, les conducteurs sont redistribués en nappe
+ * (grille colonnes × couches) et les transitions encoche ↔ nappe sont interpolées : les brins d'un
+ * conducteur peuvent s'y croiser légèrement (comme un faisceau tordu à la main). En 12/2, les
+ * bobines à pas de 6 encoches se superposent fortement : quelques interpénétrations locales entre
+ * têtes de bobines voisines subsistent. Le point neutre est une épissure posée au sommet des têtes.
  */
 import { slotAngle, type BldcDims, type CoilDef } from './params';
 import { packSlot, type ConductorCluster } from './lamination';
@@ -423,7 +429,7 @@ export function buildWindingLayout(d: BldcDims, quality: 0 | 1 | 2 | 3 = 2): Win
     for (const p of catmullRom(inside, q.step)) samples.push({ p, theta: cyl(p).theta, w: 1, slot: null });
 
     phases.push(
-      finalizePhase(phase, samples, nS, round, rs, rb, req, tailEnd, sleeveEnd, neutralStart, neutralSide),
+      finalizePhase(phase, samples, nS, round, rb, req, tailEnd, sleeveEnd, neutralStart, neutralSide),
     );
   }
 
@@ -482,7 +488,6 @@ function finalizePhase(
   samples: readonly Sample[],
   nS: number,
   round: readonly P2[],
-  rs: number,
   rb: number,
   req: number,
   tailEnd: number,
@@ -568,7 +573,6 @@ function finalizePhase(
       strandOffsets[o + 2] = oz;
     }
   }
-  void rs;
   return {
     phase,
     centers,

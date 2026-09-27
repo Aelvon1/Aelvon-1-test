@@ -91,8 +91,11 @@ const LABELS: readonly LabelSpec[] = [
   },
 ];
 
-/** Ajoute les étiquettes (un maillage par étiquette : quelques appels de dessin). */
-export function buildLabels(ctx: AppContext, b: DecorBuild): void {
+/**
+ * Ajoute les étiquettes (un maillage par étiquette : quelques appels de dessin). Le marquage du
+ * tapis rejoint le groupe du plateau (visible en fond studio neutre).
+ */
+export function buildLabels(ctx: AppContext, b: DecorBuild, benchTop: THREE.Group): void {
   for (const spec of LABELS) {
     const density = spec.density ?? 3200;
     const tex = ctx.textures.get({
@@ -124,7 +127,7 @@ export function buildLabels(ctx: AppContext, b: DecorBuild): void {
     mesh.rotation.set(...spec.rotation);
     mesh.receiveShadow = true;
     mesh.castShadow = false;
-    b.group.add(mesh);
+    (spec.name === 'mat' ? benchTop : b.group).add(mesh);
   }
   // Ruban adhésif jaune : réparation d'un carreau fêlé (coin de la fenêtre) et repère sur le conduit.
   const tape = 'tape.yellow';

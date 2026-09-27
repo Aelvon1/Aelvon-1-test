@@ -47,6 +47,7 @@ import * as THREE from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import type { WorldUniforms } from '../uniforms';
 import type { WindowShaft } from './shaft';
+import { shaftMaskAt } from './shaftNode';
 import { valueNoise3, type FloatNode, type Vec3Node } from '../materials/tslNoise';
 
 /** Réglages artistiques de la brume (uniformes modifiables en direct). */
@@ -151,24 +152,8 @@ export function createFogNode(u: WorldUniforms, settings: FogSettings, shaft: Wi
       Loop(steps, ({ i }) => {
         const t = tEnter.add(float(i).add(ign).mul(stepLen));
         const q = c.add(d.mul(t));
-        const s = q.x.sub(shaft.planeX).div(ldx);
-        const qy = q.y.sub(s.mul(ldy));
-        const qz = q.z.sub(s.mul(ldz));
-        // Pénombre croissante avec la distance à la vitre (ciel étendu, pas un soleil ponctuel).
-        const soft = s.mul(0.03).add(0.006);
-        const hw = shaft.barWidth / 2;
-        let mask: FloatNode = smoothstep(float(shaft.z[0]), soft.add(shaft.z[0]), qz)
-          .mul(smoothstep(float(shaft.z[1]), float(shaft.z[1]).sub(soft), qz))
-          .mul(smoothstep(float(shaft.y[0]), soft.add(shaft.y[0]), qy))
-          .mul(smoothstep(float(shaft.y[1]), float(shaft.y[1]).sub(soft), qy));
-        for (const bz of shaft.barsZ)
-          mask = mask.mul(
-            smoothstep(soft.mul(0.5).add(hw), soft.negate().add(hw).max(0), abs(qz.sub(bz))).oneMinus(),
-          );
-        for (const by of shaft.barsY)
-          mask = mask.mul(
-            smoothstep(soft.mul(0.5).add(hw), soft.negate().add(hw).max(0), abs(qy.sub(by))).oneMinus(),
-          );
+        // Masque du carreau (petits bois compris), pénombre croissante avec la distance.
+        const { s, mask } = shaftMaskAt(q, shaft);
         const drift = vec3(u.time.mul(0.045), u.time.mul(-0.012), u.time.mul(0.03));
         const density = valueNoise3(q.mul(2.3).add(drift))
           .mul(0.65)

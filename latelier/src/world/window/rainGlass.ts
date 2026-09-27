@@ -161,9 +161,10 @@ export function exteriorColor(
     float(1e5),
   );
   const gp = origin.add(dir.mul(min(groundT, 1e4)));
-  const puddles = smoothstep(0.58, 0.64, fbm2(gp.xz.mul(0.35), 3)).mul(0.6);
+  // Flaques rares et sombres (reflet terne du ciel) : trop claires, elles se lisent comme de la neige.
+  const puddles = smoothstep(0.66, 0.72, fbm2(gp.xz.mul(0.28), 3)).mul(0.5);
   const grass = mix(vec3(0.012, 0.022, 0.014), vec3(0.03, 0.028, 0.022), valueNoise2(gp.xz.mul(1.7)));
-  const groundBase = mix(grass, SKY_HORIZON.mul(0.4), puddles);
+  const groundBase = mix(grass, SKY_HORIZON.mul(0.22), puddles);
   const groundFog = float(1).sub(exp(groundT.mul(-0.03)));
   const ground = mix(groundBase, MIST, groundFog);
   color = select(groundT.lessThan(1e4), ground, color);
@@ -197,11 +198,11 @@ export function exteriorColor(
         .div(0.8)
         .add(hr.mul(17)),
     );
-    const streak = smoothstep(0.16, 0.0, abs(cu))
+    const streak = smoothstep(0.09, 0.0, abs(cu))
       .mul(smoothstep(0.0, 0.04, seg))
       .mul(smoothstep(0.3, 0.12, seg))
       .mul(step(0.5, hr));
-    color = color.add(vec3(0.5, 0.55, 0.58).mul(streak.mul(0.18)));
+    color = color.add(vec3(0.5, 0.55, 0.58).mul(streak.mul(0.09)));
   }
   return color;
 }

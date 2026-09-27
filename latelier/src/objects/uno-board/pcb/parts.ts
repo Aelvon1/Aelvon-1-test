@@ -38,7 +38,18 @@ function sheet(ctx: Ctx, layer: 'silk' | 'mask' | 'copper', face: Face): THREE.M
   );
   const mesh = new THREE.Mesh(g, own(ctx, `pcb.${layer}.${face}.q${ctx.quality}`));
   mesh.name = `feuille ${layer} ${face}`;
+  noShadowCast(mesh);
   return mesh;
+}
+
+/**
+ * Les couches minces (10 à 35 µm d'écart) ne projettent pas d'ombre : à cette échelle, la carte
+ * d'ombres ne sait pas les distinguer et produirait de l'« acné » (stries) sur le vernis. Le moteur
+ * active les ombres sur tous les maillages après construction : la propriété est donc verrouillée.
+ * Elles reçoivent toujours les ombres des composants ; l'âme FR4 projette l'ombre de la carte.
+ */
+export function noShadowCast(mesh: THREE.Object3D): void {
+  Object.defineProperty(mesh, 'castShadow', { get: () => false, set: () => undefined, configurable: true });
 }
 
 /** Pastilles étamées et anneaux de vias d'une face (instanciés par forme). */
@@ -61,10 +72,14 @@ function padsGroup(ctx: Ctx, face: Face): THREE.Group {
   }
   for (const [key, entry] of byKey) {
     const g = ctx.geometry.get(`pcb.pad.${key}`, entry.geo);
-    group.add(instanced(g, tin, entry.mats, `pastilles ${key}`));
+    const im = instanced(g, tin, entry.mats, `pastilles ${key}`);
+    noShadowCast(im);
+    group.add(im);
   }
   const viaMats = routing.vias.map((v) => padMatrix(v, bottom, bottom ? Y_CORE_B : Y_CORE_T));
-  group.add(instanced(ctx.geometry.get('pcb.via.ring', viaRingGeometry), tin, viaMats, 'anneaux des vias'));
+  const vias = instanced(ctx.geometry.get('pcb.via.ring', viaRingGeometry), tin, viaMats, 'anneaux des vias');
+  noShadowCast(vias);
+  group.add(vias);
   return group;
 }
 

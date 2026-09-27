@@ -30,9 +30,9 @@ export function buildLaminations(ctx: Ctx): PartBuild {
     const inner = laminationInnerContour(st, maxStep, ctx.quality >= 3 ? 3 : 2);
     const outer = circle(0, 0, st.Ro, segs(ctx, 96));
     // Épaisseur visible légèrement inférieure au pas (revêtement isolant, jeu d'empilage).
-    const t = st.lamPitch * 0.94;
+    const t = st.lamPitch * 0.97;
     // Arête de découpe adoucie (chanfrein) : visible en macro sur les tôles épaisses.
-    const edge = st.lamCount <= 120 || ctx.quality >= 3 ? t * 0.12 : 0;
+    const edge = st.lamCount <= 120 || ctx.quality >= 3 ? t * 0.07 : 0;
     const local = new MeshBuilder();
     extrude(local, outer, [inner], -t / 2, t / 2, {
       round0: edge,
@@ -388,6 +388,8 @@ export function buildNeutral(ctx: Ctx): THREE.Object3D {
 }
 
 // --- Vernis d'imprégnation ---------------------------------------------------------------------------
+// Approximation : le vernis est une coque continue et translucide épousant l'enveloppe des têtes de
+// bobines ; en réalité il imprègne le bobinage et soude les fils entre eux.
 
 export function buildVarnish(ctx: Ctx): THREE.Object3D {
   const d = dims(ctx);

@@ -19,7 +19,9 @@
  * shaders lors des bascules.
  */
 import * as THREE from 'three/webgpu';
+import { Fn, positionWorld, vec3 } from 'three/tsl';
 import { RectAreaLightTexturesLib } from 'three/addons/lights/RectAreaLightTexturesLib.js';
+import { shaftMaskAt } from '../atmosphere/shaftNode';
 import type { QualityProfile } from '../../core/quality';
 import type { WorldUniforms } from '../uniforms';
 import { NeonFlicker } from './neonFlicker';
@@ -121,6 +123,13 @@ export class Lighting {
     this.daylight.shadow.bias = -0.0004;
     this.daylight.shadow.normalBias = 0.02;
     this.daylight.shadow.radius = 5;
+    // Découpe analytique de la fenêtre (carreaux, petits bois, pénombre) : la tache au sol a la
+    // bonne forme même sans carte d'ombre (qualité Basse) ; la carte d'ombre, si active, ajoute
+    // l'occultation par l'établi et les objets.
+    // `SpotLightNode` (r186) appelle `light.colorNode(coordonnéesProjetées)` : il faut un `Fn`
+    // (appelable ET nœud, pour la clé de cache) ; propriété absente des types.
+    const projector = Fn(() => vec3(shaftMaskAt(positionWorld, shaft, 0.004, 0.022).mask));
+    (this.daylight as THREE.SpotLight & { colorNode?: typeof projector }).colorNode = projector;
 
     // Ciel diffus dans l'embrasure (lumière froide douce sur l'établi et le mur).
     this.skyFill = new THREE.RectAreaLight(
@@ -251,8 +260,9 @@ export class Lighting {
     for (const o of hidden) o.visible = false;
     const haze = this.u.haze.value;
     this.u.haze.value = 0;
+    // L'environnement précédent reste actif pendant la capture (un rebond de plus, et pas de
+    // recompilation supplémentaire des matériaux).
     const previous = this.envTarget;
-    this.scene.environment = null;
     const pmrem = new THREE.PMREMGenerator(renderer);
     try {
       this.envTarget = pmrem.fromScene(this.scene, 0, 0.05, 20, {

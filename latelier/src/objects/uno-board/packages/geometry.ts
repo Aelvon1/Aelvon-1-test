@@ -538,22 +538,6 @@ export function instanced(
   return im;
 }
 
-/** Maillage simple ou instancié selon le nombre de placements. */
-export function meshOrInstanced(
-  geometry: THREE.BufferGeometry,
-  material: THREE.Material,
-  matrices: readonly THREE.Matrix4[],
-  name: string,
-): THREE.Mesh {
-  if (matrices.length === 1) {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = name;
-    mesh.applyMatrix4(matrices[0]!);
-    return mesh;
-  }
-  return instanced(geometry, material, matrices, name);
-}
-
 /** Fusionne des géométries transformées (copies) en une seule. */
 export function mergeTransformed(
   items: readonly { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[],
@@ -563,35 +547,6 @@ export function mergeTransformed(
   for (const c of copies) c.dispose();
   if (!merged) throw new Error('mergeTransformed : fusion impossible.');
   return merged;
-}
-
-/**
- * Recalcule les UV d'une géométrie : faces orientées vers le haut → projection planaire sur une
- * zone (w × d, m) centrée en (cx, cz) ; autres faces → UV constant (zone vierge de la texture).
- * Géométrie non indexée ou indexée acceptée (les sommets partagés prennent la projection haute).
- */
-export function remapTopUV(
-  g: THREE.BufferGeometry,
-  w: number,
-  d: number,
-  cx = 0,
-  cz = 0,
-  sideUV: P2 = [0.002, 0.002],
-): THREE.BufferGeometry {
-  const pos = g.getAttribute('position');
-  const nor = g.getAttribute('normal');
-  const uvs = new Float32Array(pos.count * 2);
-  for (let i = 0; i < pos.count; i++) {
-    if (nor.getY(i) > 0.9) {
-      uvs[i * 2] = (pos.getX(i) - cx) / w + 0.5;
-      uvs[i * 2 + 1] = (pos.getZ(i) - cz) / d + 0.5;
-    } else {
-      uvs[i * 2] = sideUV[0];
-      uvs[i * 2 + 1] = sideUV[1];
-    }
-  }
-  g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  return g;
 }
 
 /** Disque plat horizontal (normale +Y) de rayon r à la hauteur y, UV planaires sur un carré de côté `uvSize`. */

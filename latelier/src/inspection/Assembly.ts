@@ -566,8 +566,12 @@ export class Assembly {
     }
   }
 
-  /** Libère géométries, matériaux non partagés, textures et matériaux de l'objet. */
-  dispose(): void {
+  /**
+   * Libère géométries, matériaux non partagés, textures et matériaux de l'objet.
+   * `keepScope` : les textures et matériaux enregistrés sous la portée de l'objet sont conservés
+   * (un autre assemblage du même objet les utilise, ex. miniature pendant l'inspection).
+   */
+  dispose(options: { keepScope?: boolean } = {}): void {
     if (this.disposed) return;
     this.disposed = true;
     for (const part of this.order) {
@@ -580,6 +584,11 @@ export class Assembly {
     this.root.removeFromParent();
     disposeObjectTree(this.root);
     this.geometryCache.dispose();
+    if (options.keepScope) {
+      this.parts.clear();
+      this.order.length = 0;
+      return;
+    }
     const scope = objectScope(this.def.id);
     this.options.textures.disposeScope(scope);
     this.options.materials.disposeScope(scope);

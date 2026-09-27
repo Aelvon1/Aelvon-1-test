@@ -83,7 +83,8 @@ export function wearMask(
   softness = 0.06,
 ): FloatNode {
   const threshold = float(1).sub(amount);
-  const value = mask.mul(breakup.mul(1.2).add(0.4)).add(breakup.mul(0.25));
+  // Le bruit module fortement le masque : l'usure reste locale (éclats), jamais un liseré continu.
+  const value = mask.mul(breakup.mul(1.6).sub(0.2)).add(breakup.mul(0.25));
   return smoothstep(threshold.sub(softness), threshold.add(softness), value);
 }
 

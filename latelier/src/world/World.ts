@@ -144,7 +144,7 @@ export class World {
     this.switchPosition.copy(lightSwitch.position);
     const lamp = new MagnifierLamp(b);
     this.lamp = lamp;
-    buildLabels(ctx, b);
+    buildLabels(ctx, b, bench.top);
     this.buildWindowGlass();
     await yieldToMain();
 
@@ -374,6 +374,9 @@ export class World {
     if (!this.built) return;
     const u = this.uniforms;
     u.time.value = frame.time;
+    // Ciel couvert qui « respire » lentement (passage de nuages plus ou moins denses).
+    const t = frame.time;
+    u.daylight.value = 0.94 + 0.06 * (0.6 * Math.sin(t * 0.13) + 0.4 * Math.sin(t * 0.047 + 1.3));
     const camera = this.ctx.engine.camera;
     const fovRad = (camera.fov * Math.PI) / 180;
     u.pixelsPerMeter.value = this.ctx.engine.canvas.height / (2 * Math.tan(fovRad / 2));

@@ -200,10 +200,8 @@ export class Inspection {
     this.world.setInspectionMode({ active: true, neutral: previous?.neutralBackground ?? false });
     this.ctx.postfx.setMode('inspection');
 
-    const camera = this.ctx.engine.camera;
     const to = poseLookingAt(this.world.bench.viewPosition, this.world.bench.matCenter, INSPECTION_VIEW.fov);
-    this.tween = new CameraTween(camera, capturePose(camera), to, 1.6);
-    const tweenDone = this.tween.done;
+    const tweenDone = this.startTween(to, 1.6);
     try {
       const [session] = await Promise.all([this.createSession(def, merged, token), tweenDone]);
       if (!session || token !== this.openToken) return;
@@ -226,14 +224,24 @@ export class Inspection {
     this.ctx.postfx.setOutline('selected', []);
     this.ctx.postfx.setOutline('hover', []);
     this.ctx.postfx.setOutline('blocked', []);
-    const camera = this.ctx.engine.camera;
-    this.tween = new CameraTween(camera, capturePose(camera), returnPose, 1.3);
-    await this.tween.done;
+    await this.startTween(returnPose, 1.3);
     // Un autre objet a été ouvert pendant le retour caméra : il ne doit pas être libéré.
     if (token !== this.openToken) return;
     this.disposeSession();
     this.ctx.store.setState({ inspection: null });
     this.world.setInspectionMode({ active: false, neutral: false });
+  }
+
+  /**
+   * Transition caméra. Une transition en cours est terminée d'abord (sa promesse est résolue :
+   * un appelant qui l'attend ne reste jamais bloqué).
+   */
+  private startTween(to: CameraPose, duration: number): Promise<void> {
+    const camera = this.ctx.engine.camera;
+    const from = capturePose(camera);
+    this.tween?.update(Number.MAX_VALUE);
+    this.tween = new CameraTween(camera, from, to, duration);
+    return this.tween.done;
   }
 
   /**
@@ -376,7 +384,12 @@ export class Inspection {
     this.session = session;
     const failed = session.assembly.buildErrors;
     if (failed.length)
-      pushToast(this.ctx.store, `${failed.length} pièce(s) n'ont pas pu être construites (voir la console).`, 'error', 6000);
+      pushToast(
+        this.ctx.store,
+        `${failed.length} pièce(s) n'ont pas pu être construites (voir la console).`,
+        'error',
+        6000,
+      );
     const root = session.assembly.root;
     this.ctx.engine.scene.add(root);
     session.drop = { elapsed: 0, played: false };
@@ -839,12 +852,15 @@ export class Inspection {
       const pose = s.composer.get(id);
       if (!pose) continue;
       // Entrée : de la première à la dernière pièce ; sortie : ordre inverse.
-      pose.knollWeight = k.active
+      const weight = k.active
         ? knollingWeight(k.elapsed, rank, n)
         : 1 - knollingWeight(k.elapsed, n - 1 - rank, n);
+      if (weight !== pose.knollWeight) {
+        pose.knollWeight = weight;
+        s.composer.markDirty(id);
+      }
     }
     s.composer.refreshAllVisibility();
-    s.composer.markDirty();
     if (k.elapsed >= KNOLLING_TRANSITION.total) {
       k.running = false;
       if (!k.active && s.deferred) {

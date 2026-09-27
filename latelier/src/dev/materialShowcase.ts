@@ -12,6 +12,8 @@
  * - `env=world`          : garder l'environnement du décor (défaut : studio neutre) ;
  * - `glow=0..1|pulse`    : émission des LED et sources (défaut 1) ;
  * - `nobump=1`           : matériaux sans relief procédural (mise au point) ;
+ * - `post=0`             : rendu direct, sans post-traitement ;
+ * - `world=0`            : masque le décor (et ses lumières) : plateau neutre, studio seul ;
  * - `edges=0`            : cube sans attributs `edgeWear`/`cavity` (teste la variante dérivées) ;
  * - `probe=grunge.a`     : remplace les matériaux par l'affichage d'un canal d'une texture de la
  *                          bibliothèque (mappage triplanaire local), ou `probe=edge|cavity|curv`
@@ -19,13 +21,13 @@
  */
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { color, mix, normalize, positionLocal, smoothstep, vec3 } from 'three/tsl';
 import type { AppContext } from '../core/context';
 import type { World } from '../world/World';
 import { BENCH, MAT } from '../world/layout';
 import { BASE_MATERIAL_IDS } from '../materials/types';
 import { applyEdgeWear } from '../materials/geometry/edgeWear';
+import { createBevelledBox } from '../materials/geometry/bevelledBox';
 import { setMaterialGlow } from '../materials/factories/optics';
 import { LIB_TEXTURES, type LibTextureName } from '../materials/libTextures';
 import { SurfaceKit } from '../materials/tsl/surface';
@@ -38,7 +40,7 @@ export interface ShowcaseHandle {
   dispose(): void;
 }
 
-export async function startMaterialShowcase(ctx: AppContext, _world: World): Promise<ShowcaseHandle> {
+export async function startMaterialShowcase(ctx: AppContext, world: World): Promise<ShowcaseHandle> {
   const q = ctx.dev.raw;
   const { engine, materials, textures } = ctx;
   const prefixes = q.get('filter')?.split(',').filter(Boolean) ?? [];
@@ -69,8 +71,13 @@ export async function startMaterialShowcase(ctx: AppContext, _world: World): Pro
   const r = cell * 0.2;
   const sphere = new THREE.SphereGeometry(r, 48, 32);
   sphere.computeTangents();
-  const cube = new RoundedBoxGeometry(r * 1.6, r * 1.6, r * 1.6, 4, r * 0.18);
-  if (q.get('edges') !== '0') applyEdgeWear(cube, { minAngle: 5, maxAngle: 30, spread: 1 });
+  const cube = createBevelledBox(r * 1.6, r * 1.6, r * 1.6, {
+    radius: r * 0.12,
+    bevelSegments: 4,
+    faceSegments: 8,
+  });
+  cube.computeTangents();
+  if (q.get('edges') !== '0') applyEdgeWear(cube, { radius: r * 0.16 });
   const labelGeo = new THREE.PlaneGeometry(cell * 0.86, cell * 0.2);
   const probe = createProbeMaterial(ctx, q.get('probe'));
 
@@ -131,6 +138,24 @@ export async function startMaterialShowcase(ctx: AppContext, _world: World): Pro
     samples.set(id, group);
   });
   engine.scene.add(root);
+
+  // `post=0` : rendu direct sans post-traitement (mise au point indépendante du pipeline).
+  if (q.get('post') === '0') engine.renderFn = () => engine.renderer.render(engine.scene, engine.camera);
+
+  // `world=0` : décor masqué (lumières comprises), plateau neutre à la place de l'établi.
+  const hideWorld = q.get('world') === '0';
+  let stand: THREE.Mesh | null = null;
+  if (hideWorld) {
+    world.root.visible = false;
+    stand = new THREE.Mesh(
+      new THREE.PlaneGeometry(8, 8),
+      new THREE.MeshStandardNodeMaterial({ color: 0x2e2c29, roughness: 0.85 }),
+    );
+    stand.rotation.x = -Math.PI / 2;
+    stand.position.set(center.x, y0 - 0.0005, center.z);
+    stand.receiveShadow = true;
+    engine.scene.add(stand);
+  }
 
   // Éclairage de studio d'appoint.
   const key = new THREE.SpotLight(0xfff1dd, 18, 5, Math.PI / 4, 0.7, 1.5);
@@ -227,6 +252,12 @@ export async function startMaterialShowcase(ctx: AppContext, _world: World): Pro
       removeUpdate();
       controls.dispose();
       engine.scene.remove(root, key, key.target, fill, fill.target, rim);
+      if (stand) {
+        engine.scene.remove(stand);
+        stand.geometry.dispose();
+        (stand.material as THREE.Material).dispose();
+        world.root.visible = true;
+      }
       sphere.dispose();
       cube.dispose();
       labelGeo.dispose();

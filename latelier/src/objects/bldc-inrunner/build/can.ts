@@ -54,11 +54,17 @@ export function buildCan(ctx: Ctx): PartBuild {
   return { object: root, anchor: [0, d.canR * MM, 0] };
 }
 
-/** Décalque de gravure laser posé sur le secteur lisse (10 µm au-dessus de la surface). */
+/**
+ * Décalque de gravure laser posé sur le secteur lisse (15 µm au-dessus de la surface).
+ * Approximation : la gravure (quelques µm de profondeur) est rendue par la couleur et la rugosité,
+ * sans relief.
+ */
 function buildLabel(ctx: Ctx): THREE.Mesh {
   const d = dims(ctx);
   const { length, halfAngle, x0 } = canLabelSize(d);
-  const r = d.bodyR + 0.012;
+  // Décalage géométrique (15 µm) : pas de polygonOffset, dont le signe n'est pas inversé par le
+  // tampon de profondeur inversé du moteur de rendu.
+  const r = d.bodyR + 0.015;
   const geo = cachedGeometry(ctx, geoKey(ctx, 'can-label'), () => {
     const mb = new MeshBuilder();
     gridSurface(
@@ -82,9 +88,6 @@ function buildLabel(ctx: Ctx): THREE.Mesh {
     roughness: 0.62,
     transparent: true,
     depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
   });
   m.name = 'Gravure laser';
   m.colorNode = silver ? vec3(0.16, 0.17, 0.18) : vec3(0.86, 0.88, 0.9);
