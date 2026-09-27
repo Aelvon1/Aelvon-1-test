@@ -322,4 +322,9 @@ l'implantation, regénérer le routage :
   plausible mais non électriquement vérifié, codes de date fictifs, etc.
 - **Plan de coupe.** Les sections sont remplies par rendu des faces arrière (couleur unie), pas par
   un calcul exact des surfaces coupées.
+- **Mémoire au changement d'objet.** Chaque objet libère ses géométries, matériaux et textures
+  (`dispose`). La revue d'intégration a corrigé plusieurs rétentions (sélection, maillages temporaires,
+  arbre d'objets). Une rétention résiduelle de quelques géométries après de nombreuses ouvertures et
+  fermetures successives était encore en cours d'analyse ; son origine n'est pas établie (cache du
+  moteur de rendu three.js possible).
 - **Sons synthétisés.** Ce sont des modèles phénoménologiques, pas des enregistrements.
