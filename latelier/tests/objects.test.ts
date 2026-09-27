@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three/webgpu';
-import { listObjectDefs } from '../src/objects/registry';
+import { listDevObjectDefs, listObjectDefs } from '../src/objects/registry';
 import { validateObjectAllPresets } from '../src/objects/validate';
 import { resolveObject } from '../src/objects/resolve';
 import { DisassemblyGraph } from '../src/inspection/graph';
@@ -23,7 +23,7 @@ import {
 import type { ObjectParams } from '../src/objects/types';
 import { createFakeServices } from './helpers/fakeServices';
 
-const defs = listObjectDefs();
+const defs = [...listObjectDefs(), ...listDevObjectDefs()];
 
 describe('registre des objets', () => {
   it('découvre au moins un objet', () => {
