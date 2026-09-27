@@ -608,10 +608,20 @@ export class Assembly {
   }
 }
 
+/** Objet 3D vu comme émetteur de l'événement « dispose » (maillages simples compris). */
+type DisposableObject = THREE.EventDispatcher<{ dispose: object }>;
+
 /**
  * Libère un sous-arbre : géométries non mises en cache, maillages instanciés, matériaux non
  * partagés et leurs textures directes. Les géométries du cache (`userData.cached`) et les
  * matériaux de la bibliothèque (`userData.shared`) sont libérés par leurs propriétaires.
+ *
+ * Chaque objet dessinable émet aussi « dispose » : le renderer de three (r186) ne libère ses
+ * objets de rendu (pipelines, liaisons, et surtout la référence au maillage) qu'à la libération
+ * du MATÉRIAU ou de l'OBJET — pas de la géométrie. Un maillage simple dont le matériau est
+ * partagé (bibliothèque) restait donc référencé par le renderer, avec toute l'arborescence de
+ * l'objet et ses tableaux de sommets (fuite de plusieurs centaines de Mo de tas JS par
+ * ouverture).
  */
 export function disposeObjectTree(root: THREE.Object3D): void {
   const geometries = new Set<THREE.BufferGeometry>();
@@ -624,6 +634,7 @@ export function disposeObjectTree(root: THREE.Object3D): void {
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const m of mats) if (m && m.userData.shared !== true) materials.add(m);
     if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
+    else (o as unknown as DisposableObject).dispatchEvent({ type: 'dispose' });
   });
   for (const g of geometries) g.dispose();
   for (const m of materials) {

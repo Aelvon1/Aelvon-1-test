@@ -30,6 +30,8 @@ const _t = new THREE.Matrix4();
 const _box = new THREE.Box3();
 const _sphere = new THREE.Sphere();
 const _center = new THREE.Vector3();
+/** Géométrie vide des doublures au repos. */
+const EMPTY_PROXY_GEOMETRY = new THREE.BufferGeometry();
 
 /** Doublures d'une instance (une par maillage instancié de la pièce). */
 class InstanceProxy {
@@ -76,6 +78,18 @@ class InstanceProxy {
 
   get active(): boolean {
     return this.partId !== null;
+  }
+
+  /**
+   * Objet libéré : les doublures ne retiennent plus ses géométries (ni directement, ni via les
+   * objets de rendu du renderer, libérés par l'événement « dispose »).
+   */
+  release(): void {
+    this.hide();
+    for (const m of this.meshes) {
+      m.geometry = EMPTY_PROXY_GEOMETRY;
+      (m as unknown as THREE.EventDispatcher<{ dispose: object }>).dispatchEvent({ type: 'dispose' });
+    }
   }
 
   /** Suit l'instance (animation, éclatement). */
@@ -162,8 +176,8 @@ export class Selection implements CameraPointerListener {
   detach(): void {
     this.cancelPendingToggle();
     this.assembly = null;
-    this.hoverProxy.hide();
-    this.selectedProxy.hide();
+    this.hoverProxy.release();
+    this.selectedProxy.release();
     this.hoverOutline = { partId: null, instance: null };
     this.selectedOutline = { partId: null, instance: null };
     this.o.ctx.postfx.setOutline('hover', []);

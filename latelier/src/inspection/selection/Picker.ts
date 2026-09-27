@@ -48,6 +48,9 @@ const _world = new THREE.Vector3();
 const _plane = new THREE.Plane();
 const _hitNormal = new THREE.Vector3();
 const _v = new THREE.Vector3();
+/** Contenu neutre du maillage de travail hors objet attaché (aucune référence retenue). */
+const EMPTY_GEOMETRY = new THREE.BufferGeometry();
+const EMPTY_MATERIAL = new THREE.MeshBasicMaterial();
 
 /** Matériau factice (jamais rendu) : lancer de rayon sur les deux faces. */
 function doubleSideMaterial(): THREE.Material {
@@ -131,6 +134,10 @@ export class Picker implements CameraSceneQuery {
     }
     this.trees.clear();
     this.clipPlane = null;
+    // Le maillage de travail ne retient ni la géométrie ni le matériau de l'objet libéré.
+    this.scratch.geometry = EMPTY_GEOMETRY;
+    this.scratch.material = EMPTY_MATERIAL;
+    this.hits.length = 0;
   }
 
   /** Les maillages ont changé (détail construit ou libéré) : liste à reconstruire. */
