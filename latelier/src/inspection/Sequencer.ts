@@ -293,10 +293,13 @@ export class Sequencer {
       this.o.listener.onStepStarted(run.stepIndex);
       if (this.o.autoFrame()) {
         const step = this.o.graph.steps[run.stepIndex];
+        // Remontage : toutes les pièces de l'étape (leurs places dans l'objet sont cadrées, et une
+        // pièce focalisée peut revenir dans un parent qui revient lui aussi).
+        const reinsert = run.direction === -1;
         if (step)
           this.o.listener.onFrameRequest(
-            step.focus.length ? [...step.focus] : [...step.parts],
-            run.direction === -1,
+            step.focus.length && !reinsert ? [...step.focus] : [...step.parts],
+            reinsert,
           );
       }
     }

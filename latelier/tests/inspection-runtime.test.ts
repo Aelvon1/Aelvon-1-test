@@ -346,7 +346,8 @@ describe('runtime — cadrage des étapes', () => {
     expect(frames).toHaveLength(2);
     expect(frames[0]!.reinsert).toBe(false);
     expect(frames[1]!.reinsert).toBe(true);
-    expect(frames[1]!.ids).toEqual(frames[0]!.ids);
+    // Remontage : toutes les pièces de l'étape (places dans l'objet cadrées).
+    expect(frames[1]!.ids).toEqual([...rig.graph.steps[0]!.parts]);
     sequencer.dispose();
   });
 });

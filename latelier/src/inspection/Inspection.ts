@@ -30,7 +30,7 @@ import { getObjectDef } from '../objects/registry';
 import { mergeParams, partQuantity } from '../objects/resolve';
 import { INSPECTION_VIEW } from '../world/layout';
 import type { World } from '../world/World';
-import { Assembly } from './Assembly';
+import { Assembly, type PartRuntime } from './Assembly';
 import { boxCorners, fitDistance } from './camera/orbitMath';
 import type { InspectionCameraController } from './camera/types';
 import { DetailManager } from './detail';
@@ -95,6 +95,8 @@ const _box3 = new THREE.Box3();
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _m = new THREE.Matrix4();
+const _m2 = new THREE.Matrix4();
+const _m3 = new THREE.Matrix4();
 
 export class Inspection {
   private tween: CameraTween | null = null;
@@ -359,7 +361,10 @@ export class Inspection {
       listener: {
         onStateChange: () => this.syncDynamic(),
         onStepStarted: (index) => ctx.bus.emit('inspection:stepStarted', { index }),
-        onStepFinished: (index) => ctx.bus.emit('inspection:stepFinished', { index }),
+        onStepFinished: (index) => {
+          ctx.bus.emit('inspection:stepFinished', { index });
+          this.frameCompletion();
+        },
         onBlocked: (partId, blockage, reinsert) => this.reportBlocked(partId, blockage, reinsert),
         onToolChange: (toolId) => patchInspection(ctx.store, { activeToolId: toolId }),
         onFrameRequest: (ids, reinsert) => this.onFrameRequest?.(ids, reinsert),
@@ -819,6 +824,7 @@ export class Inspection {
     const s = this.session;
     if (!a || !s) return;
     _box2.makeEmpty();
+    const moving = new Set(ids);
     for (const id of ids) {
       a.worldBounds(id, _box);
       if (_box.isEmpty()) continue;
@@ -826,21 +832,32 @@ export class Inspection {
       const part = a.parts.get(id);
       const removal = part?.def.removal;
       if (withTravel && reinsert && part) {
-        // Place de repos dans le parent courant, et entrée de la course de retrait.
-        const parentNode = part.node.parent;
-        _m.compose(part.restPosition, part.restQuaternion, part.restScale);
-        if (parentNode) {
-          parentNode.updateWorldMatrix(true, false);
-          _m.premultiply(parentNode.matrixWorld);
+        // Place de repos : relative au plus proche ancêtre qui ne revient pas avec l'étape (posé
+        // dans l'objet, ou resté rangé), en composant les poses de repos de la chaîne.
+        const chain: PartRuntime[] = [part];
+        let anchor = part.parentId ? a.parts.get(part.parentId) : undefined;
+        while (anchor && moving.has(anchor.id)) {
+          chain.push(anchor);
+          anchor = anchor.parentId ? a.parts.get(anchor.parentId) : undefined;
+        }
+        const anchorNode = anchor ? anchor.node : a.root;
+        anchorNode.updateWorldMatrix(true, false);
+        _m.copy(anchorNode.matrixWorld);
+        for (let k = chain.length - 1; k >= 0; k--) {
+          const c = chain[k]!;
+          _m.multiply(_m2.compose(c.restPosition, c.restQuaternion, c.restScale));
         }
         const local = part.subtreeBox.isEmpty() ? part.localBox : part.subtreeBox;
         if (local.isEmpty()) _box2.union(_box);
         else {
           _box3.copy(local).applyMatrix4(_m);
           _box2.union(_box3);
-          if (removal && parentNode) {
-            _v.set(removal.axis[0], removal.axis[1], removal.axis[2]).normalize();
-            _v.applyQuaternion(parentNode.getWorldQuaternion(new THREE.Quaternion()));
+          if (removal) {
+            // Entrée de la course : axe de retrait dans le repère du parent au repos.
+            _m2
+              .copy(_m)
+              .multiply(_m3.compose(part.restPosition, part.restQuaternion, part.restScale).invert());
+            _v.set(removal.axis[0], removal.axis[1], removal.axis[2]).normalize().transformDirection(_m2);
             _box2.union(_box3.translate(_v.multiplyScalar(removal.distance)));
           }
         }
@@ -878,6 +895,27 @@ export class Inspection {
       if (sphere.radius < s.restRadius * 0.5) _box2.expandByScalar(s.restRadius * 0.5 - sphere.radius);
     }
     this.camera.frameBox(_box2);
+  }
+
+  /**
+   * Démontage pas à pas terminé (dernière étape jouée, cadrage automatique actif) : vue d'ensemble
+   * de l'objet et de TOUTES les pièces rangées, destinations de rangement comprises (les
+   * dernières pièces sont encore en vol vers leur emplacement).
+   */
+  private frameCompletion(): void {
+    const s = this.session;
+    const a = this.assembly;
+    if (!s || !a || !this.ctx.store.getState().settings.autoFrameSteps) return;
+    if (s.graph.cursor(s.sequencer.removed) < s.graph.steps.length) return;
+    a.objectBounds(_box2);
+    for (const id of s.sequencer.removed) {
+      const pose = s.composer.get(id);
+      if (!pose || s.sequencer.effectivePlacement(pose.part) !== 'park') continue;
+      if (pose.parkInstanceTargets) {
+        for (const m of pose.parkInstanceTargets) _box2.expandByPoint(_v.setFromMatrixPosition(m));
+      } else if (pose.parkTarget) _box2.expandByPoint(_v.setFromMatrixPosition(pose.parkTarget));
+    }
+    if (!_box2.isEmpty()) this.camera.frameBox(_box2);
   }
 
   // --- Éclatement, vue rangée, pose -------------------------------------------------------
