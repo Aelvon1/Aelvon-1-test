@@ -28,6 +28,7 @@ import { Player } from '../player/Player';
 import { Inspection } from '../inspection/Inspection';
 import { buildCatalog, listObjectDefs } from '../objects/registry';
 import { validateObjectAllPresets } from '../objects/validate';
+import { TOOL_IDS } from '../inspection/tools/ids';
 import { mountUi } from '../ui/mount';
 import type { ObjectParams } from '../objects/types';
 
@@ -178,7 +179,15 @@ export class App {
     this.progress(1, 'Prêt');
     engine.start();
 
-    if (dev.inspect) {
+    const previewId = dev.raw.get('preview');
+    if (import.meta.env.DEV && previewId) {
+      // Banc de prévisualisation d'objet (mise au point de la géométrie).
+      const { startPreview } = await import('../dev/preview');
+      machine.go('transition');
+      machine.go('inspection');
+      postfx.setMode('inspection');
+      await startPreview(ctx, this.world, previewId);
+    } else if (dev.inspect) {
       machine.go('transition');
       await this.openObject(dev.inspect);
     } else if (dev.skipHome) {
@@ -193,7 +202,7 @@ export class App {
 
   private validateObjects(): void {
     for (const def of listObjectDefs()) {
-      for (const report of validateObjectAllPresets(def)) {
+      for (const report of validateObjectAllPresets(def, new Set<string>(TOOL_IDS))) {
         for (const w of report.warnings) console.warn(`[validation] ${def.id} (${report.context}) : ${w}`);
         if (report.errors.length) {
           console.error(`[validation] ${def.id} (${report.context}) :\n - ${report.errors.join('\n - ')}`);
