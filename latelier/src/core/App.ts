@@ -7,6 +7,7 @@
  *                         ⇅ paused
  */
 import { Engine, UpdatePriority } from './Engine';
+import { initAssetLoaders } from './assets';
 import { EventBus } from './EventBus';
 import type { AppEvents } from './events';
 import { createAppStore, patchInspection, pushToast, type AppStore, type PartDependencies } from './store';
@@ -101,6 +102,8 @@ export class App {
     });
     engine.setDynamicResolution(settings.dynamicResolution);
     engine.camera.fov = settings.fov;
+    // Chargeurs glTF (Draco/Meshopt) et KTX2, disponibles pour les objets (`getAssetLoaders()`).
+    initAssetLoaders(engine.renderer);
     store.setState({
       renderer: {
         backend: engine.backend,
