@@ -25,6 +25,7 @@ import {
   smoothstep,
   texture,
   uv,
+  vec3,
 } from 'three/tsl';
 import type { MaterialFactory } from '../../../materials/types';
 import type { TextureRequest } from '../../../textures/types';
@@ -88,6 +89,12 @@ function dieMaterial(quality: Quality): MaterialFactory {
   };
 }
 
+/** Couleur hexadécimale sRGB → nœud vec3 dans l'espace de travail linéaire. */
+function rgb(hex: number) {
+  const c = new THREE.Color(hex);
+  return vec3(c.r, c.g, c.b);
+}
+
 /** Résine de moulage (option : marquage laser du dessus). */
 function resinMaterial(marking: { id: string; quality: Quality } | null): MaterialFactory {
   return (ctx) => {
@@ -96,15 +103,11 @@ function resinMaterial(marking: { id: string; quality: Quality } | null): Materi
     const cells = mx_worley_noise_float(positionLocal.mul(20000));
     const filler = smoothstep(0.34, 0.22, cells);
     const cut = mix(color(0x2c2c30), color(0x8f8e88), filler);
-    let front = color(0x151517);
-    let roughFront = float(0.62);
-    let gloss = float(1);
-    if (marking) {
-      const t = texture(ctx.textures.get(markingRequest(marking.id, marking.quality)), uv());
-      front = mix(color(0x151517), color(0x6a6b6e), t.r);
-      roughFront = mix(float(0.55), float(0.85), t.r);
-      gloss = mix(float(1), float(0.5), t.g);
-    }
+    // Marquage laser éventuel : R = gravure (plus claire, plus mate), G = zones polies.
+    const mark = marking ? texture(ctx.textures.get(markingRequest(marking.id, marking.quality)), uv()) : null;
+    const front = mark ? mix(rgb(0x151517), rgb(0x6a6b6e), mark.r) : rgb(0x151517);
+    const roughFront = mark ? mix(float(0.55), float(0.85), mark.r) : float(0.62);
+    const gloss = mark ? mix(float(1), float(0.5), mark.g) : float(1);
     m.colorNode = select(frontFacing, front, cut);
     m.roughnessNode = select(frontFacing, roughFront.mul(gloss), float(0.78));
     m.metalness = 0;

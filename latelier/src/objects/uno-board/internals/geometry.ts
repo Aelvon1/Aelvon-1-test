@@ -159,7 +159,7 @@ function orientTo(g: THREE.BufferGeometry, want: readonly [number, number, numbe
   const c = new THREE.Vector3().fromBufferAttribute(p, idx.getX(2));
   const nrm = b.sub(a).cross(c.sub(a));
   if (nrm.x * want[0] + nrm.y * want[1] + nrm.z * want[2] < 0) {
-    const t = [...(idx.array as ArrayLike<number>)];
+    const t = Array.from(idx.array as ArrayLike<number>);
     for (let i = 0; i < t.length; i += 3) {
       idx.setX(i + 1, t[i + 2]!);
       idx.setX(i + 2, t[i + 1]!);

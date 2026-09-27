@@ -10,6 +10,7 @@ import { DEFAULT_PARAMS, type UnoParams } from './params';
 import { allParts } from './parts';
 import { artworkKey } from './pcb/artwork';
 import { artworkTexture, pcbMaterials } from './pcb/materials';
+import { internalsMaterials } from './internals/materials';
 import { computeRouting } from './pcb/routing';
 import { STEPS } from './sequence';
 
@@ -33,7 +34,7 @@ const def: ObjectDef<UnoParams> = {
   defaultParams: DEFAULT_PARAMS,
   parts: allParts,
   steps: STEPS,
-  materials: { ...pcbMaterials(), ...markingMaterials(), ...miscMaterials() },
+  materials: { ...pcbMaterials(), ...markingMaterials(), ...miscMaterials(), ...internalsMaterials() },
   removedPlacement: 'park',
   presentation: { rotationY: 0, viewDirection: [0.25, 0.8, 0.9], minSurfaceDistance: 0.0015 },
   prepare: async (ctx) => {

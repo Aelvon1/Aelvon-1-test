@@ -168,7 +168,7 @@ type RectFn = (x: number, z: number, w: number, h: number, a: number) => void;
 
 /** Motif interne d'un bloc (matrices mémoire, cellules standard, analogique). */
 function drawBlock(
-  ctx: Ctx2D,
+  _ctx: Ctx2D,
   kind: BlockKind,
   r: readonly [number, number, number, number],
   rand: () => number,

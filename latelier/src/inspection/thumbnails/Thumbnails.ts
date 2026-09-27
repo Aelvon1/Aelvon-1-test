@@ -6,7 +6,10 @@
  *
  * Étalement : une vue rendue par image (juste avant le rendu principal, état du renderer
  * restauré), lectures GPU en parallèle (au plus 3 en vol), construction par tranches de 8 ms,
- * pipelines compilés en asynchrone (`compileAsync`) avant la première vue : aucune saccade.
+ * pipelines compilés en asynchrone (`compileAsync`) avant la première vue, maillage par maillage
+ * avec des pauses (génération des shaders étalée) : aucune saccade due aux miniatures elles-mêmes.
+ * Limite : la construction de l'objet est découpée par pièce ; une pièce très lourde à générer
+ * (défini par l'objet) reste une tâche longue.
  * Rendu à 2× puis réduction 2×2 sur le processeur (pas de MSAA sur ce chemin).
  * Un objet en cours d'inspection n'est pas rendu (matériaux et textures de même portée) : il est
  * reporté à la fermeture de l'inspection.
@@ -15,6 +18,7 @@ import * as THREE from 'three/webgpu';
 import type { AppContext } from '../../core/context';
 import type { Thumbnail } from '../../core/store';
 import type { ObjectDef, ObjectParams } from '../../objects/types';
+import { TimeSlicer } from '../../core/scheduler';
 import { Assembly } from '../Assembly';
 import { fitDistance, orbitOffset } from '../camera/orbitMath';
 import { downsample2x, frameOrigin, readbackRowBytes, sheetLayout, turntableAzimuth } from './spriteSheet';
@@ -154,9 +158,9 @@ export class Thumbnails {
       this.camera.updateProjectionMatrix();
       this.scene.environment = engine.scene.environment;
       this.scene.environmentIntensity = 0.7;
-      // Compilation asynchrone des pipelines (même cible que les vues).
+      // Compilation asynchrone des pipelines (même cible que les vues), étalée maillage par maillage.
       this.placeCamera(startAzimuth, elevation, distance);
-      await this.withTarget(rt, () => engine.renderer.compileAsync(this.scene, this.camera));
+      if (!(await this.compileSliced(rt, assembly.root)) || this.o.inUse(id)) return 'deferred';
       const pixels = new Uint8ClampedArray(layout.width * layout.height * 4);
       const flipY = engine.backend === 'webgl2';
       const inFlight: Promise<void>[] = [];
@@ -198,6 +202,31 @@ export class Thumbnails {
       assembly.dispose({ keepScope: this.o.inUse(id) });
       rt?.dispose();
     }
+  }
+
+  /**
+   * Compilation asynchrone des pipelines de l'objet, un maillage à la fois : la construction des
+   * shaders à nœuds est synchrone (fil principal) ; compiler la scène d'un bloc bloquerait le fil
+   * le temps de générer TOUS les shaders de l'objet. Pause dès qu'une tranche dépasse ~6 ms ; les
+   * pipelines déjà connus sont retrouvés dans le cache du renderer. Faux si les miniatures sont
+   * libérées entre-temps.
+   */
+  private async compileSliced(rt: THREE.RenderTarget, root: THREE.Object3D): Promise<boolean> {
+    const renderer = this.o.ctx.engine.renderer;
+    const meshes: THREE.Object3D[] = [];
+    root.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) meshes.push(o);
+    });
+    this.scene.updateMatrixWorld(true);
+    const slicer = new TimeSlicer(6);
+    const pending: Promise<void>[] = [];
+    for (const mesh of meshes) {
+      pending.push(this.withTarget(rt, () => renderer.compileAsync(mesh, this.camera, this.scene)));
+      await slicer.maybeYield();
+      if (this.disposed) return false;
+    }
+    await Promise.all(pending);
+    return true;
   }
 
   /** Éclairage studio fixe par rapport à la caméra (l'objet tourne, la lumière ne tourne pas). */
