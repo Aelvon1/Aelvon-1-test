@@ -54,7 +54,13 @@ export const WINDING: WindingSpec = {
   layers: [
     { name: 'papier intérieur', offset: 0, thickness: 0.05 * MM, y0: PAPER[0] * MM, y1: PAPER[1] * MM },
     { name: 'anode', offset: 0.05 * MM, thickness: 0.09 * MM, y0: FOIL[0] * MM, y1: FOIL[1] * MM },
-    { name: 'papier extérieur', offset: 0.14 * MM, thickness: 0.05 * MM, y0: PAPER[0] * MM, y1: PAPER[1] * MM },
+    {
+      name: 'papier extérieur',
+      offset: 0.14 * MM,
+      thickness: 0.05 * MM,
+      y0: PAPER[0] * MM,
+      y1: PAPER[1] * MM,
+    },
     { name: 'cathode', offset: 0.19 * MM, thickness: 0.03 * MM, y0: FOIL[0] * MM, y1: FOIL[1] * MM },
   ],
 };
@@ -146,7 +152,13 @@ function seatGeometry(): THREE.BufferGeometry {
     const a = (i / 48) * Math.PI * 2;
     hole.push(new THREE.Vector2(Math.cos(a) * 3.22 * MM, Math.sin(a) * 3.22 * MM));
   }
-  const ring = perforatedBlock(seatOutline(), [hole], (RECESS - 0.01) * MM, (SEAT_TOP - RECESS + 0.01) * MM, 0.06 * MM);
+  const ring = perforatedBlock(
+    seatOutline(),
+    [hole],
+    (RECESS - 0.01) * MM,
+    (SEAT_TOP - RECESS + 0.01) * MM,
+    0.06 * MM,
+  );
   return mergeAll([plate, ring]);
 }
 
@@ -190,7 +202,10 @@ function unwindHooks(
   ];
   const out: PlanarSample = { x: 0, z: 0, nx: 0, nz: 0 };
   // Fraction de la durée consacrée au déroulement (phase 1 du mouvement `unwind`).
-  const phase = motionTiming({ motion: 'unwind', distance: removal.distance, duration: removal.duration }, 1).a;
+  const phase = motionTiming(
+    { motion: 'unwind', distance: removal.distance, duration: removal.duration },
+    1,
+  ).a;
   const place = () => {
     for (const tab of tabs) {
       if (!tab.mesh) continue;
@@ -326,7 +341,8 @@ export function electrolyticInternalParts(ref: 'PC1' | 'PC2'): PartDef<UnoParams
         role: 'Le condensateur proprement dit : deux feuilles d’aluminium séparées par du papier imbibé d’électrolyte. L’armature + est l’anode, le diélectrique la fine couche d’alumine formée à sa surface, l’armature − l’électrolyte, relié par la cathode.',
         material:
           'Anode en aluminium gravé (surface multipliée ≈ 50 fois) et oxydé, papier kraft imprégné (électrolyte à base d’éthylène glycol, typique), cathode en aluminium, languettes cousues',
-        dimensions: 'Ø 5,2 × 3,35 mm roulé ; ≈ 8,8 tours, bande de ≈ 8 cm × 3,35 mm une fois déroulée (typique)',
+        dimensions:
+          'Ø 5,2 × 3,35 mm roulé ; ≈ 8,8 tours, bande de ≈ 8 cm × 3,35 mm une fois déroulée (typique)',
         reference: '47 µF 25 V',
         tip: 'L’alumine ne fait que ≈ 1,4 nm par volt de formation : c’est cette épaisseur infime, sur une surface démultipliée par la gravure, qui donne 47 µF dans 6 mm. Inversé, le courant de fuite détruit l’oxyde, le gaz produit gonfle le godet.',
         extra: [

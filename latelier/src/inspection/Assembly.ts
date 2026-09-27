@@ -592,11 +592,16 @@ export class Assembly {
     const scope = objectScope(this.def.id);
     this.options.textures.disposeScope(scope);
     this.options.materials.disposeScope(scope);
-    // Alias courts `<clé>` enregistrés par l'objet : libérés s'ils ne préfixent aucun autre matériau.
-    const ids = this.options.materials.ids();
+    // Alias courts `<clé>` enregistrés par l'objet : `disposeScope` libère par PRÉFIXE, un alias
+    // n'est donc libéré que si tous les identifiants qu'il préfixe sont aussi des alias de cet
+    // objet (« int.resin » préfixe « int.resin.top.q0 » : les deux partent ensemble), jamais le
+    // matériau d'un autre objet.
+    const own = new Set(this.registeredMaterials);
     for (const id of this.registeredMaterials) {
       if (id.startsWith(scope)) continue;
-      if (ids.filter((other) => other.startsWith(id)).length === 1) this.options.materials.disposeScope(id);
+      const covered = this.options.materials.ids().filter((other) => other.startsWith(id));
+      if (covered.length > 0 && covered.every((other) => own.has(other)))
+        this.options.materials.disposeScope(id);
     }
     this.parts.clear();
     this.order.length = 0;

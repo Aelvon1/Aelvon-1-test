@@ -116,7 +116,7 @@ function TopBar() {
           title="Choisir un autre objet"
           {...focusProps}
         >
-          <Icon name="box" /> Inventaire <Key code="Tab" />
+          <Icon name="box" /> <span className="btn-text">Inventaire</span> <Key code="Tab" />
         </button>
         <button type="button" className="icon-btn" onClick={() => openOverlay('controls')} {...focusProps}>
           <Icon name="keyboard" title="Commandes" />

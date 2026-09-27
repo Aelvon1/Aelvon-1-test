@@ -172,7 +172,10 @@ function fingerPath(path: readonly P2[]): P2[] {
   const len = Math.hypot(last[0] - prev[0], last[1] - prev[1]);
   const span = Math.min(len, 0.3 * MM);
   const out = m.slice(0, -1);
-  const start: P2 = [last[0] + ((prev[0] - last[0]) * span) / len, last[1] + ((prev[1] - last[1]) * span) / len];
+  const start: P2 = [
+    last[0] + ((prev[0] - last[0]) * span) / len,
+    last[1] + ((prev[1] - last[1]) * span) / len,
+  ];
   if (span < len) out.push(start);
   for (let k = 1; k <= 8; k++)
     out.push([start[0] + ((last[0] - start[0]) * k) / 8, start[1] + ((last[1] - start[1]) * k) / 8]);
@@ -253,7 +256,12 @@ function leadframeSilver(): THREE.BufferGeometry {
 /** Colle chargée argent : galette sous la puce, ménisque remontant sur ses flancs. */
 function dieAttach(): THREE.BufferGeometry {
   const y0 = SILVER_TOP;
-  const s = (y: number, w: number, r: number): LoftSection => ({ y: y * MM, w: w * MM, d: w * MM, r: r * MM });
+  const s = (y: number, w: number, r: number): LoftSection => ({
+    y: y * MM,
+    w: w * MM,
+    d: w * MM,
+    r: r * MM,
+  });
   return loftRoundedRect(
     [
       s(y0, DIE.size + 0.24, 0.14),
@@ -419,7 +427,10 @@ export function mcuInternalParts(): PartDef<UnoParams>[] {
         dimensions: `Îlot ${fmt(LEADFRAME.paddle)} × ${fmt(LEADFRAME.paddle)} mm ; doigts de 0,25 mm, isolement ≥ 0,15 mm ; pattes au pas de 2,54 mm`,
         tip: 'Les deux barrettes qui tenaient l’îlot pendant le moulage sont coupées au ras du boîtier : leur section de cuivre affleure au fond de l’encoche et sur l’autre extrémité.',
         extra: [
-          { label: 'Doigts', value: '28, un par broche ; les broches d’extrémité rejoignent les petits côtés de la puce' },
+          {
+            label: 'Doigts',
+            value: '28, un par broche ; les broches d’extrémité rejoignent les petits côtés de la puce',
+          },
           { label: 'Colle de la puce', value: 'époxy chargée argent (conduction thermique), ≈ 25 µm' },
         ],
       },
@@ -430,7 +441,8 @@ export function mcuInternalParts(): PartDef<UnoParams>[] {
         axis: [0, 1, 0],
         distance: 0.012,
         destructive: true,
-        gesture: 'Saisir la grille par les pattes à la pince plate et l’arracher de la demi-coque inférieure.',
+        gesture:
+          'Saisir la grille par les pattes à la pince plate et l’arracher de la demi-coque inférieure.',
       },
       explode: { direction: [0, 1, 0], distance: 0.0015 },
       labelPriority: 4,
@@ -518,8 +530,10 @@ export function mcuInternalParts(): PartDef<UnoParams>[] {
       },
       info: {
         role: 'Relient chacun des plots de la puce au doigt de la broche correspondante : ce sont les seules liaisons électriques entre le silicium et l’extérieur.',
-        material: 'Or 99,99 % (4N) ; boule sur le plot d’aluminium, soudure en croissant sur le doigt argenté (thermosonique)',
-        dimensions: 'Ø 25 µm (1 mil) ; portée ≈ 0,9 à 1,2 mm ; boucle ≈ 0,2 mm au-dessus de la puce (typique)',
+        material:
+          'Or 99,99 % (4N) ; boule sur le plot d’aluminium, soudure en croissant sur le doigt argenté (thermosonique)',
+        dimensions:
+          'Ø 25 µm (1 mil) ; portée ≈ 0,9 à 1,2 mm ; boucle ≈ 0,2 mm au-dessus de la puce (typique)',
         tip: 'Un fil d’or de 25 µm fond sous ≈ 1 A en quelques millisecondes : une surcharge franche sur une broche coupe souvent son fil, la broche est « morte » alors que le reste du circuit fonctionne.',
         extra: [{ label: 'Nombre', value: '28, un par broche (cliquer un fil pour voir sa broche)' }],
       },
@@ -556,7 +570,8 @@ export function mcuInternalParts(): PartDef<UnoParams>[] {
       ],
       info: {
         role: 'Moitié haute du boîtier moulé : protège la puce et ses fils de l’humidité, de la lumière et des chocs ; porte le marquage laser.',
-        material: 'Résine époxy de moulage (EMC) noire, chargée de ≈ 80 % de billes de silice, noir de carbone (typique)',
+        material:
+          'Résine époxy de moulage (EMC) noire, chargée de ≈ 80 % de billes de silice, noir de carbone (typique)',
         dimensions: '35,2 × 7,0 mm ; 1,95 mm au-dessus du plan de joint',
         tip: cutInfo,
       },

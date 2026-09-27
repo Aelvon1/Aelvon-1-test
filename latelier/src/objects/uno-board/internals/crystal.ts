@@ -75,7 +75,13 @@ function canShell(): { outer: THREE.BufferGeometry; inner: THREE.BufferGeometry 
 /** Embase : collerette et bossage percés de deux trous (traversées de verre). */
 function baseMetal(): THREE.BufferGeometry {
   const holes = [-PIN_X, PIN_X].map((x) => circle(0.6, x));
-  const flange = perforatedBlock(rrect(11.4 * MM, 4.95 * MM, 2.46 * MM, 0, 0, 6), holes, Y0 * MM, 0.3 * MM, 0.04 * MM);
+  const flange = perforatedBlock(
+    rrect(11.4 * MM, 4.95 * MM, 2.46 * MM, 0, 0, 6),
+    holes,
+    Y0 * MM,
+    0.3 * MM,
+    0.04 * MM,
+  );
   const boss = perforatedBlock(
     rrect(10.55 * MM, 4.1 * MM, 2.04 * MM, 0, 0, 6),
     holes,
@@ -186,13 +192,14 @@ function electrodes(): THREE.BufferGeometry {
       rb: 0.0012 * MM,
       y0: (BLANK.y0 + 0.33) * MM,
     }).translate(0, 0, z);
-    // Languette : face +Z vers +X (support de la broche 2), face −Z vers −X (broche 1).
-    const tab = roundedBox(1.75 * MM, t * MM, 0.45 * MM, {
+    // Languette : face +Z vers +X (support de la broche 2), face −Z vers −X (broche 1) ; elle
+    // s'arrête à 0,1 mm du bout de la lame, sous la colle du support.
+    const tab = roundedBox(1.5 * MM, t * MM, 0.45 * MM, {
       r: 0.0012 * MM,
       rt: 0.0012 * MM,
       rb: 0.0012 * MM,
       y0: (BLANK.y0 + 0.55) * MM,
-    }).translate(s * (2.2 + 0.85) * MM, 0, z);
+    }).translate(s * (2.2 + 0.75) * MM, 0, z);
     parts.push(pad, tab);
   }
   return mergeAll(parts);
@@ -319,7 +326,8 @@ export function crystalInternalParts(): PartDef<UnoParams>[] {
       options: { pivot: [0, BLANK.y0 * MM, 0], anchor: [0, (BLANK.y0 + BLANK.h / 2) * MM, 0] },
       info: {
         role: 'Le résonateur : sous tension alternative, la lame vibre en cisaillement d’épaisseur (effet piézoélectrique) et impose sa fréquence de 16 MHz à l’oscillateur de l’ATmega16U2.',
-        material: 'Quartz synthétique (SiO₂) taillé AT (≈ 35° 15′ de l’axe optique) ; électrodes d’argent de ≈ 0,1 µm',
+        material:
+          'Quartz synthétique (SiO₂) taillé AT (≈ 35° 15′ de l’axe optique) ; électrodes d’argent de ≈ 0,1 µm',
         dimensions: `${BLANK.w.toString().replace('.', ',')} × ${BLANK.h.toString().replace('.', ',')} × 0,104 mm (typique) ; électrodes 4,4 × 1,25 mm`,
         reference: '16,000 MHz fondamental, ± 30 ppm (typique)',
         tip: 'La fréquence est fixée par l’épaisseur : 1,661 mm·MHz ÷ 16 MHz ≈ 0,104 mm. On l’ajuste en fin de fabrication en ajoutant quelques nanomètres d’argent sur l’électrode (ce qui abaisse la fréquence).',
@@ -332,7 +340,8 @@ export function crystalInternalParts(): PartDef<UnoParams>[] {
         axis: [0, 1, 0],
         distance: 0.01,
         destructive: true,
-        gesture: 'Saisir la lame par ses bords aux brucelles et la dégager des fourches (la colle conductrice cède).',
+        gesture:
+          'Saisir la lame par ses bords aux brucelles et la dégager des fourches (la colle conductrice cède).',
       },
       explode: { direction: [0, 1, 0], distance: 0.005 },
       labelPriority: 5,
@@ -363,7 +372,8 @@ export function crystalInternalParts(): PartDef<UnoParams>[] {
       },
       info: {
         role: 'Enceinte étanche remplie d’azote sec : protège la lame de l’humidité et de la poussière, qui en modifieraient la fréquence.',
-        material: 'Acier embouti nickelé de 0,15 mm, soudé par résistance sur la collerette ; marquage à l’encre',
+        material:
+          'Acier embouti nickelé de 0,15 mm, soudé par résistance sur la collerette ; marquage à l’encre',
         dimensions: 'HC-49/S : 11,05 × 4,65 × 3,5 mm (capot), collerette 11,4 × 4,95 mm',
         tip: 'Ne jamais chauffer le capot au dessoudage : la lame, épaisse d’un dixième de millimètre, se décolle ou se fêle au choc thermique.',
       },
@@ -373,7 +383,8 @@ export function crystalInternalParts(): PartDef<UnoParams>[] {
         axis: [0, 1, 0],
         distance: 0.012,
         destructive: true,
-        gesture: 'Pincer et rompre la soudure de la collerette à la pince coupante tout autour, puis soulever le capot.',
+        gesture:
+          'Pincer et rompre la soudure de la collerette à la pince coupante tout autour, puis soulever le capot.',
       },
       explode: { direction: [0, 1, 0], distance: 0.009 },
       labelPriority: 4,

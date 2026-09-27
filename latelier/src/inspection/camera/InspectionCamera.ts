@@ -26,8 +26,10 @@ import {
   damp,
   distanceInsideBox,
   effectiveMinSurfaceDistance,
+  boxCorners,
   fitDistance,
   fitDistanceInArea,
+  fitPointsDistanceInArea,
   freeViewArea,
   isClick,
   lerpLog,
@@ -66,10 +68,15 @@ export interface InspectionCameraOptions {
   safeInsets?: () => ScreenInsets | null;
 }
 
-/** Sphère à faire tenir dans la zone libre (recadrage si la zone change pendant la transition). */
+/**
+ * Cadrage à faire tenir dans la zone libre (recalculé si la zone change) : points englobants
+ * (cadrage serré de leur projection) ou, à défaut, sphère de rayon `radius`.
+ */
 interface FitRequest {
   radius: number;
   margin: number;
+  /** Points monde (coins de boîte) ou null (sphère). */
+  points: THREE.Vector3[] | null;
 }
 
 /** État orbital. */
@@ -126,6 +133,14 @@ const MAX_DISTANCE = 2.2;
 const CLEARANCE_SEARCH = 0.08;
 /** Raideur du suivi du décalage du point principal (1/s). */
 const OFFSET_RATE = 10;
+/**
+ * Marges des cadrages serrés (projection des coins de boîte) : vue initiale et cadrage d'une
+ * pièce ou de sa course (F, pas à pas, vue rangée). 1 = bord à bord de la zone libre.
+ */
+const HOME_POINTS_MARGIN = 1.12;
+const FRAME_POINTS_MARGIN = 1.18;
+/** Écart relatif de distance de cadrage au-delà duquel la zone libre est considérée changée. */
+const REFIT_TOLERANCE = 0.01;
 
 const _offset = new THREE.Vector3();
 const _pos = new THREE.Vector3();
@@ -140,6 +155,7 @@ const _ray = new THREE.Ray();
 const _plane = new THREE.Plane();
 const _sphere = new THREE.Sphere();
 const _corner = new THREE.Vector3();
+const _fitDirection = new THREE.Vector3();
 const _Y = new THREE.Vector3(0, 1, 0);
 const _angles = { azimuth: 0, elevation: 0 };
 
@@ -188,6 +204,12 @@ export class InspectionCamera implements InspectionCameraController {
   private snapOffset = false;
   /** Vue initiale exprimée comme un cadrage (recalculée pour la zone libre). */
   private homeFit: FitRequest | null = null;
+  /**
+   * Dernier cadrage automatique encore en vigueur (aucune action de l'utilisateur depuis son
+   * arrivée) : si la zone libre change ensuite (panneau replié ou ouvert, fiche d'étape plus
+   * haute, fenêtre redimensionnée), la distance suit pour que l'objet remplisse la zone.
+   */
+  private framing: { fit: FitRequest; fitDistance: number } | null = null;
   private readonly probeHit: ProbeHit = { distance: 0, backFace: false };
   private readonly disposers: (() => void)[] = [];
 
@@ -249,15 +271,23 @@ export class InspectionCamera implements InspectionCameraController {
     this.orbitVelocity.set(0, 0);
     this.panVelocity.set(0, 0, 0);
     this.o.camera.fov = this.o.fov;
-    // Vue initiale : cadrage de la sphère fournie, marge implicite de `distance` conservée.
+    // Vue initiale : cadrage serré des points englobants fournis ; à défaut, cadrage de la
+    // sphère fournie (marge implicite de `distance` conservée).
     const camera = this.o.camera;
-    this.homeFit =
-      view.radius !== undefined && view.radius > 0 && !view.instant
-        ? {
-            radius: view.radius,
-            margin: view.distance / fitDistance(view.radius, this.o.fov, camera.aspect, 1),
-          }
-        : null;
+    this.framing = null;
+    this.homeFit = null;
+    if (!view.instant && view.hull && view.hull.length > 0)
+      this.homeFit = {
+        radius: view.radius ?? 0,
+        margin: HOME_POINTS_MARGIN,
+        points: view.hull.map((p) => p.clone()),
+      };
+    else if (!view.instant && view.radius !== undefined && view.radius > 0)
+      this.homeFit = {
+        radius: view.radius,
+        margin: view.distance / fitDistance(view.radius, this.o.fov, camera.aspect, 1),
+        points: null,
+      };
     this.measureArea();
     if (view.instant) this.snapOffset = true;
     // État de départ : pose actuelle de la caméra (fin de la transition vers l'établi).
@@ -266,7 +296,7 @@ export class InspectionCamera implements InspectionCameraController {
     copyState(this.current, this.lastValid);
     const to = copyState(this.home, newState());
     let fitted = to.distance;
-    if (this.homeFit) fitted = to.distance = this.fitInArea(this.homeFit);
+    if (this.homeFit) fitted = to.distance = this.fitInArea(this.homeFit, to);
     to.distance = this.resolveDistance(to.target, to.azimuth, to.elevation, to.distance);
     if (view.instant) {
       copyState(to, this.current);
@@ -283,6 +313,7 @@ export class InspectionCamera implements InspectionCameraController {
   deactivate(): void {
     this.isActive = false;
     this.flight = null;
+    this.framing = null;
     this.endDrag();
     this.orbitVelocity.set(0, 0);
     this.panVelocity.set(0, 0, 0);
@@ -297,10 +328,14 @@ export class InspectionCamera implements InspectionCameraController {
   frameBox(box: THREE.Box3): void {
     if (!this.isActive || box.isEmpty()) return;
     box.getBoundingSphere(_sphere);
-    const fit: FitRequest = { radius: _sphere.radius, margin: 1.3 };
+    const fit: FitRequest = {
+      radius: _sphere.radius,
+      margin: FRAME_POINTS_MARGIN,
+      points: boxCorners(box, null, []),
+    };
     const to = copyState(this.goal, newState());
     to.target.copy(_sphere.center);
-    const fitted = this.fitInArea(fit);
+    const fitted = this.fitInArea(fit, to);
     to.distance = this.resolveDistance(to.target, to.azimuth, to.elevation, fitted);
     this.startFlight(to, FRAME_SECONDS, fit, fitted);
   }
@@ -308,7 +343,7 @@ export class InspectionCamera implements InspectionCameraController {
   resetView(): void {
     if (!this.isActive) return;
     const to = copyState(this.home, newState());
-    const fitted = this.homeFit ? this.fitInArea(this.homeFit) : to.distance;
+    const fitted = this.homeFit ? this.fitInArea(this.homeFit, to) : to.distance;
     to.distance = this.resolveDistance(to.target, to.azimuth, to.elevation, fitted);
     this.startFlight(to, RESET_SECONDS, this.homeFit, fitted);
   }
@@ -319,8 +354,8 @@ export class InspectionCamera implements InspectionCameraController {
    */
   focusOn(center: THREE.Vector3, radius: number): void {
     if (!this.isActive) return;
-    const fit = this.fitInArea({ radius, margin: 1 });
     const to = copyState(this.goal, newState());
+    const fit = this.fitInArea({ radius, margin: 1, points: null }, to);
     to.target.copy(center);
     to.distance = THREE.MathUtils.clamp(this.goal.distance, fit * 1.2, fit * 4);
     to.distance = Math.max(to.distance, this.minSurfaceDistance * 2);
@@ -339,6 +374,7 @@ export class InspectionCamera implements InspectionCameraController {
     copyState(s, this.goal);
     copyState(s, this.lastValid);
     this.flight = null;
+    this.framing = null;
     this.sceneDirty = true;
     this.lastPosition.set(Infinity, Infinity, Infinity);
     this.writeCamera();
@@ -354,8 +390,8 @@ export class InspectionCamera implements InspectionCameraController {
       if (f.fit) {
         // La zone libre a changé pendant la transition (panneaux de l'interface qui apparaissent) :
         // la destination est recadrée.
-        const fitted = this.fitInArea(f.fit);
-        if (Math.abs(fitted - f.fitDistance) > f.fitDistance * 0.01) {
+        const fitted = this.fitInArea(f.fit, f.to);
+        if (Math.abs(fitted - f.fitDistance) > f.fitDistance * REFIT_TOLERANCE) {
           f.fitDistance = fitted;
           f.to.distance = this.resolveDistance(f.to.target, f.to.azimuth, f.to.elevation, fitted);
           this.flightDistanceFloor = f.to.distance;
@@ -365,10 +401,14 @@ export class InspectionCamera implements InspectionCameraController {
       const t = easeInOutCubic(f.elapsed / f.duration);
       interpolateState(f.from, f.to, t, cur);
       copyState(cur, goal);
-      if (f.elapsed >= f.duration) this.flight = null;
+      if (f.elapsed >= f.duration) {
+        this.flight = null;
+        this.framing = f.fit ? { fit: f.fit, fitDistance: f.fitDistance } : null;
+      }
       // Transition automatique : sa destination a été validée, le trajet n'est pas bloqué.
       checkGeometry = false;
     } else {
+      this.followFreeArea();
       this.applyInertia(dt);
       const k = damp(SMOOTHING, dt);
       cur.target.lerp(goal.target, k);
@@ -503,6 +543,7 @@ export class InspectionCamera implements InspectionCameraController {
     fitDistance = 0,
   ): void {
     this.flightDistanceFloor = to.distance;
+    this.framing = null;
     this.flight = { from: copyState(this.current, newState()), to, elapsed: 0, duration, fit, fitDistance };
     this.orbitVelocity.set(0, 0);
     this.panVelocity.set(0, 0, 0);
@@ -533,17 +574,44 @@ export class InspectionCamera implements InspectionCameraController {
     principalOffset(width, height, this.area, this.offsetGoal);
   }
 
-  /** Distance de cadrage d'une sphère dans la zone libre. */
-  private fitInArea(fit: FitRequest): number {
-    const d = fitDistanceInArea(
-      fit.radius,
-      this.o.fov,
-      Math.max(1, this.o.canvas.clientHeight),
-      this.area.width,
-      this.area.height,
-      fit.margin,
-    );
+  /**
+   * Distance de cadrage dans la zone libre, pour la cible et l'orientation de `s` : projection
+   * des points englobants si fournis, sinon sphère.
+   */
+  private fitInArea(fit: FitRequest, s: OrbitState): number {
+    const height = Math.max(1, this.o.canvas.clientHeight);
+    let d: number;
+    if (fit.points) {
+      orbitOffset(s.azimuth, s.elevation, 1, _fitDirection);
+      d = fitPointsDistanceInArea(
+        fit.points,
+        s.target,
+        _fitDirection,
+        this.o.fov,
+        height,
+        this.area.width,
+        this.area.height,
+        fit.margin,
+      );
+    } else {
+      d = fitDistanceInArea(fit.radius, this.o.fov, height, this.area.width, this.area.height, fit.margin);
+    }
     return Math.max(this.minSurfaceDistance * 2, d);
+  }
+
+  /**
+   * Cadrage automatique toujours en vigueur : la distance suit la zone libre (amortie par le
+   * lissage de l'état courant). Toute action de l'utilisateur y met fin.
+   */
+  private followFreeArea(): void {
+    const framing = this.framing;
+    if (!framing) return;
+    const goal = this.goal;
+    const fitted = this.fitInArea(framing.fit, goal);
+    if (Math.abs(fitted - framing.fitDistance) <= framing.fitDistance * REFIT_TOLERANCE) return;
+    framing.fitDistance = fitted;
+    goal.distance = this.resolveDistance(goal.target, goal.azimuth, goal.elevation, fitted);
+    this.flightDistanceFloor = goal.distance;
   }
 
   /**
@@ -712,6 +780,7 @@ export class InspectionCamera implements InspectionCameraController {
     d.lastTime = now;
     if (!d.moved && !isClick(e.clientX - d.startX, e.clientY - d.startY, 0)) {
       d.moved = true;
+      this.framing = null;
       // L'utilisateur reprend la main : transition interrompue à la pose courante.
       if (this.flight) {
         this.flight = null;
@@ -777,6 +846,7 @@ export class InspectionCamera implements InspectionCameraController {
     e.preventDefault();
     const factor = wheelZoomFactor(e.deltaY, e.deltaMode);
     if (factor === 1) return;
+    this.framing = null;
     if (this.flight) {
       this.flight = null;
       copyState(this.current, this.goal);

@@ -21,8 +21,10 @@ import { InspectionCamera } from '../src/inspection/camera/InspectionCamera';
 import type { CameraPointerListener } from '../src/inspection/camera/types';
 import {
   NEAR_MIN_REVERSED,
+  boxCorners,
   fitDistance,
   fitDistanceInArea,
+  fitPointsDistanceInArea,
   freeViewArea,
   principalOffset,
 } from '../src/inspection/camera/orbitMath';
@@ -480,6 +482,80 @@ describe('caméra d’inspection — zone libre (panneaux de l’interface)', ()
     frames(120);
     expect(cam.view === null || !cam.view.enabled).toBe(true);
     offsetCamera.dispose();
+  });
+
+  it('cadrage serré (coins de boîte) : l’objet remplit la zone libre et suit ses changements', () => {
+    // Fonction pure : un point de la boîte touche le bord de la zone (marge 1), aucun ne la dépasse.
+    const target = sphere.center.clone();
+    const direction = new THREE.Vector3(0.25, 0.9, 1).normalize();
+    const corners = boxCorners(bounds, null, []);
+    const d = fitPointsDistanceInArea(corners, target, direction, FOV, HEIGHT, 640, 440, 1);
+    // Plus proche que la sphère englobante (même marge) : la forme réelle est prise en compte.
+    expect(d).toBeLessThan(fitDistanceInArea(sphere.radius, FOV, HEIGHT, 640, 440, 1));
+    const cam = new THREE.PerspectiveCamera(FOV, WIDTH / HEIGHT, 0.001, 60);
+    cam.position.copy(target).addScaledVector(direction, d);
+    cam.lookAt(target);
+    cam.updateMatrixWorld();
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(FOV) / 2);
+    let maxX = 0;
+    let maxY = 0;
+    for (const c of corners) {
+      const v = c.clone().applyMatrix4(cam.matrixWorldInverse);
+      // Demi-extensions projetées en px, rapportées aux demi-dimensions de la zone.
+      maxX = Math.max(maxX, ((Math.abs(v.x / -v.z) / tanHalf) * (HEIGHT / 2)) / 320);
+      maxY = Math.max(maxY, ((Math.abs(v.y / -v.z) / tanHalf) * (HEIGHT / 2)) / 220);
+    }
+    expect(Math.max(maxX, maxY)).toBeCloseTo(1, 6);
+
+    // Caméra : vue initiale cadrée sur les coins, puis panneau replié (zone élargie) → rapproché.
+    const view = new THREE.PerspectiveCamera(FOV, WIDTH / HEIGHT, 0.02, 60);
+    view.position.set(MAT.center[0], MAT.center[1] + 0.32, MAT.center[2] + 0.42);
+    view.lookAt(new THREE.Vector3(...MAT.center));
+    view.updateMatrixWorld();
+    let published = insets;
+    const tightCanvas = new FakeCanvas();
+    const tight = new InspectionCamera({
+      camera: view,
+      canvas: tightCanvas as unknown as HTMLCanvasElement,
+      query: () => picker,
+      floorY: FLOOR_Y,
+      roomBounds,
+      reversedDepth: true,
+      fov: FOV,
+      safeInsets: () => published,
+    });
+    tight.objectCenter.copy(sphere.center);
+    tight.objectRadius = sphere.radius;
+    tight.activate({
+      target: target.clone(),
+      direction,
+      distance: fitDistance(sphere.radius, FOV, WIDTH / HEIGHT, 1.4),
+      radius: sphere.radius,
+      hull: corners,
+      minDistance: MIN_SURFACE,
+    });
+    const frames = (n: number): void => {
+      for (let i = 0; i < n; i++) {
+        tight.update(1 / 60);
+        tight.updateViewOffset(1 / 60);
+      }
+    };
+    frames(90);
+    const home = tight.distance;
+    expect(home).toBeLessThan(fitDistanceInArea(sphere.radius, FOV, HEIGHT, 640, 440, 1.4));
+    // Panneaux repliés, fiche d'étape réduite : la zone libre s'agrandit, la vue initiale
+    // (intacte) se rapproche.
+    published = { left: 0, top: 60, right: 0, bottom: 90 };
+    frames(90);
+    expect(tight.distance).toBeLessThan(home * 0.99);
+    // Après une action de l'utilisateur (molette), la distance n'est plus imposée.
+    tightCanvas.dispatch('wheel', { clientX: 700, clientY: 300, deltaY: 100 });
+    frames(40);
+    const zoomed = tight.distance;
+    published = insets;
+    frames(60);
+    expect(tight.distance).toBeCloseTo(zoomed, 6);
+    tight.dispose();
   });
 });
 

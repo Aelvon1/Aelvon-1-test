@@ -31,7 +31,7 @@ import { mergeParams, partQuantity } from '../objects/resolve';
 import { INSPECTION_VIEW } from '../world/layout';
 import type { World } from '../world/World';
 import { Assembly } from './Assembly';
-import { fitDistance } from './camera/orbitMath';
+import { boxCorners, fitDistance } from './camera/orbitMath';
 import type { InspectionCameraController } from './camera/types';
 import { DetailManager } from './detail';
 import { dropHeight } from './easing';
@@ -43,7 +43,7 @@ import { Sequencer, type SequencerCommand } from './Sequencer';
 import { noopToolPresenter, type ToolPresenter } from './tools/presenter';
 import { toolDisplay } from './tools/registry';
 import { createInspectionToolPresenter } from './tools/inspectionTools';
-import { InspectionView } from './view/InspectionView';
+import { InspectionView, objectLocalBounds } from './view/InspectionView';
 
 type AnyDef = ObjectDef<ObjectParams>;
 
@@ -434,7 +434,11 @@ export class Inspection {
       .applyQuaternion(assembly.root.quaternion);
     const camera = this.ctx.engine.camera;
     let distance = fitDistance(sphere.radius, INSPECTION_VIEW.fov, camera.aspect, 1.4);
-    const target = sphere.center.clone();
+    // Coins de la boîte de l'objet dans son propre repère (plus serrée que la boîte alignée monde
+    // d'un objet tourné) : cadrage serré de la vue initiale dans la zone libre, visée au centre.
+    assembly.root.updateWorldMatrix(true, false);
+    const hull = boxCorners(objectLocalBounds(assembly, _box2), assembly.root.matrixWorld, []);
+    const target = _box2.getCenter(new THREE.Vector3()).applyMatrix4(assembly.root.matrixWorld);
     const view = this.ctx.dev.view;
     let instant = false;
     if (!this.devApplied && view && view.length >= 3) {
@@ -443,7 +447,6 @@ export class Inspection {
       // `?viewtarget=x,y,z` : cible dans le repère de l'objet (captures macro reproductibles).
       const vt = (this.ctx.dev.raw.get('viewtarget') ?? '').split(',').map(Number);
       if (vt.length === 3 && vt.every(Number.isFinite)) {
-        assembly.root.updateWorldMatrix(true, false);
         target.set(vt[0]!, vt[1]!, vt[2]!).applyMatrix4(assembly.root.matrixWorld);
       }
       instant = true;
@@ -454,6 +457,7 @@ export class Inspection {
       distance,
       // Rayon cadré : la vue initiale est recadrée dans la zone libre de l'écran (panneaux).
       radius: sphere.radius,
+      hull,
       minDistance: pres?.minSurfaceDistance ?? 0.002,
       instant,
     });

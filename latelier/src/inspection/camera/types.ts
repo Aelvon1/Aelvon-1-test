@@ -32,6 +32,12 @@ export interface InspectionViewPose {
    * change, en conservant la marge implicite de `distance`.
    */
   radius?: number;
+  /**
+   * Points monde englobant l'objet (coins de sa boîte, repère de l'objet). Fournis, la vue
+   * initiale est un cadrage SERRÉ de leur projection dans la zone libre (prioritaire sur
+   * `radius`, dont la sphère laisse beaucoup de vide autour d'un objet allongé).
+   */
+  hull?: readonly THREE.Vector3[];
   /** Placement immédiat, sans transition (captures reproductibles). */
   instant?: boolean;
 }

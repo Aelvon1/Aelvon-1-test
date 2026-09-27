@@ -1,11 +1,13 @@
 /**
  * Niveau 3 (intérieurs des composants clés) : outils communs de construction.
  *
- * Chaque composant clé est un sous-ensemble retirable (nœud placé par translation seule sur son
- * empreinte, voir `components/common.ts`). Ses pièces internes sont des ENFANTS de ce
- * sous-ensemble : la règle implicite du parent impose donc d'avoir d'abord retiré le composant de
- * la carte. Une pièce interne est construite dans le repère LOCAL du composant (mm → m, origine
- * au centre de l'empreinte sur le plan du cuivre, X/Z = axes de l'empreinte) :
+ * Chaque composant clé (`components/*.ts`) est un sous-ensemble retirable (`keyAssemblyPart`) :
+ * nœud placé par translation seule (jamais tourné) sur son empreinte, origine sur le plan du
+ * cuivre supérieur au centre de l'empreinte, porteur des joints de soudure et du geste de retrait
+ * de la carte. Ses pièces internes sont des ENFANTS de ce sous-ensemble : la règle implicite du
+ * parent impose donc d'avoir d'abord retiré le composant de la carte. Une pièce interne est
+ * construite dans le repère LOCAL du composant (mm → m, origine au centre de l'empreinte sur le
+ * plan du cuivre, X/Z = axes de l'empreinte) :
  * - nœud de la pièce = pivot (translation seule dans le repère du parent, jamais tourné : les
  *   axes de retrait et d'éclatement restent ceux de l'objet) ;
  * - groupe intérieur tourné de la rotation de l'empreinte et décalé pour que le pivot local
@@ -177,9 +179,9 @@ export interface KeyAssemblySpec {
 }
 
 /**
- * Sous-ensemble retirable d'un composant clé : mêmes conventions que `components/common.ts`
- * (nœud placé par translation seule, joints fondus au dessoudage), sans pièce extérieure
- * monolithique : ce sont les pièces internes qui constituent le composant.
+ * Sous-ensemble retirable d'un composant clé (nœud placé par translation seule, joints fondus
+ * au dessoudage), sans pièce extérieure monolithique : ce sont les pièces internes qui
+ * constituent le composant ; la pièce interne sans retrait en est la base.
  */
 export function keyAssemblyPart(spec: KeyAssemblySpec): PartDef<UnoParams> {
   const placement = () => [component(spec.ref)];

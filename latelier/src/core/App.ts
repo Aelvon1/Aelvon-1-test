@@ -33,6 +33,9 @@ import { TOOL_IDS } from '../inspection/tools/ids';
 import { mountUi } from '../ui/mount';
 import type { ObjectParams } from '../objects/types';
 
+/** Délai (ms) pendant lequel Échap ne quitte pas la pause qu'elle vient d'ouvrir. */
+const PAUSE_ESCAPE_GUARD_MS = 600;
+
 export class App {
   /** Contexte partagé (exposé pour le débogage). */
   ctx!: AppContext;
@@ -44,6 +47,8 @@ export class App {
   /** Phase d'où l'inventaire a été ouvert (pour y revenir à la fermeture). */
   private inventoryReturn: 'exploration' | 'inspection' = 'exploration';
   private busyTransition = false;
+  /** Instant de la dernière mise en pause (ms) : Échap ne reprend pas dans la foulée. */
+  private pausedAt = 0;
 
   private constructor(
     private readonly store: AppStore,
@@ -314,10 +319,7 @@ export class App {
         this.expectUnlock = false;
         return;
       }
-      if (machine.phase === 'exploration') {
-        this.player.setActive(false);
-        machine.go('paused');
-      }
+      if (machine.phase === 'exploration') this.pause();
     });
 
     // Clic sur le canvas en exploration sans verrouillage : reprise.
@@ -349,8 +351,28 @@ export class App {
         }
         if (phase === 'inventory') this.closeInventory(false);
         else if (phase === 'inspection') void this.exitInspection();
+        // Souris non capturée (refus du navigateur, « cliquer pour reprendre ») : Échap met
+        // quand même en pause. Capturée, la perte du verrouillage s'en charge.
+        else if (phase === 'exploration') this.pause();
+        // En pause : Échap reprend (pas dans la foulée de la touche qui a mis en pause, que le
+        // navigateur peut relayer après la perte du verrouillage).
+        else if (phase === 'paused' && performance.now() - this.pausedAt > PAUSE_ESCAPE_GUARD_MS)
+          bus.emit('app:resume');
       }
     });
+  }
+
+  /** Met l'exploration en pause (menu pause, souris libérée). */
+  private pause(): void {
+    const { machine, ctx } = this;
+    if (machine.phase !== 'exploration') return;
+    this.player.setActive(false);
+    if (ctx.input.pointerLocked) {
+      this.expectUnlock = true;
+      ctx.input.exitPointerLock();
+    }
+    this.pausedAt = performance.now();
+    machine.go('paused');
   }
 
   private enterExploration(requestLock: boolean): void {

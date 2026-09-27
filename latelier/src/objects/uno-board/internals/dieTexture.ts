@@ -111,7 +111,8 @@ export const dieGenerator: Generator<DieTextureParams> = ({ width, height, param
     const along = p.side === '-z' || p.side === '+z' ? p.x : p.z;
     // Cellule de 0,22 mm de large entre 0,17 et 0,33 mm du bord : transistors de protection
     // contre les décharges électrostatiques, en peigne.
-    for (let i = 0; i < 14; i++) sideRect(p.side, along - 0.11 + (i + 0.2) * (0.22 / 14), 0.006, 0.17, 0.16, 0.55);
+    for (let i = 0; i < 14; i++)
+      sideRect(p.side, along - 0.11 + (i + 0.2) * (0.22 / 14), 0.006, 0.17, 0.16, 0.55);
     // Liaison plot → cellule, puis cellule → cœur (piste de signal).
     sideRect(p.side, along - 0.012, 0.024, 0.12, 0.07, 0.9);
     sideRect(p.side, along - 0.004, 0.008, 0.33, inCore - 0.33 + 0.15, 0.5);
@@ -213,7 +214,8 @@ function drawBlock(
         // Décodeurs de lignes : colonne centrale de logique dense.
         const dx = x0 + aw;
         const dz = z0 + cy * (ah + amp);
-        for (let z = dz; z < dz + ah; z += pitchZ * 2) rect(dx + 0.006, z, dec - 0.012, pitchZ * 0.9, 0.25 + rand() * 0.25);
+        for (let z = dz; z < dz + ah; z += pitchZ * 2)
+          rect(dx + 0.006, z, dec - 0.012, pitchZ * 0.9, 0.25 + rand() * 0.25);
       }
       // Cadre du bloc (anneau d'alimentation local).
       rect(x0 - 0.008, z0 - 0.008, w + 0.016, 0.006, 0.9);

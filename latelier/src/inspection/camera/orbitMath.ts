@@ -140,6 +140,68 @@ export function fitDistanceInArea(
   return (Math.max(radius, 1e-4) * margin) / Math.sin(half);
 }
 
+const _fitRight = new THREE.Vector3();
+const _fitUp = new THREE.Vector3();
+const _fitRel = new THREE.Vector3();
+const _fitY = new THREE.Vector3(0, 1, 0);
+
+/**
+ * Distance de cadrage SERRÉE : distance cible → caméra pour que tous les `points` (monde : coins
+ * de la boîte englobante de l'objet) se projettent dans un rectangle `areaWidth` × `areaHeight`
+ * px centré sur la cible (point principal décalé au centre de la zone libre), pour une caméra qui
+ * vise `target` depuis la direction unitaire `direction` (cible → caméra, repère `lookAt` à Y
+ * vertical). `margin` = 1 : les points extrêmes touchent le bord de la zone.
+ *
+ * Contrairement à la sphère englobante (`fitDistanceInArea`), la forme réelle vue de cette
+ * direction est prise en compte : un objet allongé (moteur et son câble) remplit la zone libre.
+ */
+export function fitPointsDistanceInArea(
+  points: readonly THREE.Vector3[],
+  target: THREE.Vector3,
+  direction: THREE.Vector3,
+  fovDeg: number,
+  viewportHeight: number,
+  areaWidth: number,
+  areaHeight: number,
+  margin = 1.15,
+): number {
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(fovDeg) / 2);
+  const height = Math.max(1, viewportHeight);
+  // Tangentes des demi-champs de la zone libre (horizontal, vertical).
+  const kx = (tanHalf * Math.max(1, areaWidth)) / height;
+  const ky = (tanHalf * Math.max(1, areaHeight)) / height;
+  // Repère de la caméra : droite = Y × direction, haut = direction × droite.
+  _fitRight.crossVectors(_fitY, direction);
+  if (_fitRight.lengthSq() < 1e-12) _fitRight.set(1, 0, 0);
+  else _fitRight.normalize();
+  _fitUp.crossVectors(direction, _fitRight);
+  let distance = 0;
+  for (const p of points) {
+    _fitRel.subVectors(p, target);
+    const x = Math.abs(_fitRel.dot(_fitRight));
+    const y = Math.abs(_fitRel.dot(_fitUp));
+    // Profondeur du point vue de la caméra : distance − z (z > 0 : côté caméra).
+    const z = _fitRel.dot(direction);
+    distance = Math.max(distance, (x * margin) / kx + z, (y * margin) / ky + z);
+  }
+  return distance;
+}
+
+/** Les 8 coins d'une boîte, transformés par `matrix` (repère local → monde), écrits dans `out`. */
+export function boxCorners(
+  box: THREE.Box3,
+  matrix: THREE.Matrix4 | null,
+  out: THREE.Vector3[],
+): THREE.Vector3[] {
+  for (let k = 0; k < 8; k++) {
+    const p = out[k] ?? (out[k] = new THREE.Vector3());
+    p.set(k & 1 ? box.max.x : box.min.x, k & 2 ? box.max.y : box.min.y, k & 4 ? box.max.z : box.min.z);
+    if (matrix) p.applyMatrix4(matrix);
+  }
+  out.length = 8;
+  return out;
+}
+
 /**
  * Décalage du point principal (px, convention `PerspectiveCamera.setViewOffset`) qui amène le
  * centre de l'image (la cible de l'orbite) au centre de la zone libre.

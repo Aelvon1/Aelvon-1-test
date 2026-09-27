@@ -104,7 +104,9 @@ function resinMaterial(marking: { id: string; quality: Quality } | null): Materi
     const filler = smoothstep(0.34, 0.22, cells);
     const cut = mix(color(0x2c2c30), color(0x8f8e88), filler);
     // Marquage laser éventuel : R = gravure (plus claire, plus mate), G = zones polies.
-    const mark = marking ? texture(ctx.textures.get(markingRequest(marking.id, marking.quality)), uv()) : null;
+    const mark = marking
+      ? texture(ctx.textures.get(markingRequest(marking.id, marking.quality)), uv())
+      : null;
     const front = mark ? mix(rgb(0x151517), rgb(0x6a6b6e), mark.r) : rgb(0x151517);
     const roughFront = mark ? mix(float(0.55), float(0.85), mark.r) : float(0.62);
     const gloss = mark ? mix(float(1), float(0.5), mark.g) : float(1);

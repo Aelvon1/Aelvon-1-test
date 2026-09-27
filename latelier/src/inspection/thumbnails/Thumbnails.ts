@@ -51,6 +51,13 @@ export class Thumbnails {
   private readonly deferred = new Set<string>();
   private readonly done = new Set<string>();
   private running = false;
+  /**
+   * Objet en cours de rendu (sorti de la file) : une seconde demande pendant son rendu (effet
+   * React rejoué, réouverture de l'inventaire) ne doit pas le remettre en file, sinon il est
+   * reconstruit une seconde fois et sa portée de matériaux reste enregistrée pendant les
+   * inspections suivantes (et libérée sous leurs pieds à la fin de ce rendu superflu).
+   */
+  private current: string | null = null;
   private disposed = false;
   private waiters: (() => void)[] = [];
   private readonly scene = new THREE.Scene();
@@ -70,7 +77,14 @@ export class Thumbnails {
   request(objectIds: readonly string[]): void {
     const existing = this.o.ctx.store.getState().inventory.thumbnails;
     for (const id of objectIds) {
-      if (existing[id] || this.done.has(id) || this.queue.includes(id) || this.deferred.has(id)) continue;
+      if (
+        existing[id] ||
+        this.done.has(id) ||
+        this.current === id ||
+        this.queue.includes(id) ||
+        this.deferred.has(id)
+      )
+        continue;
       this.queue.push(id);
     }
     if (!this.running && this.queue.length > 0) void this.run();
@@ -105,6 +119,7 @@ export class Thumbnails {
           this.deferred.add(id);
           continue;
         }
+        this.current = id;
         try {
           const result = await this.renderObject(id);
           if (result === 'deferred') this.deferred.add(id);
@@ -112,6 +127,8 @@ export class Thumbnails {
         } catch (error) {
           console.warn(`[Miniatures] « ${id} » : rendu impossible.`, error);
           this.done.add(id);
+        } finally {
+          this.current = null;
         }
         await this.frame();
       }

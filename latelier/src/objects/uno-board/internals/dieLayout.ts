@@ -249,7 +249,8 @@ export function bondPads(): BondPad[] {
     for (const x of [...LONG_PADS.map((v) => -v), ...LONG_PADS])
       add(sz === 1 ? '+z' : '-z', x, sz * H, spare[`${Math.sign(x)},${sz}`] ?? 'NC');
   for (const sx of [1, -1] as const)
-    for (const z of [...SHORT_PADS.map((v) => -v), ...SHORT_PADS]) add(sx === 1 ? '+x' : '-x', sx * H, z, 'NC');
+    for (const z of [...SHORT_PADS.map((v) => -v), ...SHORT_PADS])
+      add(sx === 1 ? '+x' : '-x', sx * H, z, 'NC');
   return pads;
 }
 
@@ -268,7 +269,13 @@ export function bondWires(): BondWire[] {
   return fingers().map((f) => {
     const dx = f.stitch[0] - f.pad[0];
     const dz = f.stitch[1] - f.pad[1];
-    return { pin: f.pin, pad: f.pad, stitch: f.stitch, span: Math.hypot(dx, dz), heading: Math.atan2(-dz, dx) };
+    return {
+      pin: f.pin,
+      pad: f.pad,
+      stitch: f.stitch,
+      span: Math.hypot(dx, dz),
+      heading: Math.atan2(-dz, dx),
+    };
   });
 }
 
@@ -337,7 +344,8 @@ export function leadframeClearance(): number {
   };
   for (let i = 0; i < list.length; i++) {
     const a = inner(list[i]!.path);
-    for (let j = i + 1; j < list.length; j++) min = Math.min(min, polyDist(a, inner(list[j]!.path)) - 2 * half);
+    for (let j = i + 1; j < list.length; j++)
+      min = Math.min(min, polyDist(a, inner(list[j]!.path)) - 2 * half);
     for (const bar of tieBars()) min = Math.min(min, polyDist(a, bar) - half - LEADFRAME.tieBar / 2);
     // Îlot : distance du doigt au carré de l'îlot.
     const P = LEADFRAME.paddle / 2;

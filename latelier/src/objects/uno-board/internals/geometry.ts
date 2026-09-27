@@ -31,10 +31,15 @@ function makeGeometry(pos: number[], nor: number[], uv: number[], index: number[
   return g;
 }
 
-/** Fusion (les géométries sources sont libérées). */
+/**
+ * Fusion (les géométries sources sont libérées). Géométries indexées et non indexées mêlées
+ * (extrusions) : les indexées sont d'abord dépliées.
+ */
 export function mergeAll(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const merged = mergeGeometries(list, false);
-  for (const g of list) g.dispose();
+  const mixed = list.some((g) => g.index) && list.some((g) => !g.index);
+  const sources = mixed ? list.map((g) => (g.index ? g.toNonIndexed() : g)) : list;
+  const merged = mergeGeometries(sources, false);
+  for (const g of new Set([...list, ...sources])) g.dispose();
   if (!merged) throw new Error('mergeAll : fusion impossible (attributs différents).');
   return merged;
 }
