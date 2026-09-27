@@ -9,7 +9,7 @@
  * Les matériaux de vue sont marqués `shared` : `disposeObjectTree` ne les libère jamais, ce
  * module s'en charge.
  */
-import * as THREE from 'three/webgpu';
+import type * as THREE from 'three/webgpu';
 import type { Assembly } from '../Assembly';
 import type { PoseComposer } from '../poses';
 import { createSectionCapVariant, createXrayMaterial, supportsSectionCap } from './viewMaterials';

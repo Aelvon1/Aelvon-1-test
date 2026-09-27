@@ -392,7 +392,7 @@ export const COMPONENTS: readonly ComponentPlacement[] = [
     value: '1 µF',
     block: 'usb',
     nets: pins('UCAP', GND),
-    refAt: [0, 1.2],
+    refAt: [0, -1.2],
   },
   {
     ref: 'C10',
@@ -785,4 +785,3 @@ export const SILK_TEXTS: readonly SilkText[] = [
   { text: 'ANALOG IN', x: 57.15, y: 7.1, size: 1.0, bold: true, align: 'center', face: 'bottom' },
   { text: 'DIGITAL (PWM~)', x: 54.6, y: 43.9, size: 1.1, bold: true, align: 'center', face: 'bottom' },
 ];
-

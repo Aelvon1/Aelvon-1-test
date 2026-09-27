@@ -16,6 +16,9 @@
  * - chaque dôme agit comme une lentille : l'image extérieure y est vue INVERSÉE (décalage du
  *   rayon opposé au gradient du dôme), les bords sont assombris (réflexion interne) ;
  * - hors des gouttes et traînées, la vitre mouillée diffuse légèrement (flou angulaire plus fort).
+ * Approximation : la réfraction d'une goutte est un simple décalage angulaire du rayon
+ * proportionnel à la pente du dôme (pas de tracé optique) ; le flou de la vitre mouillée est un
+ * adoucissement des silhouettes proportionnel à la distance.
  * La normale perturbée est transmise au modèle d'éclairage : les reflets de l'ampoule et du néon
  * glissent sur les gouttes.
  */
@@ -165,7 +168,7 @@ export function exteriorColor(
   const puddles = smoothstep(0.66, 0.72, fbm2(gp.xz.mul(0.28), 3)).mul(0.5);
   const grass = mix(vec3(0.012, 0.022, 0.014), vec3(0.03, 0.028, 0.022), valueNoise2(gp.xz.mul(1.7)));
   const groundBase = mix(grass, SKY_HORIZON.mul(0.22), puddles);
-  const groundFog = float(1).sub(exp(groundT.mul(-0.03)));
+  const groundFog = float(1).sub(exp(groundT.mul(-0.018)));
   const ground = mix(groundBase, MIST, groundFog);
   color = select(groundT.lessThan(1e4), ground, color);
   // Rangées d'arbres, du fond vers l'avant.

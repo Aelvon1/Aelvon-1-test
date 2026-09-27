@@ -10,7 +10,7 @@ import { DEFAULT_PARAMS, type UnoParams } from './params';
 import { allParts } from './parts';
 import { artworkKey } from './pcb/artwork';
 import { artworkTexture, pcbMaterials } from './pcb/materials';
-import { computeRoutingAsync } from './pcb/routing';
+import { computeRouting } from './pcb/routing';
 import { STEPS } from './sequence';
 
 const def: ObjectDef<UnoParams> = {
@@ -37,9 +37,9 @@ const def: ObjectDef<UnoParams> = {
   removedPlacement: 'park',
   presentation: { rotationY: 0, viewDirection: [0.25, 0.8, 0.9], minSurfaceDistance: 0.0015 },
   prepare: async (ctx) => {
-    const routing = await computeRoutingAsync((v) => ctx.progress(v * 0.7, 'Routage des pistes…'));
-    ctx.shared.routing = routing;
-    ctx.progress(0.75, 'Illustration du circuit…');
+    // Routage précalculé (données de l'objet) : relu instantanément.
+    ctx.shared.routing = computeRouting();
+    ctx.progress(0.1, 'Illustration du circuit…');
     const keys: string[] = [];
     for (const face of ['top', 'bottom'] as const) {
       artworkTexture(ctx, face, ctx.quality);

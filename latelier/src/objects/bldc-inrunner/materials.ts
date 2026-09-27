@@ -8,7 +8,20 @@
  * Les UV de la frette sont exprimés en millimètres (u = circonférence, v = axe).
  */
 import * as THREE from 'three/webgpu';
-import { abs, float, floor, fract, mix, mod, mx_noise_float, positionLocal, pow, sin, uv, vec3 } from 'three/tsl';
+import {
+  abs,
+  float,
+  floor,
+  fract,
+  mix,
+  mod,
+  mx_noise_float,
+  positionLocal,
+  pow,
+  sin,
+  uv,
+  vec3,
+} from 'three/tsl';
 import type { MaterialFactory } from '../../materials/types';
 import { OBJECT_ID } from './params';
 

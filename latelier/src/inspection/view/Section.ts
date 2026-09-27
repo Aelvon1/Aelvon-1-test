@@ -31,7 +31,12 @@ const _size = new THREE.Vector3();
 const _center = new THREE.Vector3();
 
 /** Point de coupe (repère de l'objet) pour un axe et une position 0..1 sur les bornes. */
-export function sectionPointLocal(bounds: THREE.Box3, axis: SectionAxis, position: number, out: THREE.Vector3): THREE.Vector3 {
+export function sectionPointLocal(
+  bounds: THREE.Box3,
+  axis: SectionAxis,
+  position: number,
+  out: THREE.Vector3,
+): THREE.Vector3 {
   bounds.getCenter(out);
   const t = THREE.MathUtils.clamp(position, 0, 1);
   out[axis] = bounds.min[axis] + (bounds.max[axis] - bounds.min[axis]) * t;

@@ -3,7 +3,20 @@
  * chaud/froid, vignettage et grain animé. Fonctions TSL pures, sans état.
  */
 import type * as THREE from 'three/webgpu';
-import { clamp, float, hash, length, luminance, max, mix, screenCoordinate, smoothstep, uv, vec2, vec3 } from 'three/tsl';
+import {
+  clamp,
+  float,
+  hash,
+  length,
+  luminance,
+  max,
+  mix,
+  screenCoordinate,
+  smoothstep,
+  uv,
+  vec2,
+  vec3,
+} from 'three/tsl';
 
 type FloatNode = THREE.Node<'float'>;
 type Vec3Node = THREE.Node<'vec3'>;
@@ -20,11 +33,16 @@ const SHADOW_LIFT: readonly [number, number, number] = [-0.002, 0.003, 0.009];
  */
 export function splitTone(color: Vec3Node, strength: FloatNode): Vec3Node {
   const luma = luminance(color);
-  const shadowWeight = float(1).sub(smoothstep(0.02, 0.42, luma)).mul(strength);
+  const shadowWeight = float(1)
+    .sub(smoothstep(0.02, 0.42, luma))
+    .mul(strength);
   const highlightWeight = smoothstep(0.45, 0.95, luma).mul(strength);
   const shadowTint = mix(vec3(1), vec3(...SHADOW_TINT), shadowWeight);
   const highlightTint = mix(vec3(1), vec3(...HIGHLIGHT_TINT), highlightWeight);
-  const toned = color.mul(shadowTint).mul(highlightTint).add(vec3(...SHADOW_LIFT).mul(shadowWeight));
+  const toned = color
+    .mul(shadowTint)
+    .mul(highlightTint)
+    .add(vec3(...SHADOW_LIFT).mul(shadowWeight));
   // Contraste doux autour du gris moyen d'affichage (AgX est volontairement plat).
   const contrasted = mix(vec3(0.46), toned, float(1).add(strength.mul(0.06)));
   return max(contrasted, vec3(0));
@@ -35,7 +53,9 @@ export function splitTone(color: Vec3Node, strength: FloatNode): Vec3Node {
  * Retourne le facteur multiplicatif (1 au centre).
  */
 export function vignetteFactor(aspect: FloatNode, strength: FloatNode): FloatNode {
-  const centered = uv().sub(0.5).mul(vec2(aspect.mul(0.78), 1));
+  const centered = uv()
+    .sub(0.5)
+    .mul(vec2(aspect.mul(0.78), 1));
   const d = length(centered);
   const falloff = smoothstep(0.32, 0.92, d);
   return float(1).sub(falloff.mul(falloff).mul(strength));

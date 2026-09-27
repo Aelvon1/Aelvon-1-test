@@ -203,4 +203,3 @@ export function buildSetScrew(ctx: Ctx): THREE.Object3D {
   o.position.set(p.setScrewX * MM, top * MM, 0);
   return o;
 }
-

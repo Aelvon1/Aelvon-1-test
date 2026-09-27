@@ -8,6 +8,8 @@
  *   fondu aux bords pour masquer le repli ;
  * - éclat : faisceau de la fenêtre (diffusion avant, plus brillant à contre-jour), ampoule,
  *   néon et cône de la lampe loupe ; presque invisible dans l'ombre ;
+ * - Approximation : l'éclairage des grains est analytique (aucune ombre : un grain derrière
+ *   l'établi reste éclairé par l'ampoule) ;
  * - taille physique 1,2–2,8 mm, bornée à ~1,5 px (l'intensité est réduite d'autant : pas de
  *   scintillement des grains lointains).
  */

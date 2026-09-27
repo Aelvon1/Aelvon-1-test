@@ -25,14 +25,22 @@ export function buildLaminations(ctx: Ctx): PartBuild {
   const d = dims(ctx);
   const st = d.stator;
   const geo = cachedGeometry(ctx, geoKey(ctx, 'lamination'), () => {
-    // Tôles nombreuses : tessellation sobre (quantité réelle × budget de triangles).
-    const maxStep = [0.7, 0.5, 0.36, 0.28][ctx.quality]!;
-    const inner = laminationInnerContour(st, maxStep, ctx.quality >= 3 ? 3 : 2);
-    const outer = circle(0, 0, st.Ro, segs(ctx, 96));
+    // Tôles nombreuses (quantité réelle) : budget de triangles fixe pour tout le paquet, réparti
+    // sur le nombre de tôles ; le chanfrein de découpe n'est gardé que s'il reste assez de budget.
+    const stackBudget = [90_000, 180_000, 300_000, 380_000][ctx.quality]!;
+    const perSheet = stackBudget / st.lamCount;
+    const chamfer = perSheet >= 5200;
+    const maxPoints = perSheet / (chamfer ? 8 : 4);
+    let inner = laminationInnerContour(st, 0.22, 3);
+    for (const step of [0.22, 0.28, 0.36, 0.48, 0.65, 0.9, 1.3]) {
+      inner = laminationInnerContour(st, step, step < 0.4 ? 3 : 2);
+      if (inner.length + 96 <= maxPoints) break;
+    }
+    const outer = circle(0, 0, st.Ro, Math.max(48, Math.min(128, Math.round(maxPoints - inner.length))));
     // Épaisseur visible légèrement inférieure au pas (revêtement isolant, jeu d'empilage).
     const t = st.lamPitch * 0.97;
     // Arête de découpe adoucie (chanfrein) : visible en macro sur les tôles épaisses.
-    const edge = st.lamCount <= 120 || ctx.quality >= 3 ? t * 0.07 : 0;
+    const edge = chamfer ? t * 0.07 : 0;
     const local = new MeshBuilder();
     extrude(local, outer, [inner], -t / 2, t / 2, {
       round0: edge,
@@ -235,6 +243,7 @@ class FreeStrand {
     pos.needsUpdate = true;
     nor.needsUpdate = true;
     this.geometry.setDrawRange(0, Math.max(0, count - 1) * this.radial * 6);
+    this.geometry.computeBoundingBox();
     this.geometry.computeBoundingSphere();
   }
 
@@ -287,7 +296,8 @@ export function buildPhase(ctx: Ctx, phase: 0 | 1 | 2): PartBuild {
   // Gaine tressée de la sortie (repère couleur de la phase) : du bornier au sommet des têtes de
   // bobines ; le bout dénudé qui traverse l'œillet de la languette reste nu.
   let sleeveStart = 0;
-  while (sleeveStart < wire.sleeveEnd - 2 && wire.centers[sleeveStart * 3]! < -d.half - 1.2 * d.s) sleeveStart++;
+  while (sleeveStart < wire.sleeveEnd - 2 && wire.centers[sleeveStart * 3]! < -d.half - 1.2 * d.s)
+    sleeveStart++;
   const sleeveSegments = Math.max(1, wire.sleeveEnd - sleeveStart);
   const sleeveGeoB = new MeshBuilder();
   const sleeveCount = sleeveSegments + 1;
@@ -317,7 +327,12 @@ export function buildPhase(ctx: Ctx, phase: 0 | 1 | 2): PartBuild {
     visible: wire.count,
     base: { mesh: base, perSegment: indicesPerSegment },
     detail: null,
-    sleeve: { mesh: sleeveMesh, perSegment: sleeveInfo.indicesPerSegment, start: sleeveStart, segments: sleeveSegments },
+    sleeve: {
+      mesh: sleeveMesh,
+      perSegment: sleeveInfo.indicesPerSegment,
+      start: sleeveStart,
+      segments: sleeveSegments,
+    },
     free,
   };
   ctx.shared[phaseKey(phase)] = state;
@@ -346,7 +361,7 @@ export function buildPhaseDetail(ctx: Ctx, phase: 0 | 1 | 2): THREE.Object3D {
   const L = layout(ctx);
   const wire = L.phases[phase]!;
   const mb = new MeshBuilder();
-  const radial = [4, 5, 6, 8][ctx.quality]!;
+  const radial = [5, 7, 8, 10][ctx.quality]!;
   const { indicesPerSegment } = strandTubes(mb, wire, L.strands, L.strandRadius * 0.96, radial);
   const m = mesh(mb.build(MM), ctx.materials.get(own(ENAMEL[phase])), 'strands');
   const state = ctx.shared[phaseKey(phase)] as PhaseState | undefined;

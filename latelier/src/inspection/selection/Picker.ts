@@ -229,6 +229,15 @@ export class Picker implements CameraSceneQuery {
     probe.material = material ?? mesh.material;
     const inst = entry.instanced;
     if (!inst) {
+      // Rejet rapide par la sphère englobante (évite l'inversion de matrice du BVH).
+      const g = mesh.geometry;
+      if (!g.boundingSphere) g.computeBoundingSphere();
+      if (g.boundingSphere) {
+        _sphere.copy(g.boundingSphere).applyMatrix4(mesh.matrixWorld);
+        if (!this.raycaster.ray.intersectsSphere(_sphere)) return;
+        if (this.raycaster.far < Infinity && _sphere.distanceToPoint(this.raycaster.ray.origin) > this.raycaster.far)
+          return;
+      }
       probe.matrixWorld.copy(mesh.matrixWorld);
       const before = this.hits.length;
       acceleratedRaycast.call(probe, this.raycaster, this.hits);

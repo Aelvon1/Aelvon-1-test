@@ -136,7 +136,10 @@ export class Selection implements CameraPointerListener {
   private readonly hoverProxy: InstanceProxy;
   private readonly selectedProxy: InstanceProxy;
   private hoverOutline: { partId: string | null; instance: number | null } = { partId: null, instance: null };
-  private selectedOutline: { partId: string | null; instance: number | null } = { partId: null, instance: null };
+  private selectedOutline: { partId: string | null; instance: number | null } = {
+    partId: null,
+    instance: null,
+  };
 
   constructor(private readonly o: SelectionOptions) {
     this.proxyMaterial = new THREE.MeshBasicNodeMaterial({ colorWrite: false, depthWrite: false });
@@ -231,7 +234,10 @@ export class Selection implements CameraPointerListener {
     if (instance !== null && part.instanced) {
       a.instanceCenterWorld(partId, instance, _sphere.center);
       _box.copy(part.instanced.instanceBox);
-      _sphere.radius = Math.max(1e-4, (_box.isEmpty() ? 0.002 : _box.getSize(_center).length() / 2) * part.restWorldScale.x);
+      _sphere.radius = Math.max(
+        1e-4,
+        (_box.isEmpty() ? 0.002 : _box.getSize(_center).length() / 2) * part.restWorldScale.x,
+      );
     } else {
       a.worldBounds(partId, _box);
       if (_box.isEmpty()) return;
@@ -298,7 +304,11 @@ export class Selection implements CameraPointerListener {
     this.o.ctx.postfx.setOutline('selected', this.outlineObjects(partId, instance, this.selectedProxy));
   }
 
-  private outlineObjects(partId: string | null, instance: number | null, proxy: InstanceProxy): THREE.Object3D[] {
+  private outlineObjects(
+    partId: string | null,
+    instance: number | null,
+    proxy: InstanceProxy,
+  ): THREE.Object3D[] {
     const a = this.assembly;
     if (!a || !partId) {
       proxy.hide();

@@ -69,7 +69,10 @@ export class StudioLights {
     _camDir.subVectors(camera.position, this.center);
     const camAzimuth = Math.atan2(_camDir.x, _camDir.z);
     // Suivi partiel de la caméra (au plus court autour de l'azimut de présentation).
-    const delta = Math.atan2(Math.sin(camAzimuth - this.baseAzimuth), Math.cos(camAzimuth - this.baseAzimuth));
+    const delta = Math.atan2(
+      Math.sin(camAzimuth - this.baseAzimuth),
+      Math.cos(camAzimuth - this.baseAzimuth),
+    );
     const follow = this.baseAzimuth + delta * 0.6;
     this.place(this.key, follow + 0.7, THREE.MathUtils.degToRad(52));
     this.place(this.rim, camAzimuth + Math.PI + 0.35, THREE.MathUtils.degToRad(28));

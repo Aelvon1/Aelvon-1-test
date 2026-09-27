@@ -110,7 +110,7 @@ export function buildYoke(ctx: Ctx): THREE.Object3D {
           [hubEnd, r0, 0.1],
           [(d.yokeX0 + hubEnd) / 2, r0],
         ],
-        0.4,
+        4,
       ),
       { segments: segs(ctx, 64) },
     );
@@ -175,7 +175,7 @@ export function buildSleeve(ctx: Ctx): THREE.Object3D {
           [x0, r1, 0.08],
           [(x0 + x1) / 2, r1],
         ],
-        0.5,
+        4,
         3,
       ),
       { segments: segs(ctx, 96), uRepeat: 2 * Math.PI * r1, vLength: true },

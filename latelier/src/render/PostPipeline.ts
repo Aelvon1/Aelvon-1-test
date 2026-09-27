@@ -14,13 +14,30 @@
  * aucun coût, aucune recompilation (donc aucune saccade) quand on change de mode.
  */
 import * as THREE from 'three/webgpu';
-import { Fn, If, convertToTexture, float, mix, pass, renderOutput, smoothstep, uniform, vec4 } from 'three/tsl';
+import {
+  Fn,
+  If,
+  abs,
+  clamp,
+  convertToTexture,
+  float,
+  luminance,
+  mix,
+  pass,
+  renderOutput,
+  smoothstep,
+  sqrt,
+  step,
+  uniform,
+  vec3,
+  vec4,
+} from 'three/tsl';
 import { bloom as createBloom } from 'three/addons/tsl/display/BloomNode.js';
 import type BloomNode from 'three/addons/tsl/display/BloomNode.js';
 import { smaa } from 'three/addons/tsl/display/SMAANode.js';
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 import type { Engine } from '../core/Engine';
-import type { PostBuildConfig } from './postLogic';
+import type { PostBuildConfig, PostDebugView } from './postLogic';
 import { AmbientOcclusion } from './nodes/ambientOcclusion';
 import { InspectionDepthOfField } from './nodes/depthOfField';
 import { SelectionOutlineNode } from './nodes/SelectionOutlineNode';
@@ -54,6 +71,9 @@ export function createPostUniforms() {
 
 export type PostUniforms = ReturnType<typeof createPostUniforms>;
 
+/** Sous-ensemble du moteur utilisé par le graphe (permet un banc d'essai isolé). */
+export type PostEngine = Pick<Engine, 'renderer' | 'scene' | 'camera' | 'reversedDepth'>;
+
 interface Disposable {
   dispose(): void;
 }
@@ -68,9 +88,10 @@ export class PostPipeline {
   private readonly disposables: Disposable[] = [];
 
   constructor(
-    engine: Engine,
+    engine: PostEngine,
     readonly config: PostBuildConfig,
     uniforms: PostUniforms,
+    readonly debugView: PostDebugView = 'none',
   ) {
     const { renderer, scene, camera } = engine;
     const u = uniforms;
@@ -89,8 +110,8 @@ export class PostPipeline {
         camera,
         resolution: config.aoResolution,
         samples: config.aoSamples,
-        // En WebGL, three lit la profondeur comme un NDC [-1, 1] (voir ambientOcclusion.ts).
-        ndcFix: engine.backend === 'webgl2' && engine.reversedDepth,
+        reversedDepth: engine.reversedDepth,
+        coordinateSystem: renderer.coordinateSystem,
       });
       this.ao = ao;
       this.disposables.push(ao);
@@ -142,9 +163,7 @@ export class PostPipeline {
     this.disposables.push(this.outline);
     const outlineNode = this.outline;
     const graded = Fn(() => {
-      const color = splitTone(display.rgb, u.splitTone)
-        .mul(vignetteFactor(u.aspect, u.vignette))
-        .toVar();
+      const color = splitTone(display.rgb, u.splitTone).mul(vignetteFactor(u.aspect, u.vignette)).toVar();
       If(u.outlineOn.greaterThan(0.5), () => {
         const overlay = vec4(outlineNode).toVar();
         color.assign(color.mul(overlay.a.oneMinus()).add(overlay.rgb));
@@ -180,6 +199,34 @@ export class PostPipeline {
       }
     } else {
       output = withGrain(graded);
+    }
+
+    // --- Vues de contrôle (développement) : remplacent la sortie ---
+    if (debugView !== 'none') {
+      const shade = sqrt(clamp(luminance(sceneColor.rgb), 0, 1))
+        .mul(0.7)
+        .add(0.3);
+      if (debugView === 'ao') {
+        output = this.ao ? vec4(vec3(this.ao.factor), 1) : vec4(1);
+      } else if (debugView === 'aoraw') {
+        output = this.ao ? vec4(vec3(this.ao.rawFactor), 1) : vec4(1);
+      } else if (debugView === 'aodepth') {
+        output = this.ao ? vec4(vec3(clamp(this.ao.resolvedViewZ.negate().div(6), 0, 1)), 1) : vec4(0);
+      } else if (debugView === 'depth') {
+        // Distance linéaire 0..6 m (contrôle de la profondeur inversée).
+        output = vec4(vec3(clamp(viewZ.negate().div(6), 0, 1)), 1);
+      } else {
+        // Mise au point : vert = zone nette, bleu = avant-plan flou, rouge = arrière-plan
+        // (flou + assombrissement).
+        const dof = this.dof;
+        const distance = viewZ.negate();
+        const delta = dof ? distance.sub(dof.focusDistance) : distance.sub(u.dimStart);
+        const band = dof ? dof.band : float(0);
+        const sharp = step(abs(delta), band);
+        const near = step(delta, band.negate());
+        const far = smoothstep(u.dimStart, u.dimEnd, distance).max(step(band, delta).mul(0.35));
+        output = vec4(vec3(far, sharp, near).mul(shade), 1);
+      }
     }
 
     this.renderPipeline = new THREE.RenderPipeline(renderer, output);

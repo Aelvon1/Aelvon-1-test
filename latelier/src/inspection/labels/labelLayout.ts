@@ -165,10 +165,13 @@ function placeColumn(
   );
   const maxWidth = Math.max(...items.map((c) => c.width));
   const railX =
-    side === 'left' ? area.left + o.margin + maxWidth + o.railGap : area.right - o.margin - maxWidth - o.railGap;
+    side === 'left'
+      ? area.left + o.margin + maxWidth + o.railGap
+      : area.right - o.margin - maxWidth - o.railGap;
   // Affectation créneau ↔ étiquette, puis suppression des croisements par échanges.
   const assign = byY.map((_, i) => i);
-  const segment = (item: LabelCandidate, slot: number) => [railX, slot + o.height / 2, item.anchorX, item.anchorY] as const;
+  const segment = (item: LabelCandidate, slot: number) =>
+    [railX, slot + o.height / 2, item.anchorX, item.anchorY] as const;
   const limit = byY.length * byY.length + 4;
   for (let pass = 0; pass < limit; pass++) {
     let swapped = false;
@@ -235,7 +238,10 @@ export function layoutTags(
     if (x < area.left || x + c.width > area.right || y < area.top || y + height > area.bottom) continue;
     const overlaps = placed.some(
       (p) =>
-        x < p.x + p.width + padding && x + c.width + padding > p.x && y < p.y + height + padding && y + height + padding > p.y,
+        x < p.x + p.width + padding &&
+        x + c.width + padding > p.x &&
+        y < p.y + height + padding &&
+        y + height + padding > p.y,
     );
     if (!overlaps) placed.push({ id: c.id, x, y, width: c.width });
   }

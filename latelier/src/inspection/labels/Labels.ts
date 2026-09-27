@@ -2,11 +2,13 @@
  * Étiquettes à traits de rappel (touche L) : couche DOM superposée au canvas (div + SVG,
  * `pointer-events: none`), style fiche cartonnée / ruban adhésif (`../labels.css`).
  *
- * - Ancres = `Assembly.anchorWorld` (ancrage déclaré ou centre de la pièce), projetées à l'écran.
+ * - Ancres = ancrage déclaré, sinon point VISIBLE de la pièce (surface touchée par un rayon vers
+ *   son centre, ou centre d'une face de ses bornes tournée vers la caméra) ; pièce instanciée :
+ *   instance sélectionnée ou première instance.
  * - Candidates : pièces affichées, étiquetables (`PartDef.label !== false`), devant la caméra ;
  *   score = priorité déclarée (prépondérante) + taille projetée ; la sélection est épinglée.
- * - Occultation : lancer de rayon BVH caméra → ancre (sauf en rayons X, où tout est visible) ;
- *   seules les meilleures candidates sont testées.
+ * - Occultation : lancers de rayon BVH caméra → ancre (sauf en rayons X, où tout est visible),
+ *   64 au plus par mise à jour, pour les meilleures candidates seulement.
  * - ~12 étiquettes (18 en vue éclatée), rangées sur les côtés sans croisement (`labelLayout`).
  * - Vue rangée : nom de chaque pièce sous son emplacement (données `getKnollingLabels`).
  * - Recalcul à 30 Hz au plus, et seulement si la caméra, les poses ou l'état ont changé.
@@ -39,6 +41,8 @@ const DEFAULT_INSETS = { left: 330, right: 350, top: 64, bottom: 118 };
 export interface LabelsViewState {
   enabled: boolean;
   selectedId: string | null;
+  /** Instance sélectionnée (pièce instanciée) : l'étiquette s'y ancre. */
+  selectedInstance: number | null;
   xray: boolean;
   knolling: boolean;
   /** Taux d'éclatement courant (0..1). */
@@ -78,6 +82,12 @@ interface PartInfo {
 const _v = new THREE.Vector3();
 const _view = new THREE.Vector3();
 const _ray = new THREE.Ray();
+const _anchor = new THREE.Vector3();
+const _target = new THREE.Vector3();
+const _center = new THREE.Vector3();
+const _size = new THREE.Vector3();
+const _box = new THREE.Box3();
+const AXES = ['y', 'z', 'x'] as const;
 
 export class InspectionLabels {
   private readonly root: HTMLDivElement;
@@ -90,6 +100,7 @@ export class InspectionLabels {
   private state: LabelsViewState = {
     enabled: false,
     selectedId: null,
+    selectedInstance: null,
     xray: false,
     knolling: false,
     explode: 0,
@@ -107,6 +118,8 @@ export class InspectionLabels {
   private visible = false;
   private readonly insets = { ...DEFAULT_INSETS };
   private insetsStale = true;
+  /** Rayons d'occultation restants pour la mise à jour en cours. */
+  private rayBudget = 0;
   private readonly hit: PickHit = {
     partId: '',
     instance: null,
@@ -136,7 +149,10 @@ export class InspectionLabels {
     this.assembly = assembly;
     this.composer = composer;
     this.infos = assembly.order
-      .filter((p) => p.def.label !== false && (p.hasGeometry || (p.def.label && p.def.label.priority !== undefined)))
+      .filter(
+        (p) =>
+          p.def.label !== false && (p.hasGeometry || (p.def.label && p.def.label.priority !== undefined)),
+      )
       .map((part) => {
         const label = part.def.label || undefined;
         const box = part.subtreeBox.isEmpty() ? part.localBox : part.subtreeBox;
@@ -164,6 +180,19 @@ export class InspectionLabels {
   }
 
   setState(state: LabelsViewState): void {
+    const prev = this.state;
+    if (
+      state.enabled === prev.enabled &&
+      state.selectedId === prev.selectedId &&
+      state.selectedInstance === prev.selectedInstance &&
+      state.xray === prev.xray &&
+      state.knolling === prev.knolling &&
+      state.explode === prev.explode &&
+      state.leftPanelOpen === prev.leftPanelOpen &&
+      state.rightPanelOpen === prev.rightPanelOpen &&
+      state.textScale === prev.textScale
+    )
+      return;
     if (state.textScale !== this.state.textScale) {
       this.root.style.setProperty('--insp-scale', String(state.textScale));
       for (const node of this.nodes.values()) node.content = '';
@@ -253,7 +282,12 @@ export class InspectionLabels {
   }
 
   /** Projette `world` en pixels (dans `out`) ; faux si derrière la caméra. */
-  private project(world: THREE.Vector3, width: number, height: number, out: { x: number; y: number }): boolean {
+  private project(
+    world: THREE.Vector3,
+    width: number,
+    height: number,
+    out: { x: number; y: number },
+  ): boolean {
     _view.copy(world).applyMatrix4(this.camera.matrixWorldInverse);
     if (_view.z > -1e-6) return false;
     _v.copy(world).project(this.camera);
@@ -268,34 +302,35 @@ export class InspectionLabels {
     const visible = this.visibleParts(a);
     const camera = this.camera;
     const pxPerRad = height / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-    const scored: { info: PartInfo; x: number; y: number; score: number; pinned: boolean; dist: number }[] = [];
+    const scored: { info: PartInfo; score: number; pinned: boolean }[] = [];
     const p = { x: 0, y: 0 };
     for (const info of this.infos) {
       const id = info.part.id;
       if (!visible.has(id)) continue;
-      a.anchorWorld(id, _v);
-      const dist = _v.distanceTo(camera.position);
-      if (!this.project(_v, width, height, p)) continue;
-      if (p.x < area.left || p.x > area.right || p.y < area.top || p.y > area.bottom) continue;
+      this.anchorOf(info, _anchor);
+      const dist = _anchor.distanceTo(camera.position);
+      if (!this.project(_anchor, width, height, p)) continue;
+      // Ancre visible à l'écran, hors des panneaux latéraux.
+      if (p.x < area.left || p.x > area.right || p.y < 0 || p.y > height) continue;
       const pinned = id === this.state.selectedId;
       const sizePx = (info.radius / Math.max(dist, 1e-6)) * pxPerRad;
       if (!pinned && sizePx < 3) continue;
-      scored.push({ info, x: p.x, y: p.y, score: info.priority * 1000 + sizePx, pinned, dist });
+      scored.push({ info, score: info.priority * 1000 + sizePx, pinned });
     }
     scored.sort((u, w) => Number(w.pinned) - Number(u.pinned) || w.score - u.score);
     const maxCount = this.state.explode > 0.25 ? 18 : 12;
     const candidates: LabelCandidate[] = [];
-    let tests = 0;
+    this.rayBudget = 64;
     for (const s of scored) {
-      if (candidates.length >= Math.ceil(maxCount * 1.5) || tests >= 48) break;
-      if (!this.state.xray && !s.pinned) {
-        tests++;
-        if (this.occluded(s.info.part, s.dist)) continue;
-      }
+      if (candidates.length >= Math.ceil(maxCount * 1.5) || this.rayBudget <= 0) break;
+      this.anchorOf(s.info, _anchor);
+      // Rayons X : tout est visible à travers les fantômes ; sinon, point de la pièce visible.
+      if (!this.state.xray && !this.visibleAnchor(s.info, _anchor, _anchor) && !s.pinned) continue;
+      if (!this.project(_anchor, width, height, p)) continue;
       candidates.push({
         id: s.info.part.id,
-        anchorX: s.x,
-        anchorY: s.y,
+        anchorX: p.x,
+        anchorY: p.y,
         width: this.measureLabel(s.info),
         score: s.score,
         pinned: s.pinned,
@@ -307,19 +342,61 @@ export class InspectionLabels {
     });
   }
 
-  /** L'ancre de la pièce est-elle cachée par une autre pièce ? */
-  private occluded(part: PartRuntime, anchorDistance: number): boolean {
+  /**
+   * Ancre monde d'une pièce : ancrage déclaré ; pièce instanciée sans ancrage déclaré : centre de
+   * l'instance sélectionnée (ou de la première), plutôt que le milieu vide du groupe.
+   */
+  private anchorOf(info: PartInfo, out: THREE.Vector3): THREE.Vector3 {
     const a = this.assembly!;
-    a.anchorWorld(part.id, _v);
-    _ray.origin.copy(this.camera.position);
-    _ray.direction.subVectors(_v, _ray.origin).normalize();
-    if (!this.picker.pick(_ray, this.hit)) return false;
-    if (this.hit.distance >= anchorDistance * 0.995 - 1e-4) return false;
-    // Impact sur la pièce elle-même ou sur une de ses sous-pièces : visible.
-    for (let id: string | null = this.hit.partId; id; id = a.parts.get(id)?.parentId ?? null) {
-      if (id === part.id) return false;
+    const part = info.part;
+    if (part.instanced && !part.anchorExplicit) {
+      const selected = this.state.selectedId === part.id ? this.state.selectedInstance : null;
+      return a.instanceCenterWorld(part.id, selected ?? 0, out);
     }
-    return true;
+    return a.anchorWorld(part.id, out);
+  }
+
+  /**
+   * Point visible de la pièce : l'ancre si rien ne la cache (ou si le premier impact est sur la
+   * pièce elle-même : le point de surface est alors retenu), sinon, pour un ancrage par défaut,
+   * le centre des faces de ses bornes tournées vers la caméra. Faux si tout est caché.
+   */
+  private visibleAnchor(info: PartInfo, anchor: THREE.Vector3, out: THREE.Vector3): boolean {
+    if (this.rayToPart(info.part, anchor, out, info.part.anchorExplicit)) return true;
+    if (info.part.anchorExplicit || info.part.instanced) return false;
+    const a = this.assembly!;
+    a.worldBounds(info.part.id, _box);
+    if (_box.isEmpty()) return false;
+    _box.getCenter(_center);
+    _box.getSize(_size).multiplyScalar(0.45);
+    for (const axis of AXES) {
+      if (this.rayBudget <= 0) return false;
+      const side = this.camera.position[axis] > _center[axis] ? 1 : -1;
+      _target.copy(_center);
+      _target[axis] += side * _size[axis];
+      if (this.rayToPart(info.part, _target, out, false)) return true;
+    }
+    return false;
+  }
+
+  /** Rayon caméra → `target` : la première surface touchée appartient-elle à la pièce ? */
+  private rayToPart(part: PartRuntime, target: THREE.Vector3, out: THREE.Vector3, keepTarget: boolean): boolean {
+    const a = this.assembly!;
+    this.rayBudget--;
+    _ray.origin.copy(this.camera.position);
+    const distance = _ray.direction.subVectors(target, _ray.origin).length();
+    _ray.direction.divideScalar(Math.max(distance, 1e-9));
+    if (!this.picker.pick(_ray, this.hit) || this.hit.distance >= distance * 0.995 - 1e-4) {
+      out.copy(target);
+      return true;
+    }
+    for (let id: string | null = this.hit.partId; id; id = a.parts.get(id)?.parentId ?? null) {
+      if (id === part.id) {
+        out.copy(keepTarget ? target : this.hit.point);
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Pièces affichées (au moins un maillage visible dans leur sous-arbre). */
@@ -394,7 +471,7 @@ export class InspectionLabels {
   /** Largeur de l'étiquette (mesurée une fois par texte et par échelle). */
   private measureLabel(info: PartInfo): number {
     const node = this.nodeFor(info);
-    const content = info.count > 1 ? `${info.text} ×${info.count}` : info.text;
+    const content = info.count > 1 ? `${info.text}\u00a0×${info.count}` : info.text;
     if (node.content !== content) {
       node.content = content;
       node.text.textContent = content;

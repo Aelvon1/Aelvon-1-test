@@ -21,6 +21,7 @@ import {
   float,
   floor,
   fract,
+  hash,
   length,
   mix,
   mod,
@@ -161,17 +162,24 @@ const coreMaterial: MaterialFactory = () => {
   const ply = floor(y.div(plyT));
   const v = fract(y.div(plyT));
   const odd = mod(ply, 2);
-  // Torons de trame coupés (ellipses), décalés d'un demi-pas d'un pli à l'autre.
-  const u = fract(s.div(0.58).add(odd.mul(0.5)));
-  const ell = length(vec2(u.sub(0.5).div(0.38), v.sub(0.5).div(0.36)));
-  const weft = smoothstep(1.0, 0.72, ell);
+  // Torons de trame coupés (ellipses), décalés d'un demi-pas d'un pli à l'autre ; taille et
+  // teinte légèrement aléatoires par toron (le tissu n'est jamais parfaitement régulier).
+  const su = s.div(0.58).add(odd.mul(0.5));
+  const rnd = hash(floor(su).add(ply.mul(37)));
+  const u = fract(su);
+  const size = rnd.mul(0.25).add(0.85);
+  const ell = length(vec2(u.sub(0.5).div(size.mul(0.36)), v.sub(0.5).div(size.mul(0.33))));
+  const weft = smoothstep(1.0, 0.75, ell).mul(rnd.mul(0.35).add(0.65));
   // Fils de chaîne vus en long entre les ellipses + fines stries de filaments.
-  const warp = smoothstep(0.42, 0.3, abs(v.sub(0.5))).mul(0.45);
-  const strands = sin(v.mul(80)).mul(0.5).add(0.5).mul(0.12);
+  const warp = smoothstep(0.42, 0.3, abs(v.sub(0.5))).mul(0.3);
+  const strands = sin(v.mul(80).add(s.mul(3)))
+    .mul(0.5)
+    .add(0.5)
+    .mul(0.1);
   const interPly = smoothstep(0.08, 0.0, v)
     .add(smoothstep(0.92, 1.0, v))
     .mul(0.5);
-  const edgeCol = mix(mix(resin, glass, weft.add(warp).add(strands).clamp(0, 1)), resin.mul(0.7), interPly);
+  const edgeCol = mix(mix(resin, glass, weft.add(warp).add(strands).clamp(0, 1)), resin.mul(0.65), interPly);
   // Faces : tissage toile (pas 0,58 × 0,79 mm), dessus/dessous alternés.
   const wx = sin(p.x.mul((2 * Math.PI) / 0.58));
   const wz = sin(p.z.mul((2 * Math.PI) / 0.79));
@@ -181,8 +189,6 @@ const coreMaterial: MaterialFactory = () => {
   m.colorNode = mix(faceCol, edgeCol, side);
   m.roughnessNode = mix(float(0.5), float(0.7), side);
   m.metalness = 0;
-  m.sheen = 0.2;
-  m.sheenRoughness = 0.6;
   return m;
 };
 

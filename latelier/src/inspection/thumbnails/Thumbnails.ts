@@ -169,7 +169,10 @@ export class Thumbnails {
         const origin = frameOrigin(layout, i);
         const read = engine.renderer.readRenderTargetPixelsAsync(target, 0, 0, size, size).then((data) => {
           const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-          const rowBytes = bytes.length >= size * size * 4 && engine.backend === 'webgpu' ? readbackRowBytes(size, 4, true) : size * 4;
+          const rowBytes =
+            bytes.length >= size * size * 4 && engine.backend === 'webgpu'
+              ? readbackRowBytes(size, 4, true)
+              : size * 4;
           downsample2x(bytes, size, size, rowBytes, pixels, layout.width, origin.x, origin.y, flipY);
         });
         inFlight.push(read);

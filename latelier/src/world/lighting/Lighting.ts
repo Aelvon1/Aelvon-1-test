@@ -4,7 +4,8 @@
  * Sources :
  * - ampoule tungstène (PointLight chaude, ombres cubiques) : montée en 80 ms, lueur résiduelle
  *   du filament à l'extinction ;
- * - tube néon (RectAreaLight verdâtre, sans ombre) : scintillement piloté par `NeonFlicker` ;
+ * - tube néon (RectAreaLight verdâtre) : scintillement piloté par `NeonFlicker`.
+ *   Approximation : les lumières surfaciques de three.js ne projettent pas d'ombre ;
  * - lumière du jour (SpotLight froide placée dehors, ombres : le mur et les petits bois dessinent
  *   la fenêtre au sol) + remplissage diffus du ciel (RectAreaLight dans l'embrasure) ;
  * - lampe loupe (SpotLight de la tête articulée, ombres).
@@ -14,6 +15,9 @@
  * d'ombres de l'ampoule et de la fenêtre ne sont recalculées que sur demande
  * (`invalidateShadows`) ; celle de la lampe l'est pendant ses mouvements, et celles de l'ampoule
  * et de la lampe à chaque image en mode inspection (objet animé sur le tapis).
+ *
+ * Approximation : un accessoire animé ne met pas à jour seul les ombres statiques ; il doit
+ * appeler `invalidateShadows()` (voir `props/index.ts`).
  *
  * Les lumières ne sont jamais retirées ni masquées (intensité 0) : pas de recompilation des
  * shaders lors des bascules.
@@ -236,7 +240,8 @@ export class Lighting {
     const daylight = u.daylight.value * (this.neutral ? 0.35 : 1);
     this.daylight.intensity = LIGHT_LEVELS.daylight * daylight;
     this.skyFill.intensity = LIGHT_LEVELS.skyFill * daylight;
-    // Environnement : capturé lumières allumées, atténué quand elles baissent.
+    // Approximation : l'environnement est capturé lumières allumées puis simplement atténué
+    // quand elles baissent (pas de seconde capture « lumières éteintes »).
     const roomLight = Math.max(bulb, neon * 0.7);
     this.scene.environmentIntensity = LIGHT_LEVELS.environment * (0.18 + 0.82 * roomLight);
 

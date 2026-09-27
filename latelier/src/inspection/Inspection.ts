@@ -5,8 +5,9 @@
  *   de la préparation/construction (tranches ≤ 8 ms), puis l'objet se pose sur le tapis.
  * - Relie le bus d'événements (`inspection:*`) et les raccourcis clavier au runtime : séquenceur
  *   (pas à pas, démontage libre), éclatement, vue rangée, sélection, masquage/isolation.
- * - Les commandes de VUE (cadrage, coupe, rayons X, étiquettes…) mettent à jour le store ; le
- *   rendu correspondant est ajouté par le module de vue (caméra `BasicCamera` temporaire).
+ * - Les commandes de VUE (cadrage, coupe, rayons X, étiquettes…) mettent à jour le store ; la
+ *   vue (`view/InspectionView` : caméra d'inspection, sélection BVH, rayons X, coupe, étiquettes,
+ *   éclairage d'appoint, miniatures) s'y abonne et applique le rendu correspondant.
  * - Remplit `store.inspection` intégralement (seule source de vérité pour l'interface).
  */
 import * as THREE from 'three/webgpu';
@@ -30,7 +31,8 @@ import { mergeParams, partQuantity } from '../objects/resolve';
 import { INSPECTION_VIEW } from '../world/layout';
 import type { World } from '../world/World';
 import { Assembly } from './Assembly';
-import { BasicCamera, fitDistance, type InspectionCameraController } from './BasicCamera';
+import { fitDistance } from './camera/orbitMath';
+import type { InspectionCameraController } from './camera/types';
 import { DetailManager } from './detail';
 import { dropHeight } from './easing';
 import { DisassemblyGraph, type Blockage } from './graph';
@@ -40,6 +42,8 @@ import { PoseComposer } from './poses';
 import { Sequencer, type SequencerCommand } from './Sequencer';
 import { noopToolPresenter, type ToolPresenter } from './tools/presenter';
 import { toolDisplay } from './tools/registry';
+import { createInspectionToolPresenter } from './tools/inspectionTools';
+import { InspectionView } from './view/InspectionView';
 
 type AnyDef = ObjectDef<ObjectParams>;
 
@@ -88,6 +92,7 @@ interface Session {
 const _box = new THREE.Box3();
 const _box2 = new THREE.Box3();
 const _v = new THREE.Vector3();
+const _m = new THREE.Matrix4();
 
 export class Inspection {
   private tween: CameraTween | null = null;
@@ -95,6 +100,8 @@ export class Inspection {
   /** Jeton d'ouverture : invalide une construction en cours quand un autre objet est demandé. */
   private openToken = 0;
   private camera: InspectionCameraController;
+  /** Vue de l'inspection (caméra, sélection, rendu, étiquettes, miniatures). */
+  readonly view: InspectionView;
   private toolPresenter: ToolPresenter = noopToolPresenter;
   private readonly disposers: (() => void)[] = [];
   private blockedTimer = 0;
@@ -114,12 +121,18 @@ export class Inspection {
     protected readonly ctx: AppContext,
     protected readonly world: World,
   ) {
-    this.camera = new BasicCamera(ctx.engine.camera, ctx.engine.canvas, {
-      targets: () => this.session?.assembly.root ?? null,
-      onHover: (object, instance) => this.emitPick('hover', object, instance),
-      onClick: (object, instance) => this.emitPick('select', object, instance),
-      onDoubleClick: (object, instance) => this.emitPick('toggle', object, instance),
+    this.view = new InspectionView(ctx, world, {
+      knollingLabels: () => this.getKnollingLabels(),
+      findDef,
+      inUse: (id) => {
+        const def = findDef(id);
+        const current = this.session?.def ?? this.pendingAssembly?.def ?? null;
+        return def !== undefined && current !== null && current.id === def.id;
+      },
     });
+    this.camera = this.view.camera;
+    // Outils 3D animés des gestes de démontage (module `tools`).
+    this.setToolPresenter(createInspectionToolPresenter(ctx, () => this.assembly));
     const speed = Number(ctx.dev.raw.get('animspeed'));
     this.timeScale = import.meta.env.DEV && Number.isFinite(speed) && speed > 0 ? speed : 1;
     this.wireEvents();
@@ -169,7 +182,10 @@ export class Inspection {
     const dt = frame.dt * this.timeScale;
     if (this.tween && this.tween.update(dt)) this.tween = null;
     const s = this.session;
-    if (!s || !s.assembly.isBuilt) return;
+    if (!s || !s.assembly.isBuilt) {
+      this.view.update(dt);
+      return;
+    }
     this.updateExplode(s, dt);
     this.updateKnolling(s, dt);
     s.sequencer.update(dt);
@@ -178,6 +194,7 @@ export class Inspection {
     s.assembly.update(dt, frame.time);
     s.detail.update(dt, this.ctx.engine.camera);
     if (!this.tween) this.camera.update(dt);
+    this.view.update(dt);
     if (this.blockedTimer > 0) {
       this.blockedTimer -= dt;
       if (this.blockedTimer <= 0) {
@@ -220,9 +237,10 @@ export class Inspection {
   async close(returnPose: CameraPose): Promise<void> {
     const token = ++this.openToken;
     this.camera.deactivate();
+    this.view.deactivate();
     this.session?.sequencer.cancel();
-    this.ctx.postfx.setOutline('selected', []);
-    this.ctx.postfx.setOutline('hover', []);
+    this.view.selection.showSelected(null, null);
+    this.view.selection.showHover(null);
     this.ctx.postfx.setOutline('blocked', []);
     await this.startTween(returnPose, 1.3);
     // Un autre objet a été ouvert pendant le retour caméra : il ne doit pas être libéré.
@@ -244,16 +262,17 @@ export class Inspection {
     return this.tween.done;
   }
 
-  /**
-   * Génère les miniatures d'inventaire.
-   * Non implémenté dans ce module : l'inventaire affiche ses fiches sans miniature animée.
-   */
-  async renderThumbnails(_objectIds: string[]): Promise<void> {}
+  /** Génère les miniatures d'inventaire manquantes (étalées sur plusieurs images). */
+  async renderThumbnails(objectIds: string[]): Promise<void> {
+    this.view.thumbnails.request(objectIds);
+  }
 
   dispose(): void {
     this.openToken++;
     this.disposeSession();
     this.camera.dispose();
+    this.view.dispose();
+    this.toolPresenter.dispose();
     for (const d of this.disposers) d();
     this.disposers.length = 0;
     this.tween = null;
@@ -391,11 +410,13 @@ export class Inspection {
         6000,
       );
     const root = session.assembly.root;
-    this.ctx.engine.scene.add(root);
+    this.view.objectParent.add(root);
     session.drop = { elapsed: 0, played: false };
     this.fillStaticState(session);
     this.syncDynamic();
+    this.view.attach(session);
     this.activateCamera(session);
+    this.view.activate();
     if (!this.devApplied) {
       this.devApplied = true;
       this.applyDevParams(session);
@@ -413,16 +434,26 @@ export class Inspection {
       .applyQuaternion(assembly.root.quaternion);
     const camera = this.ctx.engine.camera;
     let distance = fitDistance(sphere.radius, INSPECTION_VIEW.fov, camera.aspect, 1.4);
+    const target = sphere.center.clone();
     const view = this.ctx.dev.view;
+    let instant = false;
     if (!this.devApplied && view && view.length >= 3) {
       direction.set(view[0]!, view[1]!, view[2]!).normalize();
       if (view.length >= 4 && view[3]! > 0) distance = view[3]!;
+      // `?viewtarget=x,y,z` : cible dans le repère de l'objet (captures macro reproductibles).
+      const vt = (this.ctx.dev.raw.get('viewtarget') ?? '').split(',').map(Number);
+      if (vt.length === 3 && vt.every(Number.isFinite)) {
+        assembly.root.updateWorldMatrix(true, false);
+        target.set(vt[0]!, vt[1]!, vt[2]!).applyMatrix4(assembly.root.matrixWorld);
+      }
+      instant = true;
     }
     this.camera.activate({
-      target: sphere.center.clone(),
+      target,
       direction,
       distance,
       minDistance: pres?.minSurfaceDistance ?? 0.002,
+      instant,
     });
   }
 
@@ -432,12 +463,12 @@ export class Inspection {
     const s = this.session;
     if (!s) return;
     this.session = null;
+    // La vue restitue d'abord les matériaux d'origine (rayons X, coupe) avant toute libération.
+    this.view.detach();
     s.sequencer.dispose();
     s.detail.dispose();
     s.composer.dispose();
     s.assembly.dispose();
-    this.ctx.postfx.setOutline('selected', []);
-    this.ctx.postfx.setOutline('hover', []);
     this.ctx.postfx.setOutline('blocked', []);
     this.blockedTimer = 0;
   }
@@ -564,19 +595,29 @@ export class Inspection {
     on('inspection:select', ({ partId, instance }) => this.select(partId, instance ?? null));
     on('inspection:hover', ({ partId }) => {
       const current = store.getState().inspection;
-      if (!current || current.hoveredId === partId) return;
-      patchInspection(store, { hoveredId: partId });
-      const a = this.assembly;
-      this.ctx.postfx.setOutline('hover', a && partId ? a.meshesOf(partId, true) : []);
+      if (!current) return;
+      const id = partId && this.assembly?.parts.has(partId) ? partId : null;
+      if (current.hoveredId !== id) patchInspection(store, { hoveredId: id });
+      this.view.selection.showHover(id);
     });
     on('inspection:frame', ({ partId }) => {
-      const id = partId ?? store.getState().inspection?.selected?.partId ?? null;
-      if (id) this.frameParts([id], false);
-      else if (this.assembly) this.camera.frameBox(this.assembly.objectBounds(_box));
+      const selected = store.getState().inspection?.selected ?? null;
+      const id = partId ?? selected?.partId ?? null;
+      const a = this.assembly;
+      const inst = a && id ? a.parts.get(id)?.instanced : null;
+      if (a && id && inst && selected?.partId === id && selected.instance !== null) {
+        // Instance sélectionnée (vis, bille, tôle…) : cadrage de cette seule instance.
+        _box.copy(inst.instanceBox).applyMatrix4(a.instanceWorldMatrix(id, selected.instance, _m));
+        this.camera.frameBox(_box);
+      } else if (id) this.frameParts([id], false);
+      else if (a) this.camera.frameBox(a.objectBounds(_box));
     });
     on('inspection:resetView', () => this.camera.resetView());
     on('inspection:setHidden', ({ partId, hidden }) => this.setHidden(partId, hidden));
-    on('inspection:isolate', ({ partId }) => this.isolate(partId));
+    on('inspection:isolate', ({ partId }) => {
+      this.isolate(partId);
+      if (partId && this.assembly?.parts.has(partId)) this.frameParts([partId], false);
+    });
     on('inspection:showAll', () => {
       this.session?.hidden.clear();
       patchInspection(store, { isolatedId: null });
@@ -655,21 +696,6 @@ export class Inspection {
     }
   }
 
-  /** Relais de la sélection souris de la caméra temporaire vers le bus. */
-  private emitPick(
-    kind: 'hover' | 'select' | 'toggle',
-    object: THREE.Object3D | null,
-    instance: number | null,
-  ): void {
-    const a = this.assembly;
-    const hit = a && object ? a.pick(object, instance) : null;
-    const bus = this.ctx.bus;
-    if (kind === 'hover') bus.emit('inspection:hover', { partId: hit?.partId ?? null });
-    else if (kind === 'select')
-      bus.emit('inspection:select', { partId: hit?.partId ?? null, instance: hit?.instance ?? null });
-    else if (hit) bus.emit('inspection:toggleRemove', { partId: hit.partId });
-  }
-
   private disassemblyCommand(cmd: SequencerCommand): void {
     const s = this.session;
     if (!s || !s.assembly.isBuilt) return;
@@ -711,7 +737,7 @@ export class Inspection {
     const a = this.assembly;
     if (!a || !partId || !a.parts.has(partId)) {
       patchInspection(this.ctx.store, { selected: null });
-      this.ctx.postfx.setOutline('selected', []);
+      this.view.selection.showSelected(null, null);
       return;
     }
     const part = a.parts.get(partId)!;
@@ -723,7 +749,7 @@ export class Inspection {
         instanceLabel: inst !== null ? a.instanceLabelOf(partId, inst) : null,
       },
     });
-    this.ctx.postfx.setOutline('selected', a.meshesOf(partId, true));
+    this.view.selection.showSelected(partId, inst);
   }
 
   // --- Masquage / isolation ---------------------------------------------------------------
@@ -731,11 +757,17 @@ export class Inspection {
   private setHidden(partId: string, hidden: boolean): void {
     const s = this.session;
     if (!s || !s.assembly.parts.has(partId)) return;
-    for (const id of s.assembly.subtreeIds(partId)) {
+    const subtree = s.assembly.subtreeIds(partId);
+    for (const id of subtree) {
       if (hidden) s.hidden.add(id);
       else s.hidden.delete(id);
     }
     this.applyHidden();
+    // Une pièce masquée ne reste ni sélectionnée ni survolée.
+    const state = this.ctx.store.getState().inspection;
+    if (hidden && state?.selected && subtree.includes(state.selected.partId)) this.select(null, null);
+    if (hidden && state?.hoveredId && subtree.includes(state.hoveredId))
+      this.ctx.bus.emit('inspection:hover', { partId: null });
   }
 
   private isolate(partId: string | null): void {

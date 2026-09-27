@@ -15,6 +15,9 @@ export interface InspectionFocus {
 
 export type OutlineKind = 'hover' | 'selected' | 'blocked';
 
+/** Vues de contrôle du pipeline (développement, captures de vérification). */
+export type PostDebugView = 'none' | 'ao' | 'aoraw' | 'aodepth' | 'depth' | 'focus';
+
 /** Ordre des canaux du masque de contour (R = survol, V = sélection, B = bloqué). */
 export const OUTLINE_KINDS: readonly OutlineKind[] = ['hover', 'selected', 'blocked'];
 
@@ -38,10 +41,21 @@ export interface PostBuildConfig {
   grain: boolean;
 }
 
-/** Déduit la structure du graphe d'un profil de qualité. */
-export function resolveBuildConfig(profile: QualityProfile): PostBuildConfig {
+/**
+ * Déduit la structure du graphe d'un profil de qualité.
+ *
+ * Approximation : pas de MSAA sur le repli WebGL2. three r186 y alloue le tampon de profondeur
+ * multi-échantillonné en DEPTH_COMPONENT24 alors que la texture de profondeur (flottante en
+ * profondeur inversée) est en DEPTH_COMPONENT32F (comparaison `FloatType === gl.FLOAT` erronée
+ * dans `setupRenderBufferStorage`) : la résolution par `blitFramebuffer` échoue et l'image est
+ * noire. Le SMAA reste actif.
+ */
+export function resolveBuildConfig(
+  profile: QualityProfile,
+  backend: 'webgpu' | 'webgl2' = 'webgpu',
+): PostBuildConfig {
   return {
-    msaaSamples: profile.msaaSamples,
+    msaaSamples: backend === 'webgl2' ? 0 : profile.msaaSamples,
     ao: profile.ao,
     aoResolution: Math.min(1, Math.max(0.25, profile.aoResolution)),
     // Bas n'a pas d'AO ; Moyen se contente de 12 échantillons (3 directions × 4 pas).
@@ -131,9 +145,9 @@ export function computeFocusParams(
   return out;
 }
 
-/** Rayon de flou maximal (px) selon la hauteur de l'image : ~5 px en 1080p. */
+/** Rayon de flou maximal (px) selon la hauteur de l’image : 8 px en 1080p (doublé par la passe de bokeh). */
 export function bokehPixels(bufferHeight: number, amount: number): number {
-  return 5 * (Math.max(1, bufferHeight) / 1080) * Math.min(1, Math.max(0, amount));
+  return 8 * (Math.max(1, bufferHeight) / 1080) * Math.min(1, Math.max(0, amount));
 }
 
 /** Rayon GTAO (m) adapté à l'échelle observée : pièce entière ou objet vu de près. */
@@ -161,7 +175,8 @@ export function resolveOutlineKinds<T>(
     for (const item of lists[kind]) {
       expand(item, (leaf) => {
         const previous = out.get(leaf);
-        if (previous === undefined || OUTLINE_PRIORITY[kind] > OUTLINE_PRIORITY[previous]) out.set(leaf, kind);
+        if (previous === undefined || OUTLINE_PRIORITY[kind] > OUTLINE_PRIORITY[previous])
+          out.set(leaf, kind);
       });
     }
   }

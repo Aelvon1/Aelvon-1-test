@@ -149,6 +149,8 @@ export class InspectionCamera implements InspectionCameraController {
   private readonly orbitVelocity = new THREE.Vector2();
   private readonly panVelocity = new THREE.Vector3();
   private minSurface = 0.002;
+  /** Distance d'arrivée de la dernière transition : le recul maximal ne la contredit pas. */
+  private flightDistanceFloor = 0;
   /** La scène a changé (poses, visibilité, coupe) : distance libre à recalculer. */
   private sceneDirty = true;
   private readonly lastPosition = new THREE.Vector3(Infinity, Infinity, Infinity);
@@ -250,7 +252,10 @@ export class InspectionCamera implements InspectionCameraController {
     const camera = this.o.camera;
     const to = copyState(this.goal, newState());
     to.target.copy(_sphere.center);
-    to.distance = Math.max(this.minSurfaceDistance * 2, fitDistance(_sphere.radius, camera.fov, camera.aspect, 1.3));
+    to.distance = Math.max(
+      this.minSurfaceDistance * 2,
+      fitDistance(_sphere.radius, camera.fov, camera.aspect, 1.3),
+    );
     to.distance = this.resolveDistance(to.target, to.azimuth, to.elevation, to.distance);
     this.startFlight(to, FRAME_SECONDS);
   }
@@ -364,7 +369,12 @@ export class InspectionCamera implements InspectionCameraController {
     _v.subVectors(s.target, this.objectCenter);
     if (_v.lengthSq() > maxOffset * maxOffset) s.target.copy(this.objectCenter).add(_v.setLength(maxOffset));
     const minD = this.minSurfaceDistance;
-    const maxD = Math.min(MAX_DISTANCE, Math.max(0.3, fitDistance(this.objectRadius, this.o.fov, 1, 4)));
+    // Recul maximal : 4 cadrages de l'objet, et au moins la distance de la dernière transition
+    // (vue rangée, qui s'étend pendant son animation).
+    const maxD = Math.min(
+      MAX_DISTANCE,
+      Math.max(0.3, fitDistance(this.objectRadius, this.o.fov, 1, 4), this.flightDistanceFloor * 1.25),
+    );
     s.distance = THREE.MathUtils.clamp(s.distance, minD, maxD);
     const floorMargin = Math.max(minD, 0.003);
     const minEl = minElevationAboveFloor(s.target.y, s.distance, this.o.floorY, floorMargin);
@@ -403,7 +413,12 @@ export class InspectionCamera implements InspectionCameraController {
    * est dans la matière (première surface vue de dos) ou trop près d'une surface, la caméra
    * recule jusqu'à l'extérieur.
    */
-  private resolveDistance(target: THREE.Vector3, azimuth: number, elevation: number, desired: number): number {
+  private resolveDistance(
+    target: THREE.Vector3,
+    azimuth: number,
+    elevation: number,
+    desired: number,
+  ): number {
     const q = this.o.query();
     if (!q) return desired;
     const min = this.minSurfaceDistance;
@@ -425,6 +440,7 @@ export class InspectionCamera implements InspectionCameraController {
   }
 
   private startFlight(to: OrbitState, duration: number): void {
+    this.flightDistanceFloor = to.distance;
     this.flight = { from: copyState(this.current, newState()), to, elapsed: 0, duration };
     this.orbitVelocity.set(0, 0);
     this.panVelocity.set(0, 0, 0);
@@ -596,7 +612,9 @@ export class InspectionCamera implements InspectionCameraController {
       const camera = this.o.camera;
       _right.setFromMatrixColumn(camera.matrixWorld, 0);
       _up.setFromMatrixColumn(camera.matrixWorld, 1);
-      _v.copy(_right).multiplyScalar(-dx * w).addScaledVector(_up, dy * w);
+      _v.copy(_right)
+        .multiplyScalar(-dx * w)
+        .addScaledVector(_up, dy * w);
       this.goal.target.add(_v);
       this.panVelocity.lerp(_v.divideScalar(dtEvent), 0.5);
     }

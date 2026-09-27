@@ -209,7 +209,7 @@ export function createLed(
   // Cœur plus lumineux que le bord (puce au centre de la lentille).
   const facing = pow(saturate(abs(normalWorldGeometry.y)), float(2));
   m.emissiveNode = materialEmissive.mul(facing.mul(0.6).add(0.4));
-  makeGlowable(m, o.intensity ?? 3.5, o.glow ?? 0);
+  makeGlowable(m, o.intensity ?? 2.5, o.glow ?? 0);
   return m;
 }
 

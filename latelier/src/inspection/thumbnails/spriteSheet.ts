@@ -18,7 +18,15 @@ export interface SheetLayout {
 export function sheetLayout(frames: number, frameWidth: number, frameHeight: number): SheetLayout {
   const columns = Math.max(1, Math.ceil(Math.sqrt(frames * (frameHeight / frameWidth) * 1.5)));
   const rows = Math.ceil(frames / columns);
-  return { frames, columns, rows, frameWidth, frameHeight, width: columns * frameWidth, height: rows * frameHeight };
+  return {
+    frames,
+    columns,
+    rows,
+    frameWidth,
+    frameHeight,
+    width: columns * frameWidth,
+    height: rows * frameHeight,
+  };
 }
 
 /** Origine (px) de la vue `index` dans la planche. */

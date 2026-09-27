@@ -4,6 +4,7 @@
  * outil n'a pas (encore) de modèle 3D enregistré.
  */
 import type { ToolDef } from '../../objects/types';
+import { createToolCatalog } from './catalog';
 import { TOOL_IDS, type ToolId } from './ids';
 
 /** Noms français des outils du catalogue. */
@@ -63,3 +64,6 @@ export function toolDisplay(id: string | null | undefined): { name: string; icon
 export function knownToolIds(): Set<string> {
   return new Set<string>([...TOOL_IDS, ...tools.keys()]);
 }
+
+// Catalogue du moteur : modèle 3D animé, nom et icône de chaque identifiant de `TOOL_IDS`.
+for (const def of createToolCatalog(TOOL_NAMES)) registerTool(def);

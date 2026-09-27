@@ -32,11 +32,12 @@ import {
   type InspectionFocus,
   type ModeLook,
   type OutlineKind,
+  type PostDebugView,
   type PostMode,
 } from './postLogic';
 import { PostPipeline, createPostUniforms } from './PostPipeline';
 
-export type { InspectionFocus, OutlineKind, PostMode } from './postLogic';
+export type { InspectionFocus, OutlineKind, PostDebugView, PostMode } from './postLogic';
 
 /** Rayon supposé de l'objet pour la mise au point automatique (m). */
 const AUTO_FOCUS_RADIUS = 0.18;
@@ -49,6 +50,7 @@ const FADE_RATE = 4.5;
 export interface PostFXDebugInfo {
   mode: PostMode;
   config: string;
+  debugView: PostDebugView;
   focus: InspectionFocus | null;
   focusSource: 'explicit' | 'auto' | 'none';
   dofAmount: number;
@@ -63,11 +65,18 @@ export class PostFX {
   protected pipeline: PostPipeline | null = null;
   protected mode: PostMode = 'home';
   private readonly uniforms = createPostUniforms();
-  private readonly outlineLists: Record<OutlineKind, THREE.Object3D[]> = { hover: [], selected: [], blocked: [] };
+  private readonly outlineLists: Record<OutlineKind, THREE.Object3D[]> = {
+    hover: [],
+    selected: [],
+    blocked: [],
+  };
   private unsubscribeQuality: (() => void) | null = null;
 
-  /** `undefined` : jamais fourni (mise au point auto) ; `null` : désactivée explicitement. */
-  private explicitFocus: InspectionFocus | null | undefined = undefined;
+  /** 'auto' : jamais fournie (mise au point automatique) ; 'off' : désactivée ; 'on' : fournie. */
+  private explicitState: 'auto' | 'off' | 'on' = 'auto';
+  /** Dernière mise au point fournie (recopiée : appel possible à chaque image sans allocation). */
+  private readonly explicitFocus: InspectionFocus = { distance: 1, radius: AUTO_FOCUS_RADIUS };
+  private readonly autoFocus: InspectionFocus = { distance: 1, radius: AUTO_FOCUS_RADIUS };
   private focusAnchor: THREE.Vector3 | null = null;
   private readonly focus: InspectionFocus = { distance: 1, radius: AUTO_FOCUS_RADIUS };
   private focusValid = false;
@@ -80,6 +89,9 @@ export class PostFX {
   private readonly look: ModeLook = { ...MODE_LOOKS.home };
   private readonly bufferSize = new THREE.Vector2();
   private lastBokeh = 0;
+  private debugView: PostDebugView = 'none';
+  /** Prochaine mise à jour : valeurs amorties placées directement sur leur cible. */
+  private settleNext = false;
 
   constructor(
     protected readonly engine: Engine,
@@ -95,18 +107,20 @@ export class PostFX {
   setMode(mode: PostMode): void {
     if (mode === this.mode) return;
     // Nouvelle inspection (ou sortie) : on repart de la mise au point automatique.
-    if (mode === 'inspection' || this.mode === 'inspection') this.explicitFocus = undefined;
+    if (mode === 'inspection' || this.mode === 'inspection') this.explicitState = 'auto';
     this.mode = mode;
   }
 
   /** Profondeur de champ + assombrissement de l'arrière-plan (null = désactivé). */
   setFocus(focus: InspectionFocus | null): void {
     if (!focus) {
-      this.explicitFocus = null;
+      this.explicitState = 'off';
       return;
     }
     if (!Number.isFinite(focus.distance) || !Number.isFinite(focus.radius)) return;
-    this.explicitFocus = { distance: focus.distance, radius: focus.radius };
+    this.explicitFocus.distance = focus.distance;
+    this.explicitFocus.radius = focus.radius;
+    this.explicitState = 'on';
   }
 
   /**
@@ -133,7 +147,8 @@ export class PostFX {
   update(frame: FrameInfo): void {
     const pipeline = this.pipeline;
     if (!pipeline) return;
-    const { dt } = frame;
+    const dt = this.settleNext ? 1e3 : frame.dt;
+    this.settleNext = false;
     const u = this.uniforms;
     const renderer = this.engine.renderer;
     const camera = this.engine.camera;
@@ -193,7 +208,12 @@ export class PostFX {
 
     // --- Occlusion ambiante : rayon adapté à l'échelle (pièce ou objet) ---
     if (pipeline.ao) {
-      this.aoRadius = damp(this.aoRadius, aoRadiusFor(this.mode, this.focusValid ? this.focus : null), FADE_RATE, dt);
+      this.aoRadius = damp(
+        this.aoRadius,
+        aoRadiusFor(this.mode, this.focusValid ? this.focus : null),
+        FADE_RATE,
+        dt,
+      );
       pipeline.ao.update(camera, this.aoRadius, this.bufferSize.width, height);
     }
 
@@ -203,11 +223,24 @@ export class PostFX {
     outline.pulse.value = blockedPulse(frame.time);
   }
 
+  /** Place les effets amortis (look, fondus, mise au point) sur leur cible dès la prochaine image (captures). */
+  settle(): void {
+    this.settleNext = true;
+  }
+
+  /** Vue de contrôle (développement) : 'ao', 'depth', 'focus' ou 'none'. Reconstruit le graphe. */
+  setDebugView(view: PostDebugView): void {
+    if (view === this.debugView) return;
+    this.debugView = view;
+    this.build(this.engine.quality, true);
+  }
+
   /** Informations d'état (tests, debug). */
   debugInfo(): PostFXDebugInfo {
     return {
       mode: this.mode,
       config: this.pipeline ? buildConfigKey(this.pipeline.config) : 'aucun',
+      debugView: this.debugView,
       focus: this.focusValid ? { ...this.focus } : null,
       focusSource: this.focusSource,
       dofAmount: this.dofAmount,
@@ -234,11 +267,11 @@ export class PostFX {
   }
 
   /** (Re)construit le graphe pour un profil ; ne fait rien si la structure est inchangée. */
-  private build(profile: QualityProfile): void {
-    const config = resolveBuildConfig(profile);
+  private build(profile: QualityProfile, force = false): void {
+    const config = resolveBuildConfig(profile, this.engine.backend);
     const previous = this.pipeline;
-    if (previous && buildConfigKey(previous.config) === buildConfigKey(config)) return;
-    const next = new PostPipeline(this.engine, config, this.uniforms);
+    if (!force && previous && buildConfigKey(previous.config) === buildConfigKey(config)) return;
+    const next = new PostPipeline(this.engine, config, this.uniforms, this.debugView);
     for (const kind of OUTLINE_KINDS) next.outline.setObjects(kind, this.outlineLists[kind]);
     this.pipeline = next;
     previous?.dispose();
@@ -250,11 +283,11 @@ export class PostFX {
   }
 
   private resolveFocusTarget(camera: THREE.Camera): InspectionFocus | null {
-    if (this.mode !== 'inspection' || this.explicitFocus === null) {
+    if (this.mode !== 'inspection' || this.explicitState === 'off') {
       this.focusSource = 'none';
       return null;
     }
-    if (this.explicitFocus) {
+    if (this.explicitState === 'on') {
       this.focusSource = 'explicit';
       return this.explicitFocus;
     }
@@ -263,11 +296,8 @@ export class PostFX {
       return null;
     }
     this.focusSource = 'auto';
-    // Réutilise l'objet de travail : pas d'allocation par image.
-    autoFocus.distance = camera.position.distanceTo(this.focusAnchor);
-    autoFocus.radius = AUTO_FOCUS_RADIUS;
-    return autoFocus;
+    this.autoFocus.distance = camera.position.distanceTo(this.focusAnchor);
+    this.autoFocus.radius = AUTO_FOCUS_RADIUS;
+    return this.autoFocus;
   }
 }
-
-const autoFocus: InspectionFocus = { distance: 1, radius: AUTO_FOCUS_RADIUS };

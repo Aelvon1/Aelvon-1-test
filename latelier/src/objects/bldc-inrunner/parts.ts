@@ -886,7 +886,9 @@ export function bldcParts(p: BldcParams): Part[] {
 
 // TEMPORAIRE (mise au point, à retirer) : `?bldcdetail=1` construit aussi les détails dans le banc.
 const DEV_DETAIL =
-  import.meta.env.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).has('bldcdetail');
+  import.meta.env.DEV &&
+  typeof location !== 'undefined' &&
+  new URLSearchParams(location.search).has('bldcdetail');
 function withDetail(part: Part): Part {
   const build = part.build;
   const detail = part.detail;

@@ -106,10 +106,18 @@ export function canLabelTexture(
     { op: 'rect', x: 1.2 * k, y: 13 * k, w: L - 2.4 * k, h: 0.12 * k, fill: '#ffffff' },
     // Rangée 2 : KV en grand ; caractéristiques et numéro de série à droite.
     text(`${p.kv} KV`, 1.2 * k, 19.6 * k, 4.6 * k, { bold: true }),
-    text(`Ø ${fr(d.format.shaftD, 3)} mm · ${d.format.cells}–${d.format.cells * 2}S LiPo`, right, 15.9 * k, 0.9 * k, {
+    text(
+      `Ø ${fr(d.format.shaftD, 3)} mm · ${d.format.cells}–${d.format.cells * 2}S LiPo`,
+      right,
+      15.9 * k,
+      0.9 * k,
+      {
+        align: 'right',
+      },
+    ),
+    text(`${fr(w.turns, 1)} T · ${w.strands} × Ø ${fr(w.strandD, 2)} mm`, right, 17.6 * k, 0.9 * k, {
       align: 'right',
     }),
-    text(`${fr(w.turns, 1)} T · ${w.strands} × Ø ${fr(w.strandD, 2)} mm`, right, 17.6 * k, 0.9 * k, { align: 'right' }),
     text(serial, right, 19.5 * k, 0.85 * k, { align: 'right', mono: true }),
     text('Ⓐ Ⓑ Ⓒ  ROTATION ↻', right, 22.4 * k, 0.55 * k, { align: 'right' }),
   ];

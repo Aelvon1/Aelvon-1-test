@@ -5,7 +5,11 @@
  * - Masse (GND) : non routée en pistes, assurée par les plans de masse des deux faces ; des vias
  *   de couture relient les pastilles CMS de masse au plan inférieur.
  * - Boîtiers à pas fin (QFN, MSOP) : amorces de dégagement tracées depuis chaque pastille utilisée.
- * - Version asynchrone : rend la main au navigateur entre deux réseaux (écran de chargement fluide).
+ *
+ * Le routage complet (`routeBoard`, ≈ 1 à 3 s) n'est PAS exécuté au chargement : son résultat est
+ * enregistré dans `routing.data.ts` (données de l'objet) et relu par `computeRouting`. Le test
+ * « données de routage à jour » vérifie la concordance ; après une modification de l'implantation,
+ * régénérer avec `UNO_ROUTING_UPDATE=1 npx vitest run tests/uno-board.test.ts`.
  */
 import { BOARD_H, BOARD_W } from '../constants';
 import {
@@ -19,6 +23,7 @@ import {
   NET_CLASSES,
 } from '../layout';
 import { FOOTPRINTS } from '../footprints';
+import { ROUTING_DATA } from './routing.data';
 import { allPads, pointConvexDistance, rectCorners, type PlacedPad } from './pads';
 import {
   GridRouter,
@@ -301,34 +306,68 @@ function* routingSteps(): Generator<number, Routing> {
   return { traces, vias, failures, pads };
 }
 
-let cache: Routing | null = null;
-
-/** Routage complet (calculé une fois, puis mis en cache). */
-export function computeRouting(): Routing {
-  if (cache) return cache;
+/** Exécute le routeur (calcul complet, déterministe). */
+export function routeBoard(): Routing {
   const it = routingSteps();
-  for (let r = it.next(); ; r = it.next()) {
-    if (r.done) {
-      cache = r.value;
-      return cache;
-    }
-  }
+  for (let r = it.next(); ; r = it.next()) if (r.done) return r.value;
 }
 
-/** Routage asynchrone : rend la main au navigateur toutes les ~20 ms. */
-export async function computeRoutingAsync(onProgress?: (value: number) => void): Promise<Routing> {
+/** Données de routage enregistrées : pistes [réseau, couche, largeur, points] et vias [réseau, x, y]. */
+export interface RoutingData {
+  traces: readonly (readonly [string, Layer, number, readonly number[]])[];
+  vias: readonly (readonly [string, number, number])[];
+}
+
+const r4 = (v: number): number => Math.round(v * 1e4) / 1e4;
+
+/** Forme compacte (arrondie au 0,1 µm) d'un routage, pour l'enregistrement et la comparaison. */
+export function toRoutingData(r: Routing): RoutingData {
+  return {
+    traces: r.traces.map((t) => [t.net, t.layer, r4(t.width), t.points.map(r4)] as const),
+    vias: r.vias.map((v) => [v.net, r4(v.x), r4(v.y)] as const),
+  };
+}
+
+/** Source TypeScript du fichier `routing.data.ts`. */
+export function routingDataSource(r: Routing): string {
+  const d = toRoutingData(r);
+  const lines = [
+    '/**',
+    ' * Routage de la carte (GÉNÉRÉ par `routeBoard`, ne pas modifier à la main) : pistes',
+    ' * [réseau, couche (0 dessus, 1 dessous), largeur mm, polyligne mm] et vias [réseau, x, y].',
+    ' * Régénération : `UNO_ROUTING_UPDATE=1 npx vitest run tests/uno-board.test.ts`.',
+    ' */',
+    "import type { RoutingData } from './routing';",
+    '',
+    '// prettier-ignore',
+    'export const ROUTING_DATA: RoutingData = {',
+    '  traces: [',
+    ...d.traces.map((t) => `    [${JSON.stringify(t[0])}, ${t[1]}, ${t[2]}, [${t[3].join(', ')}]],`),
+    '  ],',
+    '  vias: [',
+    ...d.vias.map((v) => `    [${JSON.stringify(v[0])}, ${v[1]}, ${v[2]}],`),
+    '  ],',
+    '};',
+    '',
+  ];
+  return lines.join('\n');
+}
+
+let cache: Routing | null = null;
+
+/** Routage de la carte, relu depuis les données enregistrées (instantané, mis en cache). */
+export function computeRouting(): Routing {
   if (cache) return cache;
-  const it = routingSteps();
-  let last = performance.now();
-  for (let r = it.next(); ; r = it.next()) {
-    if (r.done) {
-      cache = r.value;
-      return cache;
-    }
-    onProgress?.(r.value);
-    if (performance.now() - last > 20) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      last = performance.now();
-    }
-  }
+  cache = {
+    traces: ROUTING_DATA.traces.map(([net, layer, width, points]) => ({
+      net,
+      layer,
+      width,
+      points: [...points],
+    })),
+    vias: ROUTING_DATA.vias.map(([net, x, y]) => ({ net, x, y })),
+    failures: [],
+    pads: allPads(COMPONENTS),
+  };
+  return cache;
 }

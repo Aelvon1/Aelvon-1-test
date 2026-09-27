@@ -186,7 +186,10 @@ export class SelectionOutlineNode extends THREE.TempNode<'vec4'> {
     const hasContent = this.meshKinds.size > 0;
     if (!hasContent && !this.warm) {
       if (this.overlayDirty) {
-        this.rendererState = THREE.RendererUtils.resetRendererState(renderer, this.ensureRendererState(renderer));
+        this.rendererState = THREE.RendererUtils.resetRendererState(
+          renderer,
+          this.ensureRendererState(renderer),
+        );
         renderer.setRenderTarget(this.overlayTarget);
         renderer.setClearColor(0x000000, 0);
         renderer.clear();
@@ -268,7 +271,10 @@ export class SelectionOutlineNode extends THREE.TempNode<'vec4'> {
       const coord = uv();
       const offset = this.blurStep;
       const weights = [0.2, 0.18, 0.12, 0.07, 0.03];
-      const sum = this.blurSource.sample(coord).mul(weights[0] ?? 0).toVar();
+      const sum = this.blurSource
+        .sample(coord)
+        .mul(weights[0] ?? 0)
+        .toVar();
       for (let i = 1; i < weights.length; i++) {
         const w = weights[i] ?? 0;
         const d = offset.mul(i * 1.25);
@@ -300,16 +306,25 @@ export class SelectionOutlineNode extends THREE.TempNode<'vec4'> {
         [-0.7071, -0.7071],
       ];
       const around = vec4(0).toVar();
-      for (const [dx, dy] of dirs) around.assign(max(around, mask.sample(coord.add(texel.mul(vec2(dx, dy))))));
+      for (const [dx, dy] of dirs)
+        around.assign(max(around, mask.sample(coord.add(texel.mul(vec2(dx, dy))))));
       const halo = soft.sample(coord);
       // Parties cachées derrière un autre objet : même couleur, plus discrètes.
       const edgeVisibility = mix(float(0.4), float(1), around.a);
       const haloVisibility = mix(float(0.4), float(1), clamp(halo.a.mul(2.5), 0, 1));
-      const edge = clamp(around.rgb.sub(center.rgb), 0, 1).mul(edgeVisibility);
-      const glow = clamp(halo.rgb.mul(1.8).sub(center.rgb), 0, 1).mul(0.5).mul(haloVisibility);
+      // Priorités : un contour n'est pas dessiné sur un maillage de type égal ou supérieur
+      // (le trait orange d'une pièce sélectionnée passe par-dessus un parent survolé, pas l'inverse).
+      const coverAny = max(max(center.r, center.g), center.b);
+      const suppress = vec3(coverAny, max(center.g, center.b), center.b);
+      const edge = clamp(around.rgb.sub(suppress), 0, 1).mul(edgeVisibility);
+      const glow = clamp(halo.rgb.mul(1.8), 0, 1).mul(suppress.oneMinus()).mul(0.5).mul(haloVisibility);
       // Voile intérieur : rien au survol, léger pour la sélection, plus marqué si bloqué.
       const fill = center.rgb.mul(vec3(0, 0.07, 0.14)).mul(center.a.mul(0.6).add(0.4));
-      const k = edge.add(glow).add(fill).mul(vec3(1, 1, this.pulse)).toVar();
+      const k = edge
+        .add(glow)
+        .add(fill)
+        .mul(vec3(1, 1, this.pulse))
+        .toVar();
       const color = vec3(...OUTLINE_COLORS.hover)
         .mul(k.r)
         .add(vec3(...OUTLINE_COLORS.selected).mul(k.g))

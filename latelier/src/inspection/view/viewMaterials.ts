@@ -70,7 +70,12 @@ export function sectionColorOf(material: THREE.Material): THREE.Color {
 /** Un matériau peut-il recevoir une face de coupe ? (matériau à nœuds, opaque, simple face) */
 export function supportsSectionCap(material: THREE.Material): boolean {
   const m = material as THREE.NodeMaterial;
-  return m.isNodeMaterial === true && m.fragmentNode === null && !material.transparent && material.side !== THREE.DoubleSide;
+  return (
+    m.isNodeMaterial === true &&
+    m.fragmentNode === null &&
+    !material.transparent &&
+    material.side !== THREE.DoubleSide
+  );
 }
 
 /**

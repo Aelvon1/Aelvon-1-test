@@ -25,7 +25,13 @@ export interface FilletSpec {
 }
 
 /** Distance, le long d'un rayon (depuis c, direction d), jusqu'au bord d'un rectangle qui contient c. */
-function rayRect(cx: number, cz: number, dx: number, dz: number, r: readonly [number, number, number, number]): number {
+function rayRect(
+  cx: number,
+  cz: number,
+  dx: number,
+  dz: number,
+  r: readonly [number, number, number, number],
+): number {
   let t = Infinity;
   if (dx > 1e-12) t = Math.min(t, (r[2] - cx) / dx);
   if (dx < -1e-12) t = Math.min(t, (r[0] - cx) / dx);

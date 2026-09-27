@@ -196,6 +196,13 @@ export class App {
       machine.go('inspection');
       postfx.setMode('inspection');
       await startMaterialShowcase(ctx, this.world);
+    } else if (import.meta.env.DEV && dev.raw.get('tools') === '1') {
+      // Banc des outils 3D animés (mise au point des modèles et des gestes).
+      const { startToolShowcase } = await import('../dev/toolShowcase');
+      machine.go('transition');
+      machine.go('inspection');
+      postfx.setMode('inspection');
+      await startToolShowcase(ctx, this.world);
     } else if (dev.inspect) {
       machine.go('transition');
       await this.openObject(dev.inspect);

@@ -30,7 +30,15 @@ import { MARKINGS, markingRequest } from '../src/objects/uno-board/markings';
 import { artworkRequest, artworkSize } from '../src/objects/uno-board/pcb/artwork';
 import { boardOutline, insetPolygon, signedArea } from '../src/objects/uno-board/pcb/outline';
 import { allPads, convexOverlap, pointConvexDistance, rectCorners } from '../src/objects/uno-board/pcb/pads';
-import { DRC, computeRouting } from '../src/objects/uno-board/pcb/routing';
+import {
+  DRC,
+  computeRouting,
+  routeBoard,
+  routingDataSource,
+  toRoutingData,
+} from '../src/objects/uno-board/pcb/routing';
+import { ROUTING_DATA } from '../src/objects/uno-board/pcb/routing.data';
+import { writeFileSync } from 'node:fs';
 import { pointInPolygon, pointSegmentDistance } from '../src/objects/uno-board/pcb/router';
 import { filletRing, thtFillet } from '../src/objects/uno-board/packages/solder';
 import { loftRoundedRect, roundedBoxSections } from '../src/objects/uno-board/packages/geometry';
@@ -138,6 +146,21 @@ describe('uno-board : implantation', () => {
 
 describe('uno-board : routage', () => {
   const routing = computeRouting();
+
+  it(
+    'données de routage enregistrées à jour (UNO_ROUTING_UPDATE=1 pour régénérer)',
+    { timeout: 180_000 },
+    () => {
+      const fresh = routeBoard();
+      expect(fresh.failures).toEqual([]);
+      if (process.env.UNO_ROUTING_UPDATE === '1')
+        writeFileSync(
+          new URL('../src/objects/uno-board/pcb/routing.data.ts', import.meta.url),
+          routingDataSource(fresh),
+        );
+      else expect(toRoutingData(fresh)).toEqual(ROUTING_DATA);
+    },
+  );
 
   it('toutes les liaisons sont routées', () => {
     expect(routing.failures).toEqual([]);

@@ -5,10 +5,10 @@
  *    lit la profondeur avec `textureGather`, interdit sur une texture multi-échantillonnée en
  *    WGSL. Une passe minuscule recopie donc la profondeur (échantillon 0) dans une vraie
  *    `DepthTexture` flottante à la résolution de l'AO — plus petite, donc aussi plus rapide à lire.
- * 2. **Profondeur inversée** : `getViewPosition()` (three) suppose en WebGL un NDC z ∈ [-1, 1],
- *    alors qu'avec `reversedDepthBuffer` + `EXT_clip_control` la profondeur est dans [0, 1].
- *    On fournit à GTAO une caméra « miroir » dont l'inverse de projection intègre la correction
- *    z' ↦ (z' + 1) / 2 ; en WebGPU (NDC z ∈ [0, 1]) aucune correction n'est nécessaire.
+ * 2. **Profondeur inversée** : GTAO (r186) suppose une profondeur classique (fond = 1, « min » =
+ *    plus proche, NDC WebGL dans [-1, 1]). La recopie écrit donc `1 − d` (profondeur classique
+ *    [0, 1], identique en WebGPU et en WebGL) et GTAO reçoit une caméra « miroir » à projection
+ *    classique (non inversée) dans le système de coordonnées du backend.
  * 3. **Débruitage** : le motif de bruit 5 × 5 de GTAO est effacé par un flou séparable 5 + 5
  *    prises pondéré par la profondeur (pas de fuite d'occlusion d'un objet sur le fond).
  *
@@ -16,7 +16,7 @@
  * matériaux des autres modules).
  */
 import * as THREE from 'three/webgpu';
-import { Fn, abs, exp, float, max, perspectiveDepthToViewZ, reference, rtt, texture, uniform, uv, vec4 } from 'three/tsl';
+import { Fn, abs, exp, float, max, reference, rtt, texture, uniform, uv, vec4 } from 'three/tsl';
 import GTAONode from 'three/addons/tsl/display/GTAONode.js';
 
 type FloatNode = THREE.Node<'float'>;
@@ -29,24 +29,43 @@ const RECONSTRUCTED_NORMALS = null as unknown as THREE.Node;
 
 const _size = new THREE.Vector2();
 
-/** Caméra miroir de la caméra de scène pour GTAO (matrices recopiées à chaque image). */
+/**
+ * Caméra miroir de la caméra de scène pour GTAO : mêmes paramètres optiques, mais projection
+ * classique (jamais rendue par le renderer, elle n'est donc jamais passée en profondeur inversée).
+ */
 export class AoCameraMirror {
   readonly camera = new THREE.PerspectiveCamera();
-  /** z' (NDC WebGL) ↦ (z' + 1) / 2 : profondeur inversée [0, 1] lue comme un NDC [-1, 1]. */
-  private readonly ndcFix = new THREE.Matrix4().set(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
 
-  constructor(private readonly needsNdcFix: boolean) {
+  constructor(coordinateSystem: THREE.CoordinateSystem) {
     this.camera.name = 'Caméra AO (miroir)';
+    this.camera.coordinateSystem = coordinateSystem;
   }
 
   sync(source: THREE.PerspectiveCamera): void {
     const cam = this.camera;
+    if (
+      cam.fov === source.fov &&
+      cam.aspect === source.aspect &&
+      cam.near === source.near &&
+      cam.far === source.far &&
+      cam.zoom === source.zoom &&
+      cam.filmOffset === source.filmOffset
+    ) {
+      return;
+    }
+    cam.fov = source.fov;
+    cam.aspect = source.aspect;
     cam.near = source.near;
     cam.far = source.far;
-    cam.projectionMatrix.copy(source.projectionMatrix);
-    cam.projectionMatrixInverse.copy(source.projectionMatrixInverse);
-    if (this.needsNdcFix) cam.projectionMatrixInverse.multiply(this.ndcFix);
+    cam.zoom = source.zoom;
+    cam.filmOffset = source.filmOffset;
+    cam.updateProjectionMatrix();
   }
+}
+
+/** Profondeur classique [0, 1] → z de vue (négatif), indépendamment du mode du renderer. */
+function standardDepthToViewZ(depth: FloatNode, near: FloatNode, far: FloatNode): FloatNode {
+  return near.mul(far).div(far.sub(near).mul(depth).sub(far));
 }
 
 /** Recopie de la profondeur de la passe de scène (MSAA ou non) dans une DepthTexture simple. */
@@ -56,7 +75,7 @@ class DepthResolvePass {
   private readonly material = new THREE.NodeMaterial();
   private readonly quad: THREE.QuadMesh;
 
-  constructor(sourceDepth: THREE.Texture) {
+  constructor(sourceDepth: THREE.Texture, reversed: boolean) {
     this.depthTexture.type = THREE.FloatType;
     this.depthTexture.name = 'PostFX.aoDepth';
     // Cible couleur minimale (R8) : seule la profondeur est utile.
@@ -68,10 +87,14 @@ class DepthResolvePass {
     this.target.depthTexture = this.depthTexture;
     this.material.name = 'PostFX.depthResolve';
     this.material.fragmentNode = vec4(0);
-    this.material.depthNode = texture(sourceDepth, uv()).r;
+    const source = texture(sourceDepth, uv()).r;
+    // Profondeur inversée → classique : 1 − d (exact : les deux sont hyperboliques en z).
+    this.material.depthNode = reversed ? float(1).sub(source) : source;
+    // Test de profondeur par défaut (LessEqual) sur un tampon fraîchement effacé : chaque pixel
+    // n'est dessiné qu'une fois, le test passe toujours. Surtout PAS `AlwaysDepth` : three r186
+    // « inverse » les fonctions de comparaison en profondeur inversée et Always devient Never.
     this.material.depthTest = true;
     this.material.depthWrite = true;
-    this.material.depthFunc = THREE.AlwaysDepth;
     this.quad = new THREE.QuadMesh(this.material);
     this.quad.name = 'PostFX [ Résolution de la profondeur AO ]';
   }
@@ -128,8 +151,10 @@ export interface AmbientOcclusionOptions {
   resolution: number;
   /** Échantillons GTAO (constante de compilation). */
   samples: number;
-  /** Correction NDC (WebGL + profondeur inversée). */
-  ndcFix: boolean;
+  /** Profondeur inversée active sur le renderer. */
+  reversedDepth: boolean;
+  /** Système de coordonnées du backend (NDC z ∈ [0, 1] en WebGPU, [-1, 1] en WebGL). */
+  coordinateSystem: THREE.CoordinateSystem;
 }
 
 /** Chaîne AO complète : GTAO + flou bilatéral séparable. `factor` : 1 = pas d'occlusion. */
@@ -137,6 +162,9 @@ export class AmbientOcclusion {
   readonly gtao: ResolvedGTAONode;
   /** Facteur d'occlusion filtré (flottant 0..1) à la résolution de l'AO, rééchantillonné bilinéairement. */
   readonly factor: FloatNode;
+  /** Facteur brut de GTAO et profondeur de vue recopiée (vues de contrôle). */
+  readonly rawFactor: FloatNode;
+  readonly resolvedViewZ: FloatNode;
   private readonly mirror: AoCameraMirror;
   private readonly resolve: DepthResolvePass;
   private readonly blurH: THREE.RTTNode;
@@ -149,9 +177,9 @@ export class AmbientOcclusion {
   constructor(options: AmbientOcclusionOptions) {
     const { scenePass, resolution } = options;
     this.resolution = resolution;
-    this.mirror = new AoCameraMirror(options.ndcFix);
+    this.mirror = new AoCameraMirror(options.coordinateSystem);
     this.mirror.sync(options.camera);
-    this.resolve = new DepthResolvePass(scenePass.getTexture('depth'));
+    this.resolve = new DepthResolvePass(scenePass.getTexture('depth'), options.reversedDepth);
     this.gtao = new ResolvedGTAONode(this.resolve, scenePass, this.mirror.camera);
     this.gtao.resolutionScale = resolution;
     this.gtao.samples.value = options.samples;
@@ -170,6 +198,12 @@ export class AmbientOcclusion {
     this.blurH = rtt(bilateralBlur(aoTexture, depth, options.camera, this.stepH), null, null, rttOptions);
     this.blurV = rtt(bilateralBlur(this.blurH, depth, options.camera, this.stepV), null, null, rttOptions);
     this.factor = this.blurV.r;
+    this.rawFactor = aoTexture.r;
+    this.resolvedViewZ = standardDepthToViewZ(
+      depth.r,
+      reference('near', 'float', options.camera),
+      reference('far', 'float', options.camera),
+    );
   }
 
   /**
@@ -207,7 +241,7 @@ function bilateralBlur(
   const far = reference('far', 'float', camera);
   return Fn(() => {
     const coord = uv();
-    const viewZ = (at: THREE.Node<'vec2'>): FloatNode => perspectiveDepthToViewZ(depth.sample(at).r, near, far);
+    const viewZ = (at: THREE.Node<'vec2'>): FloatNode => standardDepthToViewZ(depth.sample(at).r, near, far);
     const centerZ = viewZ(coord).toVar();
     // Tolérance relative : 2 % de la distance (+ 5 mm) — suffisant pour une surface inclinée.
     const invTolerance = float(1).div(centerZ.abs().mul(0.02).add(0.005)).toVar();

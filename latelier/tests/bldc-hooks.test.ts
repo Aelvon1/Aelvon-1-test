@@ -15,7 +15,10 @@ import {
 import type { ObjectParams, PartBuild } from '../src/objects/types';
 import { createFakeServices } from './helpers/fakeServices';
 
-function buildPart(id: string, params: Partial<ObjectParams> = {}): { built: PartBuild; detail?: THREE.Object3D } {
+function buildPart(
+  id: string,
+  params: Partial<ObjectParams> = {},
+): { built: PartBuild; detail?: THREE.Object3D } {
   const services = createFakeServices();
   registerObjectMaterials(def as never, services.materials);
   const r = resolveObject(def as never, params);

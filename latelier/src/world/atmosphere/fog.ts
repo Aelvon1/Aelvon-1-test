@@ -12,6 +12,8 @@
  *   des petits bois, une densité bruitée qui dérive lentement et une fonction de phase
  *   anisotrope (Henyey-Greenstein) : les rais sont plus visibles à contre-jour.
  *
+ * Approximation : le tube néon est intégré comme trois sources ponctuelles, et le cône de la
+ * lampe loupe n'est évalué qu'au point du segment le plus proche de la source.
  * Approximation : les obstacles (établi, objets) n'ombrent pas la brume de l'ampoule et du néon ;
  * le faisceau de la fenêtre, lui, est limité par la surface visée (le sol, un mur…).
  */

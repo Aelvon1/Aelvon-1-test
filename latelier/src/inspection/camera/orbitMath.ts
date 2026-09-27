@@ -40,7 +40,9 @@ export function orbitOffset(
   out: THREE.Vector3,
 ): THREE.Vector3 {
   const ce = Math.cos(elevation);
-  return out.set(ce * Math.sin(azimuth), Math.sin(elevation), ce * Math.cos(azimuth)).multiplyScalar(distance);
+  return out
+    .set(ce * Math.sin(azimuth), Math.sin(elevation), ce * Math.cos(azimuth))
+    .multiplyScalar(distance);
 }
 
 /** Azimut et élévation d'une direction cible → caméra (non nécessairement normée). */
@@ -191,7 +193,11 @@ export function lerpLog(a: number, b: number, t: number): number {
  * Distance maximale le long de `direction` (unitaire) depuis `origin` avant de sortir de la
  * boîte `bounds` (murs de la pièce). Infinity si l'origine est hors de la boîte.
  */
-export function distanceInsideBox(origin: THREE.Vector3, direction: THREE.Vector3, bounds: THREE.Box3): number {
+export function distanceInsideBox(
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  bounds: THREE.Box3,
+): number {
   if (!bounds.containsPoint(origin)) return Infinity;
   let t = Infinity;
   const axes = ['x', 'y', 'z'] as const;
