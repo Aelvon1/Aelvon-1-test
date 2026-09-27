@@ -8,7 +8,8 @@ import * as THREE from 'three/webgpu';
 import { Assembly } from '../src/inspection/Assembly';
 import { objectBodyBounds, objectLocalBounds } from '../src/inspection/view/InspectionView';
 import { sectionPointLocal } from '../src/inspection/view/Section';
-import { getObjectDef } from '../src/objects/registry';
+import { defaultSection } from '../src/inspection/Inspection';
+import { getObjectDef, listObjectDefs } from '../src/objects/registry';
 import { createFakeServices } from './helpers/fakeServices';
 
 describe('coupe — bornes du corps de l’objet', () => {
@@ -38,4 +39,16 @@ describe('coupe — bornes du corps de l’objet', () => {
     expect(Math.max(fs.x / bs.x, fs.y / bs.y, fs.z / bs.z)).toBeGreaterThan(1.5);
     assembly.dispose();
   }, 120000);
+
+  it('axe par défaut tourné vers la vue initiale (face coupée visible)', () => {
+    for (const def of listObjectDefs()) {
+      const d = def.presentation?.viewDirection ?? [0.3, 0.75, 1];
+      const section = defaultSection(def);
+      const i = ['x', 'y', 'z'].indexOf(section.axis);
+      // Axe le plus aligné sur la vue, face de coupe (+axe si `flip` faux) du côté de la caméra.
+      expect(Math.abs(d[i]!)).toBe(Math.max(...d.map(Math.abs)));
+      expect(section.flip).toBe(d[i]! < 0);
+      expect(section.position).toBe(0.5);
+    }
+  });
 });

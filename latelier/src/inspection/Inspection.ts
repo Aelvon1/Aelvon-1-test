@@ -303,7 +303,12 @@ export class Inspection {
       labels: previous?.labels ?? false,
       knolling: false,
       xray: previous?.xray ?? false,
-      section: previous?.section ?? { enabled: false, axis: 'x', position: 0.5, flip: false },
+      // Même objet (reconstruction) : réglages de coupe conservés ; autre objet : axe par défaut
+      // tourné vers la vue initiale (activation reprise de l'inspection précédente).
+      section:
+        previous && previous.objectId === def.id
+          ? previous.section
+          : { ...defaultSection(def), enabled: previous?.section.enabled ?? false },
       isolatedId: null,
       neutralBackground: previous?.neutralBackground ?? false,
       busy: false,
@@ -804,10 +809,10 @@ export class Inspection {
 
   /**
    * Cadre des pièces ; `withTravel` inclut leur course de retrait (pas à pas). `reinsert`
-   * (remontage) : la place de chaque pièce dans son parent (pose de repos, parent tel qu'il est
-   * maintenant) et l'entrée de sa course sont cadrées avec sa position actuelle (rangée sur le
-   * tapis) — sinon la caméra resterait sur l'emplacement de rangement, vide une fois la pièce
-   * remontée.
+   * (remontage) : c'est la place de chaque pièce dans son parent (pose de repos, parent tel qu'il
+   * est maintenant) et l'entrée de sa course qui sont cadrées, et non sa position actuelle
+   * (rangée au bord du tapis, vide une fois la pièce remontée) : la pièce revient dans le champ,
+   * le geste de remontage se fait au centre.
    */
   private frameParts(ids: readonly string[], withTravel: boolean, reinsert = false): void {
     const a = this.assembly;
@@ -817,7 +822,7 @@ export class Inspection {
     for (const id of ids) {
       a.worldBounds(id, _box);
       if (_box.isEmpty()) continue;
-      _box2.union(_box);
+      if (!(withTravel && reinsert)) _box2.union(_box);
       const part = a.parts.get(id);
       const removal = part?.def.removal;
       if (withTravel && reinsert && part) {
@@ -829,7 +834,8 @@ export class Inspection {
           _m.premultiply(parentNode.matrixWorld);
         }
         const local = part.subtreeBox.isEmpty() ? part.localBox : part.subtreeBox;
-        if (!local.isEmpty()) {
+        if (local.isEmpty()) _box2.union(_box);
+        else {
           _box3.copy(local).applyMatrix4(_m);
           _box2.union(_box3);
           if (removal && parentNode) {
@@ -1005,6 +1011,18 @@ export class Inspection {
     s.composer.markDirty();
     s.composer.apply();
   }
+}
+
+/**
+ * Coupe par défaut d'un objet : axe (repère de l'objet) le plus aligné sur la direction de la vue
+ * initiale, sens choisi pour que la face coupée soit tournée vers la caméra (côté conservé :
+ * coordonnées inférieures à la coupe, face de coupe vers +axe si `flip` est faux).
+ */
+export function defaultSection(def: AnyDef): InspectionState['section'] {
+  const d = def.presentation?.viewDirection ?? [0.3, 0.75, 1];
+  const abs = d.map(Math.abs);
+  const i = abs[2]! >= abs[0]! && abs[2]! >= abs[1]! ? 2 : abs[1]! >= abs[0]! ? 1 : 0;
+  return { enabled: false, axis: (['x', 'y', 'z'] as const)[i]!, position: 0.5, flip: d[i]! < 0 };
 }
 
 /** Définition d'objet ; les objets de développement (dossiers « _x ») répondent aussi à « _x ». */

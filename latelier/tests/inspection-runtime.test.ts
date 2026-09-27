@@ -310,3 +310,43 @@ describe('runtime — vue rangée', () => {
     expect(plan.labels.length).toBeGreaterThan(5);
   });
 });
+
+describe('runtime — cadrage des étapes', () => {
+  it('le séquenceur signale le sens (retrait / remontage) de chaque demande de cadrage', async () => {
+    const rig = await createRig();
+    const frames: { ids: string[]; reinsert: boolean }[] = [];
+    const sequencer = new Sequencer({
+      assembly: rig.assembly,
+      composer: rig.composer,
+      graph: rig.graph,
+      audio: rig.audio,
+      placementSetting: () => 'stay',
+      autoFrame: () => true,
+      listener: {
+        onStateChange: () => undefined,
+        onStepStarted: () => undefined,
+        onStepFinished: () => undefined,
+        onBlocked: () => undefined,
+        onToolChange: () => undefined,
+        onFrameRequest: (ids, reinsert) => frames.push({ ids, reinsert }),
+      },
+    });
+    const run = () => {
+      let t = 0;
+      do {
+        sequencer.update(1 / 60);
+        rig.composer.apply();
+        t += 1 / 60;
+      } while ((sequencer.busy || sequencer.hasTweens) && t < 60);
+    };
+    sequencer.command({ kind: 'next' });
+    run();
+    sequencer.command({ kind: 'prev' });
+    run();
+    expect(frames).toHaveLength(2);
+    expect(frames[0]!.reinsert).toBe(false);
+    expect(frames[1]!.reinsert).toBe(true);
+    expect(frames[1]!.ids).toEqual(frames[0]!.ids);
+    sequencer.dispose();
+  });
+});
