@@ -67,7 +67,9 @@ export const InventoryCard = memo(function InventoryCard({
   const pin = PIN_TONES[h % PIN_TONES.length];
   const descriptionId = `inv-desc-${entry.id}`;
   // Mots-clés trouvés par la recherche (invisibles sinon sur la fiche).
-  const keywordHits = query ? entry.keywords.filter((k) => highlightRanges(k, query).length > 0).slice(0, 3) : [];
+  const keywordHits = query
+    ? entry.keywords.filter((k) => highlightRanges(k, query).length > 0).slice(0, 3)
+    : [];
   return (
     <li className="inv-cell">
       <button

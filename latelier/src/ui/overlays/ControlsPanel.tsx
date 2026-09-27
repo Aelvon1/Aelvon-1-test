@@ -44,8 +44,8 @@ export function ControlsPanel() {
     >
       <p className="controls-intro">
         Les déplacements suivent la position des touches&nbsp;: la disposition détectée est affichée. Les
-        raccourcis de l’établi sont des lettres (X pour éclater, L pour les étiquettes…), identiques sur tous les
-        claviers.
+        raccourcis de l’établi sont des lettres (X pour éclater, L pour les étiquettes…), identiques sur tous
+        les claviers.
       </p>
       <div className="controls-grid">
         <Section section={EXPLORATION_CONTROLS} />

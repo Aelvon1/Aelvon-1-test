@@ -88,7 +88,15 @@ describe('textes', () => {
 });
 
 describe('valeurs de paramètres', () => {
-  const kv: ParamSchema = { key: 'kv', label: 'KV', kind: 'number', min: 3000, max: 6000, step: 100, unit: 'tr/min/V' };
+  const kv: ParamSchema = {
+    key: 'kv',
+    label: 'KV',
+    kind: 'number',
+    min: 3000,
+    max: 6000,
+    step: 100,
+    unit: 'tr/min/V',
+  };
   const format: ParamSchema = {
     key: 'format',
     label: 'Format',

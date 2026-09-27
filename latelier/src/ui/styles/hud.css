@@ -252,3 +252,12 @@
   --font-family: var(--font-mono);
   --font-size: 11px;
 }
+
+/* Mesures en lecture seule : lisibles (lil-gui estompe les contrôles désactivés). */
+.debug-panel .lil-gui .controller.disabled {
+  opacity: 1;
+}
+
+.debug-panel .lil-gui .controller.disabled input {
+  color: var(--tape);
+}

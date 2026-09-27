@@ -26,6 +26,12 @@ export interface InspectionViewPose {
   distance: number;
   /** Distance minimale caméra → surface (m) : `presentation.minSurfaceDistance`. */
   minDistance: number;
+  /**
+   * Rayon de la sphère cadrée par `distance` (m). Fourni, il permet à la caméra de recadrer la
+   * vue initiale dans la zone libre de l'écran (hors panneaux de l'interface) quand celle-ci
+   * change, en conservant la marge implicite de `distance`.
+   */
+  radius?: number;
   /** Placement immédiat, sans transition (captures reproductibles). */
   instant?: boolean;
 }
@@ -49,6 +55,14 @@ export interface CameraSceneQuery {
    * dos, c'est-à-dire si l'origine du rayon est à l'intérieur d'un volume. Faux si aucun impact.
    */
   probe(origin: THREE.Vector3, direction: THREE.Vector3, far: number, out: ProbeHit): boolean;
+}
+
+/** Encarts de l'écran recouverts par l'interface (px CSS, bords du canvas). */
+export interface ScreenInsets {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
 export interface ProbeHit {

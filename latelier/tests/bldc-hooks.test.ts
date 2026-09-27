@@ -56,13 +56,19 @@ describe('bldc-inrunner : débobinage', () => {
     expect(counts[0]!).toBeLessThan(full);
     expect(free.visible).toBe(true);
     expect(free.geometry.drawRange.count).toBeGreaterThan(0);
-    // Fin du débobinage : plus aucune spire en place.
+    // Fin du débobinage : plus aucune spire en place (seul reste le triangle dégénéré de tête,
+    // qui évite un appel de dessin à 0 indice).
     hook(1, { motion: 'unwind', direction: 1 });
-    expect(drawCount(base)).toBe(0);
+    expect(drawCount(base)).toBe(3);
+    expect(drawCount(strands)).toBe(3);
     // Remontage : état initial restauré.
     hook(0, { motion: 'unwind', direction: -1 });
     expect(drawCount(base)).toBe(full);
     expect(free.visible).toBe(false);
+    // Brin libre replié : plage non vide mais triangles dégénérés (sommets confondus).
+    expect(free.geometry.drawRange.count).toBeGreaterThan(0);
+    const pos = free.geometry.getAttribute('position');
+    for (let v = 0; v < 6; v++) expect(Math.hypot(pos.getX(v), pos.getY(v), pos.getZ(v))).toBe(0);
   });
 });
 

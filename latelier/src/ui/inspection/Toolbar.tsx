@@ -183,7 +183,12 @@ export function Toolbar() {
             shortcut="F"
             onClick={() => bus.emit('inspection:frame', selectedId ? { partId: selectedId } : {})}
           />
-          <ToolButton icon="recenter" label="Recentrer" shortcut="R" onClick={() => bus.emit('inspection:resetView')} />
+          <ToolButton
+            icon="recenter"
+            label="Recentrer"
+            shortcut="R"
+            onClick={() => bus.emit('inspection:resetView')}
+          />
           <ToolButton
             icon="showAll"
             label="Tout afficher"

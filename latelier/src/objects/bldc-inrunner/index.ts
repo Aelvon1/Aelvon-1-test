@@ -49,7 +49,9 @@ const def: ObjectDef<BldcParams> = {
   removedPlacement: 'park',
   presentation: {
     rotationY: -0.42,
-    viewDirection: [0.55, 0.62, 1],
+    // Vue de trois quarts ARRIÈRE : les premières étapes (câble, phases, platine, flasque arrière,
+    // calage, rotor) se font côté capteurs ; le pignon reste visible en bout d'arbre.
+    viewDirection: [-0.45, 0.6, 1],
     minSurfaceDistance: 0.0015,
   },
 };

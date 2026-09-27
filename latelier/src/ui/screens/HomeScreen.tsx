@@ -37,10 +37,20 @@ export function HomeScreen() {
               <Icon name="play" /> Entrer
             </button>
             <div className="home-secondary">
-              <button type="button" className="btn btn-ink" onMouseEnter={hover} onClick={() => open('settings')}>
+              <button
+                type="button"
+                className="btn btn-ink"
+                onMouseEnter={hover}
+                onClick={() => open('settings')}
+              >
                 <Icon name="gear" /> Réglages
               </button>
-              <button type="button" className="btn btn-ink" onMouseEnter={hover} onClick={() => open('controls')}>
+              <button
+                type="button"
+                className="btn btn-ink"
+                onMouseEnter={hover}
+                onClick={() => open('controls')}
+              >
                 <Icon name="keyboard" /> Commandes
               </button>
             </div>

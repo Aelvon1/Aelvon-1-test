@@ -7,6 +7,8 @@
  * - plans near/far recalculés en continu (near ≤ distance libre, jamais nul) ;
  * - orbite rasante au macro : jamais à travers la matière ; jamais sous le tapis ;
  * - clic simple (sélection) distinct du glisser ; cadrage et vue initiale ;
+ * - zone libre de l'écran (panneaux de l'interface) : point principal décalé, cadrage dans la
+ *   zone, zoom vers le curseur toujours exact, retour à zéro à la désactivation ;
  * - modes de rendu de la vue : substitution et restitution EXACTE des matériaux (rayons X, coupe),
  *   plan de coupe (3 axes, inversion).
  */
@@ -17,7 +19,13 @@ import { PoseComposer } from '../src/inspection/poses';
 import { Picker } from '../src/inspection/selection/Picker';
 import { InspectionCamera } from '../src/inspection/camera/InspectionCamera';
 import type { CameraPointerListener } from '../src/inspection/camera/types';
-import { NEAR_MIN_REVERSED, fitDistance } from '../src/inspection/camera/orbitMath';
+import {
+  NEAR_MIN_REVERSED,
+  fitDistance,
+  fitDistanceInArea,
+  freeViewArea,
+  principalOffset,
+} from '../src/inspection/camera/orbitMath';
 import { MaterialModes } from '../src/inspection/view/MaterialModes';
 import { Section, sectionNormalLocal, sectionPointLocal } from '../src/inspection/view/Section';
 import { IdleQueue } from '../src/core/scheduler';
@@ -358,6 +366,120 @@ describe('caméra d’inspection — zoom vers le curseur jusqu’au macro', () 
     expect(canvas.listenerCount).toBe(count * 2);
     other.dispose();
     expect(canvas.listenerCount).toBe(count);
+  });
+});
+
+describe('caméra d’inspection — zone libre (panneaux de l’interface)', () => {
+  const insets = { left: 300, top: 60, right: 340, bottom: 220 };
+
+  it('zone libre, décalage du point principal et distance de cadrage (fonctions pures)', () => {
+    const area = freeViewArea(WIDTH, HEIGHT, insets, { x: 0, y: 0, width: 0, height: 0 });
+    expect(area).toEqual({ x: 300, y: 60, width: 640, height: 440 });
+    const offset = principalOffset(WIDTH, HEIGHT, area, { x: 0, y: 0 });
+    expect(offset).toEqual({ x: 640 - 620, y: 360 - 280 });
+    // Écran entier : identique à `fitDistance`.
+    expect(fitDistanceInArea(0.05, FOV, HEIGHT, WIDTH, HEIGHT, 1.3)).toBeCloseTo(
+      fitDistance(0.05, FOV, WIDTH / HEIGHT, 1.3),
+      12,
+    );
+    // Zone plus petite : plus loin.
+    expect(fitDistanceInArea(0.05, FOV, HEIGHT, 640, 440, 1.3)).toBeGreaterThan(
+      fitDistance(0.05, FOV, WIDTH / HEIGHT, 1.3),
+    );
+    // Mesure incohérente (interface masquée) : écran entier.
+    const hidden = freeViewArea(
+      WIDTH,
+      HEIGHT,
+      { left: 8, top: 8, right: WIDTH + 8, bottom: HEIGHT + 8 },
+      area,
+    );
+    expect(hidden).toEqual({ x: 0, y: 0, width: WIDTH, height: HEIGHT });
+  });
+
+  it('l’objet est cadré et centré dans la zone libre ; zoom au curseur exact ; retour à zéro', () => {
+    const cam = new THREE.PerspectiveCamera(FOV, WIDTH / HEIGHT, 0.02, 60);
+    cam.position.set(MAT.center[0], MAT.center[1] + 0.32, MAT.center[2] + 0.42);
+    cam.lookAt(new THREE.Vector3(...MAT.center));
+    cam.updateMatrixWorld();
+    const ui = new FakeCanvas();
+    let published: typeof insets | null = null;
+    const offsetCamera = new InspectionCamera({
+      camera: cam,
+      canvas: ui as unknown as HTMLCanvasElement,
+      query: () => picker,
+      floorY: FLOOR_Y,
+      roomBounds,
+      reversedDepth: true,
+      fov: FOV,
+      safeInsets: () => published,
+    });
+    offsetCamera.objectCenter.copy(sphere.center);
+    offsetCamera.objectRadius = sphere.radius;
+    offsetCamera.activate({
+      target: sphere.center.clone(),
+      direction: new THREE.Vector3(0.25, 0.9, 1).normalize(),
+      distance: fitDistance(sphere.radius, FOV, WIDTH / HEIGHT, 1.4),
+      radius: sphere.radius,
+      minDistance: MIN_SURFACE,
+    });
+    const frames = (n: number): void => {
+      for (let i = 0; i < n; i++) {
+        offsetCamera.update(1 / 60);
+        offsetCamera.updateViewOffset(1 / 60);
+      }
+    };
+    frames(5);
+    // Les panneaux apparaissent pendant la transition d'arrivée : destination recadrée.
+    published = insets;
+    frames(90);
+    const px = (p: THREE.Vector3): THREE.Vector2 => {
+      cam.updateMatrixWorld();
+      const n = p.clone().project(cam);
+      return new THREE.Vector2((n.x * 0.5 + 0.5) * WIDTH, (-n.y * 0.5 + 0.5) * HEIGHT);
+    };
+    const center = px(sphere.center);
+    expect(center.x).toBeCloseTo(300 + 640 / 2, 0);
+    expect(center.y).toBeCloseTo(60 + 440 / 2, 0);
+    expect(offsetCamera.distance).toBeCloseTo(
+      fitDistanceInArea(sphere.radius, FOV, HEIGHT, 640, 440, 1.4),
+      4,
+    );
+    for (let k = 0; k < 8; k++) {
+      const corner = new THREE.Vector3(
+        k & 1 ? bounds.max.x : bounds.min.x,
+        k & 2 ? bounds.max.y : bounds.min.y,
+        k & 4 ? bounds.max.z : bounds.min.z,
+      );
+      const s = px(corner);
+      expect(s.x).toBeGreaterThan(300);
+      expect(s.x).toBeLessThan(WIDTH - 340);
+      expect(s.y).toBeGreaterThan(60);
+      expect(s.y).toBeLessThan(HEIGHT - 220);
+    }
+    // Zoom vers le curseur avec la projection décalée : le point visé ne bouge pas.
+    const cursor = { x: 560, y: 250 };
+    const origin = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
+    const direction = new THREE.Vector3((cursor.x / WIDTH) * 2 - 1, -(cursor.y / HEIGHT) * 2 + 1, 0.5)
+      .unproject(cam)
+      .sub(origin)
+      .normalize();
+    const point = new THREE.Vector3();
+    expect(Number.isFinite(picker.surfacePoint(new THREE.Ray(origin, direction), point))).toBe(true);
+    for (let notch = 0; notch < 12; notch++) {
+      ui.dispatch('wheel', { clientX: cursor.x, clientY: cursor.y, deltaY: -100 });
+      frames(4);
+    }
+    frames(40);
+    const after = px(point);
+    expect(after.x).toBeCloseTo(cursor.x, 0);
+    expect(after.y).toBeCloseTo(cursor.y, 0);
+    // Désactivation : le décalage revient à zéro en douceur, puis est supprimé.
+    offsetCamera.deactivate();
+    frames(2);
+    expect(cam.view?.enabled).toBe(true);
+    frames(120);
+    expect(cam.view === null || !cam.view.enabled).toBe(true);
+    offsetCamera.dispose();
   });
 });
 

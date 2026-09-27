@@ -103,7 +103,9 @@ export async function benchThumbnail(hue: number): Promise<Thumbnail> {
       .sort((p, q) => p.depth - q.depth);
     sorted.forEach(({ face }, k) => {
       ctx.beginPath();
-      face.forEach((c, j) => (j === 0 ? ctx.moveTo(proj[c]!.x, proj[c]!.y) : ctx.lineTo(proj[c]!.x, proj[c]!.y)));
+      face.forEach((c, j) =>
+        j === 0 ? ctx.moveTo(proj[c]!.x, proj[c]!.y) : ctx.lineTo(proj[c]!.x, proj[c]!.y),
+      );
       ctx.closePath();
       ctx.fillStyle = `hsl(${hue} 45% ${28 + k * 7}%)`;
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';
@@ -133,8 +135,22 @@ interface FakePart {
 const PARTS: FakePart[] = [
   { id: 'moteur', name: 'Moteur complet', parent: null, kind: 'assembly', base: true },
   { id: 'cloche', name: 'Flasque avant', parent: 'moteur', kind: 'assembly', requires: ['vis-flasque'] },
-  { id: 'vis-flasque', name: 'Vis de flasque M3', parent: 'moteur', quantity: 4, tool: 'hex-key-2.5', reference: 'ISO 4762 M3×6' },
-  { id: 'roul-av', name: 'Roulement avant', parent: 'cloche', tool: 'bearing-puller', requires: ['cloche'], reference: '693ZZ' },
+  {
+    id: 'vis-flasque',
+    name: 'Vis de flasque M3',
+    parent: 'moteur',
+    quantity: 4,
+    tool: 'hex-key-2.5',
+    reference: 'ISO 4762 M3×6',
+  },
+  {
+    id: 'roul-av',
+    name: 'Roulement avant',
+    parent: 'cloche',
+    tool: 'bearing-puller',
+    requires: ['cloche'],
+    reference: '693ZZ',
+  },
   { id: 'circlip', name: 'Circlip d’arbre', parent: 'moteur', tool: 'pliers-circlip', requires: ['cloche'] },
   { id: 'rotor', name: 'Rotor', parent: 'moteur', kind: 'assembly', requires: ['circlip'] },
   { id: 'arbre', name: 'Arbre', parent: 'rotor', base: true, reference: 'Ø 3,175 mm' },
@@ -160,25 +176,67 @@ const PARTS: FakePart[] = [
     reference: 'M270-35A',
     tip: 'Les tôles sont isolées entre elles par un vernis : cela limite les courants de Foucault.',
   },
-  { id: 'bobinage', name: 'Bobinage triphasé', parent: 'stator', tool: 'cutter-flush', requires: ['stator'], destructive: true },
-  { id: 'hall', name: 'Capteur à effet Hall', parent: 'stator', quantity: 3, tool: 'soldering-iron', requires: ['stator'] },
+  {
+    id: 'bobinage',
+    name: 'Bobinage triphasé',
+    parent: 'stator',
+    tool: 'cutter-flush',
+    requires: ['stator'],
+    destructive: true,
+  },
+  {
+    id: 'hall',
+    name: 'Capteur à effet Hall',
+    parent: 'stator',
+    quantity: 3,
+    tool: 'soldering-iron',
+    requires: ['stator'],
+  },
   { id: 'carter', name: 'Carter', parent: 'moteur', base: true },
   { id: 'fils', name: 'Fil de phase', parent: 'moteur', quantity: 3, tool: 'soldering-iron' },
 ];
 
 const STEPS: { title: string; description: string; parts: string[] }[] = [
-  { title: 'Dessouder les fils de phase', description: 'Chauffer chaque languette et tirer doucement le fil.', parts: ['fils'] },
-  { title: 'Dévisser le flasque avant', description: 'Quatre vis BTR M3 en croix, un quart de tour chacune.', parts: ['vis-flasque'] },
-  { title: 'Déposer le flasque', description: 'Le flasque se soulève d’un bloc avec son roulement.', parts: ['cloche'] },
-  { title: 'Extraire le roulement avant', description: 'Extracteur à griffes : effort progressif.', parts: ['roul-av'] },
+  {
+    title: 'Dessouder les fils de phase',
+    description: 'Chauffer chaque languette et tirer doucement le fil.',
+    parts: ['fils'],
+  },
+  {
+    title: 'Dévisser le flasque avant',
+    description: 'Quatre vis BTR M3 en croix, un quart de tour chacune.',
+    parts: ['vis-flasque'],
+  },
+  {
+    title: 'Déposer le flasque',
+    description: 'Le flasque se soulève d’un bloc avec son roulement.',
+    parts: ['cloche'],
+  },
+  {
+    title: 'Extraire le roulement avant',
+    description: 'Extracteur à griffes : effort progressif.',
+    parts: ['roul-av'],
+  },
   { title: 'Retirer le circlip', description: 'Pince à circlips, bec dans les œillets.', parts: ['circlip'] },
-  { title: 'Sortir le rotor', description: 'Les aimants retiennent le rotor : tirer franchement dans l’axe.', parts: ['rotor'] },
+  {
+    title: 'Sortir le rotor',
+    description: 'Les aimants retiennent le rotor : tirer franchement dans l’axe.',
+    parts: ['rotor'],
+  },
   { title: 'Desserrer le pignon', description: 'Vis sans tête de 1,5 mm.', parts: ['pignon'] },
   { title: 'Décoller les aimants', description: 'Opération destructive : colle époxy.', parts: ['aimants'] },
   { title: 'Déposer le stator', description: 'Le paquet de tôles glisse hors du carter.', parts: ['stator'] },
   { title: 'Dessouder les capteurs Hall', description: 'Fer à pointe fine, tresse.', parts: ['hall'] },
-  { title: 'Couper le bobinage', description: 'Opération destructive : fil émaillé de 0,3 mm.', parts: ['bobinage'] },
-  { title: 'Presser le paquet de tôles', description: 'Presse à main, cale sous le paquet.', parts: ['toles'] },
+  {
+    title: 'Couper le bobinage',
+    description: 'Opération destructive : fil émaillé de 0,3 mm.',
+    parts: ['bobinage'],
+  },
+  {
+    title: 'Presser le paquet de tôles',
+    description: 'Presse à main, cale sous le paquet.',
+    parts: ['toles'],
+  },
 ];
 
 export interface BenchInspection {
@@ -213,12 +271,12 @@ export function benchInspection(): BenchInspection {
     parts[p.id] = { removed: false, hidden: false, animating: false };
     dependencies[p.id] = { requires: p.requires ?? [], dependents: [] };
   }
-  for (const p of PARTS) for (const r of p.requires ?? []) (dependencies[r]!.dependents as string[]).push(p.id);
+  for (const p of PARTS)
+    for (const r of p.requires ?? []) (dependencies[r]!.dependents as string[]).push(p.id);
   const node = (id: string): PartTreeNode => {
     const p = PARTS.find((x) => x.id === id)!;
     const children = PARTS.filter((x) => x.parent === id).map((x) => node(x.id));
-    const quantity =
-      p.kind === 'assembly' ? children.reduce((s, c) => s + c.quantity, 0) : (p.quantity ?? 1);
+    const quantity = p.kind === 'assembly' ? children.reduce((s, c) => s + c.quantity, 0) : (p.quantity ?? 1);
     return { id, name: p.name, kind: p.kind ?? 'part', quantity, children };
   };
   const steps: StepSummary[] = STEPS.map((s, index) => {
@@ -251,11 +309,24 @@ export function benchInspection(): BenchInspection {
         ],
       },
       { key: 'kv', label: 'KV', kind: 'number', min: 3000, max: 6000, step: 100, unit: 'tr/min/V' },
-      { key: 'sensors', label: 'Capteurs à effet Hall', kind: 'boolean', help: 'Trois capteurs de commutation.' },
+      {
+        key: 'sensors',
+        label: 'Capteurs à effet Hall',
+        kind: 'boolean',
+        help: 'Trois capteurs de commutation.',
+      },
     ],
     presets: [
-      { id: '3650', label: '3650 capteurs 4300 KV (défaut)', params: { format: '3650', kv: 4300, sensors: true } },
-      { id: '2848', label: '2848 sans capteurs 4800 KV', params: { format: '2848', kv: 4800, sensors: false } },
+      {
+        id: '3650',
+        label: '3650 capteurs 4300 KV (défaut)',
+        params: { format: '3650', kv: 4300, sensors: true },
+      },
+      {
+        id: '2848',
+        label: '2848 sans capteurs 4800 KV',
+        params: { format: '2848', kv: 4800, sensors: false },
+      },
     ],
     tree: [node('moteur')],
     partStatic,

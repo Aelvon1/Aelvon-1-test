@@ -34,7 +34,15 @@ export function flattenTree(
       const children = visible ? node.children.filter((c) => visible.has(c.id)) : node.children;
       const hasChildren = children.length > 0;
       const isOpen = hasChildren && (expanded.has(node.id) || (forcedOpen?.has(node.id) ?? false));
-      rows.push({ node, depth, parentId, hasChildren, expanded: isOpen, posInSet: i + 1, setSize: shown.length });
+      rows.push({
+        node,
+        depth,
+        parentId,
+        hasChildren,
+        expanded: isOpen,
+        posInSet: i + 1,
+        setSize: shown.length,
+      });
       if (isOpen) walk(node.children, depth + 1, node.id);
     });
   };
@@ -85,7 +93,8 @@ export function defaultExpanded(roots: readonly PartTreeNode[]): Set<string> {
   for (const root of roots) {
     if (root.children.length) out.add(root.id);
     if (roots.length === 1)
-      for (const child of root.children) if (child.kind === 'assembly' && child.children.length) out.add(child.id);
+      for (const child of root.children)
+        if (child.kind === 'assembly' && child.children.length) out.add(child.id);
   }
   return out;
 }

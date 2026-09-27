@@ -208,6 +208,8 @@ class FreeStrand {
   /** Cosinus/sinus des génératrices de la section. */
   private readonly cosJ: Float32Array;
   private readonly sinJ: Float32Array;
+  /** Vrai quand le brin est replié (rien à dessiner). */
+  private collapsed = true;
 
   constructor(
     material: THREE.Material,
@@ -244,7 +246,10 @@ class FreeStrand {
     );
     this.geometry.setAttribute('normal', new THREE.BufferAttribute(nor, 3).setUsage(THREE.DynamicDrawUsage));
     this.geometry.setIndex(idx);
-    this.geometry.setDrawRange(0, 0);
+    // Au repos : un segment dégénéré (sommets confondus à l'origine) plutôt qu'une plage vide. Le
+    // moteur d'inspection peut réafficher ce maillage (visibilité des pièces) : aucun triangle
+    // n'est tracé, sans appel de dessin à 0 indice.
+    this.geometry.setDrawRange(0, this.radial * 6);
     this.mesh = new THREE.Mesh(this.geometry, material);
     this.mesh.name = 'Brin libéré';
     this.mesh.frustumCulled = false;
@@ -254,10 +259,11 @@ class FreeStrand {
   /** Met à jour le brin libre : point de coupe (fx, fy, fz) en mm et longueur déroulée (mm). */
   update(fx: number, fy: number, fz: number, length: number): void {
     if (length < 0.5) {
-      this.mesh.visible = false;
+      this.collapse();
       return;
     }
     this.mesh.visible = true;
+    this.collapsed = false;
     const { center, r, pitch } = this.pile;
     const pts = this.pts;
     // Point d'entrée de l'écheveau et pont (courbe de Bézier quadratique) depuis le point de coupe.
@@ -322,6 +328,18 @@ class FreeStrand {
     this.geometry.computeBoundingSphere();
   }
 
+  /** Repli : premier segment ramené à un point (triangles dégénérés), maillage masqué. */
+  private collapse(): void {
+    this.mesh.visible = false;
+    if (this.collapsed) return;
+    this.collapsed = true;
+    const pos = this.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const n = 2 * (this.radial + 1);
+    for (let v = 0; v < n; v++) pos.setXYZ(v, 0, 0, 0);
+    pos.needsUpdate = true;
+    this.geometry.setDrawRange(0, this.radial * 6);
+  }
+
   dispose(): void {
     this.geometry.dispose();
   }
@@ -341,14 +359,22 @@ const phaseKey = (phase: number) => `bldcPhaseState${phase}`;
 const ENAMEL = ['enamelA', 'enamelB', 'enamelC'] as const;
 const SLEEVE = ['sleeveA', 'sleeveB', 'sleeveC'] as const;
 
+/**
+ * Triangle dégénéré placé en tête des index des maillages tronqués : la plage de dessin n'est
+ * jamais vide (le moteur d'inspection gère la visibilité des maillages ; un fil entièrement
+ * débobiné ne produit ainsi aucun appel de dessin à 0 indice).
+ */
+const LEAD = 3;
+const leadTriangle = (mb: MeshBuilder) => mb.tri(0, 0, 0);
+
 /** Applique le nombre de segments visibles aux maillages de la phase. */
 function applyVisible(state: PhaseState): void {
   const segsVisible = Math.max(0, state.visible - 1);
-  if (state.base) state.base.mesh.geometry.setDrawRange(0, segsVisible * state.base.perSegment);
-  if (state.detail) state.detail.mesh.geometry.setDrawRange(0, segsVisible * state.detail.perSegment);
+  if (state.base) state.base.mesh.geometry.setDrawRange(0, LEAD + segsVisible * state.base.perSegment);
+  if (state.detail) state.detail.mesh.geometry.setDrawRange(0, LEAD + segsVisible * state.detail.perSegment);
   if (state.sleeve) {
     const s = Math.min(state.sleeve.segments, Math.max(0, segsVisible - state.sleeve.start));
-    state.sleeve.mesh.geometry.setDrawRange(0, s * state.sleeve.perSegment);
+    state.sleeve.mesh.geometry.setDrawRange(0, LEAD + s * state.sleeve.perSegment);
   }
 }
 
@@ -358,6 +384,7 @@ export function buildPhase(ctx: Ctx, phase: 0 | 1 | 2): PartBuild {
   const wire = L.phases[phase]!;
   const radial = [5, 6, 8, 10][ctx.quality]!;
   const baseGeo = new MeshBuilder();
+  leadTriangle(baseGeo);
   const { indicesPerSegment } = tube(baseGeo, wire.centers, wire.count, {
     radialSegments: radial,
     radii: wire.radius,
@@ -375,6 +402,7 @@ export function buildPhase(ctx: Ctx, phase: 0 | 1 | 2): PartBuild {
     sleeveStart++;
   const sleeveSegments = Math.max(1, wire.sleeveEnd - sleeveStart);
   const sleeveGeoB = new MeshBuilder();
+  leadTriangle(sleeveGeoB);
   const sleeveCount = sleeveSegments + 1;
   const sleeveRadii = new Float32Array(sleeveCount).fill(L.bundleRadius + 0.22 * d.s);
   const sleeveInfo = tube(sleeveGeoB, wire.centers.subarray(sleeveStart * 3), sleeveCount, {
@@ -440,6 +468,7 @@ export function buildPhaseDetail(ctx: Ctx, phase: 0 | 1 | 2): THREE.Object3D {
   const L = layout(ctx);
   const wire = L.phases[phase]!;
   const mb = new MeshBuilder();
+  leadTriangle(mb);
   const radial = [5, 7, 8, 10][ctx.quality]!;
   const { indicesPerSegment } = strandTubes(mb, wire, L.strands, L.strandRadius * 0.96, radial);
   const m = mesh(mb.build(MM), ctx.materials.get(own(ENAMEL[phase])), 'strands');

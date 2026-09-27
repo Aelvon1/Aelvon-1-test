@@ -6,12 +6,29 @@
  * - clavier (motif ARIA « tree ») : ↑ ↓ Début Fin, → déplie / enfant, ← replie / parent,
  *   Entrée ou Espace sélectionne. La sélection faite dans la vue 3D déplie et montre la ligne.
  */
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+} from 'react';
 import type { PartDynamic, PartTreeNode } from '../../core/store';
 import { useKeyScope, useUi, useUiSound } from '../UiContext';
 import { Icon } from '../components/Icon';
 import { formatQuantity, plural } from '../logic/format';
-import { ancestorsOf, defaultExpanded, filterTree, flattenTree, nodeState, type TreeRow } from '../logic/tree';
+import {
+  ancestorsOf,
+  defaultExpanded,
+  filterTree,
+  flattenTree,
+  nodeState,
+  type TreeRow,
+} from '../logic/tree';
 import { Highlighted } from '../inventory/InventoryCard';
 import { EMPTY, useInspection } from './hooks';
 
@@ -197,7 +214,9 @@ export function PartTree() {
         const ancestors = ancestorsOf(state.inspection?.partStatic ?? {}, id);
         setFocusId(id);
         if (ancestors.length)
-          setExpanded((prev) => (ancestors.every((a) => prev.has(a)) ? prev : new Set([...prev, ...ancestors])));
+          setExpanded((prev) =>
+            ancestors.every((a) => prev.has(a)) ? prev : new Set([...prev, ...ancestors]),
+          );
       }),
     [store],
   );
@@ -252,7 +271,13 @@ export function PartTree() {
     [bus, play],
   );
 
-  const currentFocus = rows.some((r) => r.node.id === focusId) ? focusId : (selectedId ?? rows[0]?.node.id ?? null);
+  // Ligne portant le focus itinérant : la dernière focalisée, sinon la sélection, sinon la première.
+  const inRows = (id: string | null) => id !== null && rows.some((r) => r.node.id === id);
+  const currentFocus = inRows(focusId)
+    ? focusId
+    : inRows(selectedId)
+      ? selectedId
+      : (rows[0]?.node.id ?? null);
   const focusRow = (id: string) => {
     setFocusId(id);
     const el = treeRef.current?.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`);

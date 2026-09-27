@@ -133,7 +133,11 @@ export function PartSheet() {
           )}
           {(step?.toolName || info.toolId) && (
             <p className="sheet-tool">
-              {step?.toolIcon ? <SvgMarkup markup={step.toolIcon} className="tool-icon" /> : <Icon name="wrench" />}
+              {step?.toolIcon ? (
+                <SvgMarkup markup={step.toolIcon} className="tool-icon" />
+              ) : (
+                <Icon name="wrench" />
+              )}
               <span>
                 Outil&nbsp;: <b>{step?.toolName ?? info.toolId}</b>
               </span>
@@ -219,7 +223,9 @@ export function PartSheet() {
           className={`btn btn-ink btn-sm${isolatedId === selected.partId ? ' is-on' : ''}`}
           aria-pressed={isolatedId === selected.partId}
           onClick={() =>
-            bus.emit('inspection:isolate', { partId: isolatedId === selected.partId ? null : selected.partId })
+            bus.emit('inspection:isolate', {
+              partId: isolatedId === selected.partId ? null : selected.partId,
+            })
           }
           {...focusProps}
         >

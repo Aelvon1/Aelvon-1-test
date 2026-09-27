@@ -2,7 +2,15 @@
  * Contexte React de l'interface : accès au store (lecture), au bus (commandes), aux libellés de
  * touches selon la disposition clavier et aux sons d'interface.
  */
-import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, type RefObject } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  type RefObject,
+} from 'react';
 import { useStore } from 'zustand';
 import type { AppState, AppStore } from '../core/store';
 import type { EventBus } from '../core/EventBus';
@@ -64,7 +72,10 @@ export function useKeyScope(ref: RefObject<HTMLElement | null>, handler: KeyScop
 }
 
 /** Abonnement à un événement du bus pendant la vie du composant. */
-export function useBusEvent<K extends keyof AppEvents>(type: K, handler: (payload: AppEvents[K]) => void): void {
+export function useBusEvent<K extends keyof AppEvents>(
+  type: K,
+  handler: (payload: AppEvents[K]) => void,
+): void {
   const { bus } = useUi();
   const onEvent = useEffectEvent((payload: AppEvents[K]) => handler(payload));
   useEffect(() => bus.on(type, (payload) => onEvent(payload)), [bus, type]);

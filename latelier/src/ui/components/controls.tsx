@@ -31,7 +31,16 @@ function preventFocus(e: MouseEvent): void {
 }
 
 /** Touches gardées par un curseur (le moteur ne les reçoit pas pendant que le curseur a le focus). */
-const SLIDER_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
+const SLIDER_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+]);
 
 export function Toggle({
   checked,
@@ -145,7 +154,12 @@ export function Segmented<T extends string>({
   // Les flèches déplacent le choix (comportement natif des boutons radio).
   useKeyScope(ref, (e) => SLIDER_KEYS.has(e.key));
   return (
-    <div ref={ref} className={className ? `segmented ${className}` : 'segmented'} role="radiogroup" aria-label={label}>
+    <div
+      ref={ref}
+      className={className ? `segmented ${className}` : 'segmented'}
+      role="radiogroup"
+      aria-label={label}
+    >
       {options.map((o) => (
         <label key={o.value} className={o.value === value ? 'is-checked' : undefined} title={o.title}>
           <input

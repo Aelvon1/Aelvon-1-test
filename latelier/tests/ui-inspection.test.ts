@@ -7,7 +7,13 @@ import type { PartDependencies, PartDynamic, PartStatic, PartTreeNode, StepSumma
 import type { ParamSchema } from '../src/objects/types';
 import { ancestorsOf, defaultExpanded, filterTree, flattenTree, nodeState } from '../src/ui/logic/tree';
 import { removalAvailability } from '../src/ui/logic/blockers';
-import { changedParams, matchingPreset, snapParam, stepProgress, stepStatusLabel } from '../src/ui/logic/steps';
+import {
+  changedParams,
+  matchingPreset,
+  snapParam,
+  stepProgress,
+  stepStatusLabel,
+} from '../src/ui/logic/steps';
 import { comboText, EXPLORATION_CONTROLS, INSPECTION_CONTROLS, keyLabelFor } from '../src/ui/logic/keys';
 import { detectLayout } from '../src/ui/logic/layout';
 import { spriteAnimation, spriteFrameAt } from '../src/ui/logic/sprite';
@@ -197,16 +203,18 @@ describe('frise et paramètres', () => {
     expect(matchingPreset(presets, { kv: 4800, sensors: true })?.id).toBe('b');
     expect(matchingPreset(presets, { kv: 4300, sensors: true })?.id).toBe('a');
     expect(matchingPreset(presets, { kv: 3000, sensors: false })).toBeNull();
-    expect(changedParams(schema, { kv: 4300, sensors: true }, { kv: 4300, sensors: false })).toEqual(['sensors']);
+    expect(changedParams(schema, { kv: 4300, sensors: true }, { kv: 4300, sensors: false })).toEqual([
+      'sensors',
+    ]);
   });
 
   it('arrondit un paramètre numérique au pas et le borne', () => {
     const kv = schema[0] as Extract<ParamSchema, { kind: 'number' }>;
     expect(snapParam(kv, 4349)).toBe(4300);
     expect(snapParam(kv, 9000)).toBe(6000);
-    expect(snapParam({ key: 'e', label: 'e', kind: 'number', min: 0, max: 1, step: 0.1 }, 0.30000000000000004)).toBe(
-      0.3,
-    );
+    expect(
+      snapParam({ key: 'e', label: 'e', kind: 'number', min: 0, max: 1, step: 0.1 }, 0.30000000000000004),
+    ).toBe(0.3);
   });
 });
 

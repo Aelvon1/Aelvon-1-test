@@ -34,7 +34,8 @@ export function Modal({
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const el = ref.current;
-    const target = el?.querySelector<HTMLElement>('[data-autofocus]') ?? (el ? focusableIn(el)[0] : undefined);
+    const target =
+      el?.querySelector<HTMLElement>('[data-autofocus]') ?? (el ? focusableIn(el)[0] : undefined);
     target?.focus({ preventScroll: true });
     return () => {
       if (previous && previous.isConnected) previous.focus({ preventScroll: true });

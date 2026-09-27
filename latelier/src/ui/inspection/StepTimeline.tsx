@@ -116,8 +116,8 @@ export function StepTimeline() {
             <p className="step-card-kicker dymo is-olive">Terminé</p>
             <p className="step-card-title display">Démontage complet&nbsp;!</p>
             <p className="step-card-text">
-              Toutes les pièces sont sur l’établi. <Key char="K" /> range tout à plat, <Key code="ArrowLeft" /> remonte
-              étape par étape.
+              Toutes les pièces sont sur l’établi. <Key char="K" /> range tout à plat,{' '}
+              <Key code="ArrowLeft" /> remonte étape par étape.
             </p>
           </div>
         ) : current ? (
@@ -132,7 +132,9 @@ export function StepTimeline() {
             <p className="step-card-title display">{current.title}</p>
             <p className="step-card-text">{current.description}</p>
             {current.toolName && (
-              <p className={`step-card-tool${activeToolId && activeToolId === current.toolId ? ' is-active' : ''}`}>
+              <p
+                className={`step-card-tool${activeToolId && activeToolId === current.toolId ? ' is-active' : ''}`}
+              >
                 {current.toolIcon ? (
                   <SvgMarkup markup={current.toolIcon} className="tool-icon" />
                 ) : (
@@ -169,7 +171,7 @@ export function StepTimeline() {
           type="button"
           className="btn btn-sm timeline-nav"
           onClick={() => step('prev')}
-          disabled={cursor === 0 && playing === null}
+          disabled={progress.done + progress.partial === 0 && playing === null}
           title={`Étape précédente (${labels.ArrowLeft ?? '←'})`}
           {...focusProps}
         >

@@ -31,7 +31,9 @@ export function removalAvailability(
   const isRemoved = (p: string) => parts[p]?.removed ?? false;
   if (!removed) {
     const blockers = deps.requires.filter((r) => !isRemoved(r));
-    return blockers.length ? { kind: 'blocked', action, blockers, reinsertFirst: false } : { kind: 'ready', action };
+    return blockers.length
+      ? { kind: 'blocked', action, blockers, reinsertFirst: false }
+      : { kind: 'ready', action };
   }
   const inPlace = deps.requires.filter((r) => !isRemoved(r));
   const dependents = deps.dependents.filter((d) => isRemoved(d));

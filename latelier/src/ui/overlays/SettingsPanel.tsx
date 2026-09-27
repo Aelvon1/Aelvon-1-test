@@ -7,7 +7,12 @@ import { useAppState, useUi, useUiSound } from '../UiContext';
 import { Modal } from '../components/Modal';
 import { Segmented, SelectField, Slider, Toggle } from '../components/controls';
 import { formatDecimal, formatPercent, NARROW_NBSP } from '../logic/format';
-import { QUALITY_LABELS, type QualityPreset, type RemovedPlacementSetting, type Settings } from '../../core/settings';
+import {
+  QUALITY_LABELS,
+  type QualityPreset,
+  type RemovedPlacementSetting,
+  type Settings,
+} from '../../core/settings';
 
 const QUALITY_OPTIONS = (Object.keys(QUALITY_LABELS) as QualityPreset[]).map((value) => ({
   value,
@@ -67,7 +72,15 @@ function SliderRow({
   const id = useId();
   return (
     <Row label={label} help={help} htmlFor={id}>
-      <Slider id={id} value={value} min={min} max={max} step={step} valueText={format(value)} onChange={onChange} />
+      <Slider
+        id={id}
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        valueText={format(value)}
+        onChange={onChange}
+      />
       <output className="field-value" htmlFor={id}>
         {format(value)}
       </output>
@@ -249,11 +262,7 @@ export function SettingsPanel() {
           <h3 id={`${qualityId}-ins`} className="dymo">
             Démontage et interface
           </h3>
-          <Row
-            label="Pièces retirées"
-            help="Où vont les pièces une fois démontées."
-            htmlFor={placementId}
-          >
+          <Row label="Pièces retirées" help="Où vont les pièces une fois démontées." htmlFor={placementId}>
             <SelectField
               id={placementId}
               value={s.removedPlacement}

@@ -85,6 +85,76 @@ export function fitDistance(radius: number, fovDeg: number, aspect: number, marg
   return (Math.max(radius, 1e-4) * margin) / Math.sin(fov / 2);
 }
 
+/** Rectangle de l'écran (px) : origine en haut à gauche. */
+export interface ScreenRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Zone libre de l'écran (hors encarts de l'interface). Des encarts incohérents (interface
+ * masquée mesurée à zéro, zone libre réduite à moins de 30 % d'une dimension) sont ignorés :
+ * l'écran entier est alors libre.
+ */
+export function freeViewArea(
+  width: number,
+  height: number,
+  insets: { left: number; top: number; right: number; bottom: number } | null,
+  out: ScreenRect,
+): ScreenRect {
+  let l = 0;
+  let t = 0;
+  let r = 0;
+  let b = 0;
+  if (insets) {
+    l = Math.max(0, insets.left);
+    t = Math.max(0, insets.top);
+    r = Math.max(0, insets.right);
+    b = Math.max(0, insets.bottom);
+    if (!(l + r <= width * 0.7 && t + b <= height * 0.7)) l = t = r = b = 0;
+  }
+  out.x = l;
+  out.y = t;
+  out.width = Math.max(1, width - l - r);
+  out.height = Math.max(1, height - t - b);
+  return out;
+}
+
+/**
+ * Distance de cadrage d'une sphère dans un sous-rectangle de l'écran (`areaWidth` × `areaHeight`
+ * px, centré sur le point principal décalé de la caméra) pour un écran de hauteur
+ * `viewportHeight` et un champ vertical `fovDeg`. Pour l'écran entier, identique à `fitDistance`.
+ */
+export function fitDistanceInArea(
+  radius: number,
+  fovDeg: number,
+  viewportHeight: number,
+  areaWidth: number,
+  areaHeight: number,
+  margin = 1.25,
+): number {
+  const tanPerPixel = Math.tan(THREE.MathUtils.degToRad(fovDeg) / 2) / Math.max(1, viewportHeight);
+  const half = Math.atan(tanPerPixel * Math.max(1, Math.min(areaWidth, areaHeight)));
+  return (Math.max(radius, 1e-4) * margin) / Math.sin(half);
+}
+
+/**
+ * Décalage du point principal (px, convention `PerspectiveCamera.setViewOffset`) qui amène le
+ * centre de l'image (la cible de l'orbite) au centre de la zone libre.
+ */
+export function principalOffset(
+  width: number,
+  height: number,
+  area: ScreenRect,
+  out: { x: number; y: number },
+): { x: number; y: number } {
+  out.x = width / 2 - (area.x + area.width / 2);
+  out.y = height / 2 - (area.y + area.height / 2);
+  return out;
+}
+
 /** Taille d'un pixel écran (m) à la distance `distance` pour un champ vertical `fovDeg`. */
 export function worldPerPixel(distance: number, fovDeg: number, viewportHeight: number): number {
   return (2 * distance * Math.tan(THREE.MathUtils.degToRad(fovDeg) / 2)) / Math.max(1, viewportHeight);

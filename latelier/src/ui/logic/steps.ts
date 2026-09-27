@@ -49,11 +49,7 @@ export function matchingPreset(presets: readonly ObjectPreset[], params: ObjectP
 }
 
 /** Clés dont la valeur diffère entre deux jeux de paramètres (limité au schéma). */
-export function changedParams(
-  schema: readonly ParamSchema[],
-  a: ObjectParams,
-  b: ObjectParams,
-): string[] {
+export function changedParams(schema: readonly ParamSchema[], a: ObjectParams, b: ObjectParams): string[] {
   return schema.filter((s) => !sameValue(a[s.key], b[s.key])).map((s) => s.key);
 }
 

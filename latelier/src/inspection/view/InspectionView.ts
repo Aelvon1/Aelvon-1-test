@@ -19,6 +19,7 @@ import type { DetailManager } from '../detail';
 import type { KnollingLabel } from '../knollingPlan';
 import type { PoseComposer } from '../poses';
 import { InspectionCamera } from '../camera/InspectionCamera';
+import type { ScreenInsets } from '../camera/types';
 import { InspectionLabels } from '../labels/Labels';
 import { Picker } from '../selection/Picker';
 import { Selection } from '../selection/Selection';
@@ -26,6 +27,7 @@ import { Thumbnails } from '../thumbnails/Thumbnails';
 import { MaterialModes } from './MaterialModes';
 import { Section } from './Section';
 import { StudioLights } from './StudioLights';
+import { readUiInsets } from './uiInsets';
 
 type AnyDef = ObjectDef<ObjectParams>;
 
@@ -87,6 +89,8 @@ export class InspectionView {
   private readonly bounds = new THREE.Sphere(new THREE.Vector3(), 0.1);
   private readonly unsubscribe: () => void;
   private readonly focus = { distance: 1, radius: 0.1 };
+  /** Encarts publiés par l'interface (panneaux), relus à chaque image. */
+  private readonly uiInsets: ScreenInsets = { left: 0, top: 0, right: 0, bottom: 0 };
 
   constructor(
     private readonly ctx: AppContext,
@@ -110,6 +114,7 @@ export class InspectionView {
       roomBounds,
       reversedDepth: ctx.engine.reversedDepth,
       fov: INSPECTION_VIEW.fov,
+      safeInsets: () => (readUiInsets(this.uiInsets) ? this.uiInsets : null),
     });
     this.selection = new Selection({
       ctx,
@@ -204,6 +209,9 @@ export class InspectionView {
   /** À chaque image (après la caméra). */
   update(dt: number): void {
     this.thumbnails.tick();
+    // Point principal décalé vers la zone libre (et retour à zéro hors inspection) avant tout
+    // calcul dépendant de la projection (survol, étiquettes).
+    this.camera.updateViewOffset(dt);
     const camera = this.ctx.engine.camera;
     this.lights.update(dt, camera);
     const s = this.session;

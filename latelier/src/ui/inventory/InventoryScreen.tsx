@@ -36,7 +36,11 @@ export function InventoryScreen() {
   const { play, hover } = useUiSound();
   const catalog = useAppState((s) => s.catalog);
   const { query, category, thumbnails } = useAppState(
-    useShallow((s) => ({ query: s.inventory.query, category: s.inventory.category, thumbnails: s.inventory.thumbnails })),
+    useShallow((s) => ({
+      query: s.inventory.query,
+      category: s.inventory.category,
+      thumbnails: s.inventory.thumbnails,
+    })),
   );
   const benchId = useAppState((s) => s.inspection?.objectId ?? null);
   const [focusIndex, setFocusIndex] = useState(0);
@@ -78,10 +82,15 @@ export function InventoryScreen() {
 
   const select = useCallback(
     (entry: CatalogEntry) => {
+      // L'objet déjà sur l'établi : simple retour à son inspection (pas de reconstruction).
+      if (entry.id === store.getState().inspection?.objectId) {
+        bus.emit('inventory:close');
+        return;
+      }
       play('ui.stamp');
       bus.emit('inventory:select', { objectId: entry.id });
     },
-    [bus, play],
+    [bus, play, store],
   );
 
   const focusCard = (i: number) => {
@@ -134,7 +143,12 @@ export function InventoryScreen() {
   const total = catalog.length;
 
   return (
-    <div className="screen inventory-screen" role="dialog" aria-modal="true" aria-labelledby={`${searchId}-title`}>
+    <div
+      className="screen inventory-screen"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={`${searchId}-title`}
+    >
       <div className="inv-board">
         <header className="inv-header">
           <div className="inv-title-block">
@@ -205,7 +219,9 @@ export function InventoryScreen() {
           <div className="inv-empty paper">
             <span className="tape top-center" aria-hidden="true" />
             <p className="display">
-              {query ? `Rien dans le tiroir ne correspond à « ${query} ».` : 'Aucun objet dans cette catégorie.'}
+              {query
+                ? `Rien dans le tiroir ne correspond à « ${query} ».`
+                : 'Aucun objet dans cette catégorie.'}
             </p>
             <button
               type="button"

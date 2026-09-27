@@ -33,7 +33,13 @@ export function SpriteThumbnail({ thumb, name }: { thumb: Thumbnail | undefined;
   return (
     <div className="thumb thumb-ready" style={style} role="img" aria-label={`${name} : vue en rotation`}>
       <div className="thumb-rows" style={{ height: `${anim.sheetRows * 100}%` }}>
-        <img className="thumb-sheet" src={thumb.url} alt="" draggable={false} style={{ width: `${anim.columns * 100}%` }} />
+        <img
+          className="thumb-sheet"
+          src={thumb.url}
+          alt=""
+          draggable={false}
+          style={{ width: `${anim.columns * 100}%` }}
+        />
       </div>
     </div>
   );

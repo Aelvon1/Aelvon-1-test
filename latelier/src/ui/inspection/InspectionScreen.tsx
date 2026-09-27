@@ -141,7 +141,8 @@ function useInsetVariables(root: RefObject<HTMLDivElement | null>): void {
     const measure = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      const rect = (selector: string) => el.querySelector<HTMLElement>(selector)?.getBoundingClientRect() ?? null;
+      const rect = (selector: string) =>
+        el.querySelector<HTMLElement>(selector)?.getBoundingClientRect() ?? null;
       const left = rect('.panel-left');
       const right = rect('.panel-right');
       const top = rect('.topbar');
@@ -168,7 +169,8 @@ function useInsetVariables(root: RefObject<HTMLDivElement | null>): void {
   useEffect(
     () => () => {
       const docStyle = document.documentElement.style;
-      for (const side of ['left', 'right', 'top', 'bottom']) docStyle.removeProperty(`--inspection-inset-${side}`);
+      for (const side of ['left', 'right', 'top', 'bottom'])
+        docStyle.removeProperty(`--inspection-inset-${side}`);
     },
     [],
   );
@@ -185,6 +187,10 @@ export function InspectionScreen() {
       <div
         ref={rootRef}
         className={`inspection-ui${building ? ' is-building' : ''}${ready ? ' is-ready' : ''}${section ? ' has-section' : ''}`}
+        onContextMenu={(e) => {
+          // Pas de menu contextuel du navigateur sur les panneaux (sauf dans les champs de saisie).
+          if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+        }}
       >
         <TopBar />
         <LeftPanel />

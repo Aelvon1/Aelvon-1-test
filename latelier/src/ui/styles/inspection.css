@@ -67,9 +67,7 @@
 }
 
 .btn-back {
-  background:
-    var(--tex-grain),
-    linear-gradient(180deg, #3a3f2b 0%, #2a2e1f 100%);
+  background: var(--tex-grain), linear-gradient(180deg, #3a3f2b 0%, #2a2e1f 100%);
   padding: 0.55em 0.9em;
 }
 
@@ -830,9 +828,7 @@
   position: relative;
   margin-top: 0.3rem;
   padding: 0.95rem 0.85rem 0.75rem;
-  background:
-    var(--tex-grain),
-    linear-gradient(170deg, #f8e9a0 0%, #efd97a 100%);
+  background: var(--tex-grain), linear-gradient(170deg, #f8e9a0 0%, #efd97a 100%);
   color: var(--ink);
   box-shadow:
     0 1px 1px rgba(0, 0, 0, 0.2),
@@ -1310,9 +1306,7 @@
   padding: 0.55rem 0 0.1rem;
   border: 1px solid rgba(0, 0, 0, 0.5);
   border-radius: 3px 3px 6px 6px;
-  background:
-    var(--tex-grain),
-    linear-gradient(180deg, #e6d6ac, #d0bb8a);
+  background: var(--tex-grain), linear-gradient(180deg, #e6d6ac, #d0bb8a);
   color: var(--ink);
   font: inherit;
   cursor: pointer;
@@ -1374,9 +1368,7 @@
 }
 
 .ticket.is-done {
-  background:
-    var(--tex-grain),
-    linear-gradient(180deg, #b3bb8b, #97a06c);
+  background: var(--tex-grain), linear-gradient(180deg, #b3bb8b, #97a06c);
 }
 
 .ticket.is-done .ticket-num,
@@ -1385,9 +1377,7 @@
 }
 
 .ticket.is-partial {
-  background:
-    var(--tex-grain),
-    linear-gradient(135deg, rgba(242, 194, 27, 0.95) 0 50%, #e2d0a2 50%);
+  background: var(--tex-grain), linear-gradient(135deg, rgba(242, 194, 27, 0.95) 0 50%, #e2d0a2 50%);
 }
 
 .ticket.is-destructive::after {

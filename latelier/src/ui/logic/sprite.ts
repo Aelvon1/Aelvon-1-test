@@ -27,7 +27,10 @@ export interface SpriteAnimation {
  * elle est ignorée (le tour saute alors les dernières vues) — la planche du moteur (24 vues en
  * 6 × 4) est toujours complète.
  */
-export function spriteAnimation(thumb: Pick<Thumbnail, 'frames' | 'columns'>, secondsPerFrame: number): SpriteAnimation {
+export function spriteAnimation(
+  thumb: Pick<Thumbnail, 'frames' | 'columns'>,
+  secondsPerFrame: number,
+): SpriteAnimation {
   const columns = Math.max(1, Math.min(thumb.columns, thumb.frames));
   const sheetRows = Math.max(1, Math.ceil(thumb.frames / columns));
   const rows = thumb.frames % columns === 0 ? sheetRows : Math.max(1, Math.floor(thumb.frames / columns));

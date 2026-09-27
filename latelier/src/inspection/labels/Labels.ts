@@ -19,6 +19,8 @@ import type { Assembly, PartRuntime } from '../Assembly';
 import type { PoseComposer } from '../poses';
 import type { KnollingLabel } from '../knollingPlan';
 import type { Picker, PickHit } from '../selection/Picker';
+import type { ScreenInsets } from '../camera/types';
+import { readUiInsets, sameInsets } from '../view/uiInsets';
 import {
   layoutLabels,
   layoutTags,
@@ -121,6 +123,10 @@ export class InspectionLabels {
   private visible = false;
   private readonly insets = { ...DEFAULT_INSETS };
   private insetsStale = true;
+  /** Encarts publiés en ligne par l'interface (relus à chaque mise à jour, sans recalcul de style). */
+  private readonly uiInsets: ScreenInsets = { left: 0, top: 0, right: 0, bottom: 0 };
+  private readonly polledInsets: ScreenInsets = { left: 0, top: 0, right: 0, bottom: 0 };
+  private uiPublished = false;
   /** Rayons d'occultation restants pour la mise à jour en cours. */
   private rayBudget = 0;
   private readonly hit: PickHit = {
@@ -231,6 +237,13 @@ export class InspectionLabels {
       this.dirty = true;
       if (width !== this.lastWidth || height !== this.lastHeight) this.insetsStale = true;
     }
+    // Panneaux ouverts, repliés ou redimensionnés : l'interface republie ses encarts.
+    const published = readUiInsets(this.polledInsets);
+    if (published !== this.uiPublished || (published && !sameInsets(this.polledInsets, this.uiInsets))) {
+      this.uiPublished = published;
+      Object.assign(this.uiInsets, this.polledInsets);
+      this.dirty = true;
+    }
     if (!this.dirty || this.timer < UPDATE_INTERVAL) return;
     this.timer = 0;
     this.dirty = false;
@@ -272,8 +285,25 @@ export class InspectionLabels {
 
   private area(width: number, height: number): LabelArea {
     if (this.insetsStale) this.readInsets();
-    let left = this.state.leftPanelOpen ? this.insets.left : 0;
-    let right = this.state.rightPanelOpen ? this.insets.right : 0;
+    let left: number;
+    let right: number;
+    let top: number;
+    let bottom: number;
+    if (this.uiPublished) {
+      // Encarts mesurés par l'interface (panneaux ouverts ou repliés) ; une mesure incohérente
+      // (interface masquée : rectangles nuls) est ignorée.
+      const u = this.uiInsets;
+      left = u.left;
+      right = u.right;
+      top = u.top;
+      bottom = u.bottom;
+      if (left + right > width * 0.7 || top + bottom > height * 0.7) left = right = top = bottom = 0;
+    } else {
+      left = this.state.leftPanelOpen ? this.insets.left : 0;
+      right = this.state.rightPanelOpen ? this.insets.right : 0;
+      top = this.insets.top;
+      bottom = this.insets.bottom;
+    }
     // Zone centrale d'au moins 45 % de la largeur.
     const maxInsets = width * 0.55;
     if (left + right > maxInsets) {
@@ -281,7 +311,7 @@ export class InspectionLabels {
       left *= k;
       right *= k;
     }
-    return { left, right: width - right, top: this.insets.top, bottom: height - this.insets.bottom };
+    return { left, right: width - right, top, bottom: height - bottom };
   }
 
   /** Projette `world` en pixels (dans `out`) ; faux si derrière la caméra. */

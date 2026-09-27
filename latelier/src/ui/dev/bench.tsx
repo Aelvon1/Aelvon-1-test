@@ -33,10 +33,22 @@ const AZERTY: Record<string, string> = {
   KeyZ: 'W',
   Backquote: '²',
 };
-const QWERTY: Record<string, string> = { KeyW: 'W', KeyA: 'A', KeyS: 'S', KeyD: 'D', KeyE: 'E', KeyC: 'C', Backquote: '`' };
+const QWERTY: Record<string, string> = {
+  KeyW: 'W',
+  KeyA: 'A',
+  KeyS: 'S',
+  KeyD: 'D',
+  KeyE: 'E',
+  KeyC: 'C',
+  Backquote: '`',
+};
 
 store.setState({
-  renderer: { backend: params.get('backend') === 'webgl' ? 'webgl2' : 'webgpu', reversedDepth: true, maxAnisotropy: 16 },
+  renderer: {
+    backend: params.get('backend') === 'webgl' ? 'webgl2' : 'webgpu',
+    reversedDepth: true,
+    maxAnisotropy: 16,
+  },
   keyLabels: params.get('layout') === 'qwerty' ? QWERTY : AZERTY,
   catalog: benchCatalog(),
   stats: { fps: 58.7, frameMs: 17, drawCalls: 412, triangles: 1_234_000, pixelRatio: 1 },
@@ -53,7 +65,8 @@ function syncSteps(): void {
   if (!insp) return;
   const steps = insp.steps.map((s) => {
     const n = s.partIds.filter((id) => insp.parts[id]?.removed).length;
-    const status: 'todo' | 'partial' | 'done' = n === 0 ? 'todo' : n === s.partIds.length ? 'done' : 'partial';
+    const status: 'todo' | 'partial' | 'done' =
+      n === 0 ? 'todo' : n === s.partIds.length ? 'done' : 'partial';
     return { ...s, status };
   });
   const cursor = steps.findIndex((s) => s.status !== 'done');
@@ -107,7 +120,9 @@ bus.on('app:home', () => {
   store.setState({ overlay: 'none', inspection: null });
   go('home');
 });
-bus.on('settings:update', (patch) => store.setState((s) => ({ settings: sanitizeSettings({ ...s.settings, ...patch }) })));
+bus.on('settings:update', (patch) =>
+  store.setState((s) => ({ settings: sanitizeSettings({ ...s.settings, ...patch }) })),
+);
 bus.on('settings:reset', () => store.setState({ settings: { ...DEFAULT_SETTINGS } }));
 bus.on('ui:sound', (id) => console.info('[banc] son', id));
 bus.on('inventory:open', () => go('inventory'));
@@ -119,10 +134,15 @@ bus.on('inventory:select', ({ objectId }) => {
 bus.on('inventory:thumbnails', ({ objectIds }) => {
   // Miniatures produites une à une (comme le moteur, étalées dans le temps).
   objectIds.forEach((id, i) =>
-    setTimeout(async () => {
-      const thumb = await benchThumbnail((i * 47) % 360);
-      store.setState((s) => ({ inventory: { ...s.inventory, thumbnails: { ...s.inventory.thumbnails, [id]: thumb } } }));
-    }, 150 * (i + 1)),
+    setTimeout(
+      async () => {
+        const thumb = await benchThumbnail((i * 47) % 360);
+        store.setState((s) => ({
+          inventory: { ...s.inventory, thumbnails: { ...s.inventory.thumbnails, [id]: thumb } },
+        }));
+      },
+      150 * (i + 1),
+    ),
   );
 });
 bus.on('inspection:exit', () => {
@@ -177,7 +197,9 @@ bus.on('inspection:toggleExplode', () =>
 bus.on('inspection:labels', ({ enabled }) => patchInspection(store, { labels: enabled }));
 bus.on('inspection:knolling', ({ enabled }) => patchInspection(store, { knolling: enabled }));
 bus.on('inspection:xray', ({ enabled }) => patchInspection(store, { xray: enabled }));
-bus.on('inspection:neutralBackground', ({ enabled }) => patchInspection(store, { neutralBackground: enabled }));
+bus.on('inspection:neutralBackground', ({ enabled }) =>
+  patchInspection(store, { neutralBackground: enabled }),
+);
 bus.on('inspection:section', (patch) => {
   const insp = store.getState().inspection;
   if (insp) patchInspection(store, { section: { ...insp.section, ...patch } });
@@ -185,12 +207,16 @@ bus.on('inspection:section', (patch) => {
 bus.on('inspection:panels', ({ left, right }) => {
   const insp = store.getState().inspection;
   if (!insp) return;
-  patchInspection(store, { leftPanelOpen: left ?? insp.leftPanelOpen, rightPanelOpen: right ?? insp.rightPanelOpen });
+  patchInspection(store, {
+    leftPanelOpen: left ?? insp.leftPanelOpen,
+    rightPanelOpen: right ?? insp.rightPanelOpen,
+  });
 });
 bus.on('inspection:isolate', ({ partId }) => patchInspection(store, { isolatedId: partId }));
 bus.on('inspection:setHidden', ({ partId, hidden }) => {
   const insp = store.getState().inspection;
-  if (insp) patchInspection(store, { parts: { ...insp.parts, [partId]: { ...insp.parts[partId]!, hidden } } });
+  if (insp)
+    patchInspection(store, { parts: { ...insp.parts, [partId]: { ...insp.parts[partId]!, hidden } } });
 });
 bus.on('inspection:showAll', () => {
   const insp = store.getState().inspection;
@@ -248,7 +274,11 @@ switch (screen) {
     break;
   case 'error':
     store.setState({
-      loading: { progress: 0, label: '', error: 'Impossible de démarrer l’atelier : votre navigateur ne prend en charge ni WebGPU ni WebGL 2.' },
+      loading: {
+        progress: 0,
+        label: '',
+        error: 'Impossible de démarrer l’atelier : votre navigateur ne prend en charge ni WebGPU ni WebGL 2.',
+      },
     });
     break;
   case 'home':
@@ -260,7 +290,12 @@ switch (screen) {
   case 'exploration':
     go('exploration');
     store.setState((s) => ({
-      hud: { ...s.hud, prompt: 'Allumer la lampe loupe', targetActive: true, clickToResume: params.get('resume') === '1' },
+      hud: {
+        ...s.hud,
+        prompt: 'Allumer la lampe loupe',
+        targetActive: true,
+        clickToResume: params.get('resume') === '1',
+      },
       radio: { on: true, stationLabel: 'Radio Atelier 98.4' },
       settings: { ...s.settings, showFps: true },
     }));

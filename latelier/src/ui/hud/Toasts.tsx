@@ -18,7 +18,11 @@ export function Toasts() {
   return (
     <div className="toasts" role="status" aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className={`toast paper toast-${t.kind}`} role={t.kind === 'error' ? 'alert' : undefined}>
+        <div
+          key={t.id}
+          className={`toast paper toast-${t.kind}`}
+          role={t.kind === 'error' ? 'alert' : undefined}
+        >
           <Icon name={TOAST_ICONS[t.kind]} className="toast-icon" />
           <span>{t.message}</span>
         </div>

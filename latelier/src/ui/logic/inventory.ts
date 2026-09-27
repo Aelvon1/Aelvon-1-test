@@ -24,7 +24,14 @@ export function buildSearchIndex(catalog: readonly CatalogEntry[]): SearchIndexE
     const category = normalizeText(entry.category);
     const keywords = normalizeText(entry.keywords.join(' '));
     const description = normalizeText(entry.description);
-    return { entry, name, category, keywords, description, all: `${name} ${category} ${keywords} ${description}` };
+    return {
+      entry,
+      name,
+      category,
+      keywords,
+      description,
+      all: `${name} ${category} ${keywords} ${description}`,
+    };
   });
 }
 

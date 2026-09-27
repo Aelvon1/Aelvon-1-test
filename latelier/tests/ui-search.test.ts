@@ -46,7 +46,12 @@ const CATALOG: CatalogEntry[] = [
     keywords: ['moteur à bague de déphasage'],
     description: 'Hélice, grille et moteur.',
   }),
-  entry({ id: 'oeil', name: 'Œilleton de porte', category: 'Quincaillerie', description: 'Lentille grand angle.' }),
+  entry({
+    id: 'oeil',
+    name: 'Œilleton de porte',
+    category: 'Quincaillerie',
+    description: 'Lentille grand angle.',
+  }),
 ];
 
 describe('normalisation du texte', () => {

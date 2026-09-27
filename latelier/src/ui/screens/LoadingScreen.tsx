@@ -44,7 +44,11 @@ export function LoadingScreen() {
   return (
     <div className="screen loading-screen">
       <div className="loading-card paper">
-        <span className="pin" style={{ left: '50%', top: '0.7rem', marginLeft: '-0.47rem' }} aria-hidden="true" />
+        <span
+          className="pin"
+          style={{ left: '50%', top: '0.7rem', marginLeft: '-0.47rem' }}
+          aria-hidden="true"
+        />
         <p className="loading-kicker dymo is-black">Atelier de démontage</p>
         <h1 className="brand-title display">L’Atelier</h1>
         {loading.error ? (
@@ -52,7 +56,8 @@ export function LoadingScreen() {
             <Stamp className="loading-error-stamp">Échec</Stamp>
             <p>{loading.error}</p>
             <p className="loading-error-help">
-              Essayez un navigateur récent (Chrome, Edge ou Firefox à jour) avec l’accélération matérielle activée.
+              Essayez un navigateur récent (Chrome, Edge ou Firefox à jour) avec l’accélération matérielle
+              activée.
             </p>
           </div>
         ) : (

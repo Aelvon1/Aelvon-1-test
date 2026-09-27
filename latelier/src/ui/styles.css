@@ -50,8 +50,8 @@
   /* Polices (système) */
   --font-ui: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif;
   --font-display:
-    Bahnschrift, 'DIN Alternate', 'DIN Condensed', 'Roboto Condensed', 'Arial Narrow', 'Liberation Sans Narrow',
-    system-ui, sans-serif;
+    Bahnschrift, 'DIN Alternate', 'DIN Condensed', 'Roboto Condensed', 'Arial Narrow',
+    'Liberation Sans Narrow', system-ui, sans-serif;
   --font-type: 'Courier Prime', 'Courier New', 'Nimbus Mono PS', 'Liberation Mono', ui-monospace, monospace;
   --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
 
@@ -68,10 +68,10 @@
   --paper-bg: var(--tex-grain), var(--tex-fibers), linear-gradient(170deg, #f6efdb 0%, #ece0bf 100%);
   --kraft-bg: var(--tex-grain), var(--tex-fibers), linear-gradient(170deg, #d6bb8f 0%, #c3a371 100%);
   --metal-bg:
-    var(--tex-grain),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 4px),
+    var(--tex-grain), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 4px),
     linear-gradient(180deg, #3f4630 0%, #323824 100%);
-  --metal-dark-bg: var(--tex-grain), linear-gradient(180deg, rgba(34, 38, 26, 0.94) 0%, rgba(24, 27, 18, 0.94) 100%);
+  --metal-dark-bg:
+    var(--tex-grain), linear-gradient(180deg, rgba(34, 38, 26, 0.94) 0%, rgba(24, 27, 18, 0.94) 100%);
 
   /* Rayons et ombres */
   --radius: 4px;
@@ -205,14 +205,14 @@ body {
   inset: 0.35rem;
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) left top / 0.42rem 0.42rem
-      no-repeat,
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) left top / 0.42rem
+      0.42rem no-repeat,
     radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) right top / 0.42rem
       0.42rem no-repeat,
-    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) left bottom / 0.42rem
-      0.42rem no-repeat,
-    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) right bottom / 0.42rem
-      0.42rem no-repeat;
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) left bottom /
+      0.42rem 0.42rem no-repeat,
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) right bottom /
+      0.42rem 0.42rem no-repeat;
   opacity: 0.55;
 }
 
@@ -221,9 +221,7 @@ body {
   position: absolute;
   width: 5.2rem;
   height: 1.35rem;
-  background:
-    var(--tex-grain),
-    linear-gradient(180deg, rgba(240, 230, 190, 0.9), rgba(226, 213, 168, 0.86));
+  background: var(--tex-grain), linear-gradient(180deg, rgba(240, 230, 190, 0.9), rgba(226, 213, 168, 0.86));
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   clip-path: polygon(
     2% 0,
@@ -245,9 +243,7 @@ body {
 }
 
 .tape.is-yellow {
-  background:
-    var(--tex-grain),
-    linear-gradient(180deg, rgba(246, 204, 52, 0.92), rgba(232, 184, 24, 0.9));
+  background: var(--tex-grain), linear-gradient(180deg, rgba(246, 204, 52, 0.92), rgba(232, 184, 24, 0.9));
 }
 
 .tape.top-center {
@@ -326,7 +322,9 @@ body {
 }
 
 .stamp.is-double {
-  box-shadow: inset 0 0 0 0.1em transparent, inset 0 0 0 0.2em currentColor;
+  box-shadow:
+    inset 0 0 0 0.1em transparent,
+    inset 0 0 0 0.2em currentColor;
   padding: 0.2em 0.6em;
 }
 
@@ -406,9 +404,7 @@ body {
   padding: 0.55em 1.1em;
   border-radius: var(--radius);
   border: 1px solid rgba(0, 0, 0, 0.6);
-  background:
-    var(--tex-grain),
-    linear-gradient(180deg, #535b3c 0%, #40472d 100%);
+  background: var(--tex-grain), linear-gradient(180deg, #535b3c 0%, #40472d 100%);
   color: var(--cream);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
@@ -450,24 +446,18 @@ body {
 }
 
 .btn-primary {
-  background:
-    var(--tex-grain),
-    linear-gradient(180deg, #d66d34 0%, var(--orange) 55%, #a44a1b 100%);
+  background: var(--tex-grain), linear-gradient(180deg, #d66d34 0%, var(--orange) 55%, #a44a1b 100%);
   border-color: #6d2d0c;
   color: #fff8ec;
 }
 
 .btn-petrol {
-  background:
-    var(--tex-grain),
-    linear-gradient(180deg, #2f6c7b 0%, var(--petrol) 60%, #173c46 100%);
+  background: var(--tex-grain), linear-gradient(180deg, #2f6c7b 0%, var(--petrol) 60%, #173c46 100%);
   border-color: #0c2429;
 }
 
 .btn-danger {
-  background:
-    var(--tex-grain),
-    linear-gradient(180deg, #a85a36 0%, var(--rust) 60%, #6c371d 100%);
+  background: var(--tex-grain), linear-gradient(180deg, #a85a36 0%, var(--rust) 60%, #6c371d 100%);
   border-color: #3e1c0b;
 }
 
@@ -833,7 +823,13 @@ body {
 
 /* Surlignage d'une correspondance de recherche (feutre jaune). */
 mark.hl {
-  background: linear-gradient(180deg, transparent 12%, rgba(242, 194, 27, 0.6) 12%, rgba(242, 194, 27, 0.6) 88%, transparent 88%);
+  background: linear-gradient(
+    180deg,
+    transparent 12%,
+    rgba(242, 194, 27, 0.6) 12%,
+    rgba(242, 194, 27, 0.6) 88%,
+    transparent 88%
+  );
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;

@@ -56,7 +56,10 @@ export function DebugPanel() {
       perf.add(values, 'pixelRatio').name('Ratio de pixels'),
     ];
     const render = gui.addFolder('Rendu');
-    controllers.push(render.add(values, 'backend').name('Backend'), render.add(values, 'phase').name('Phase'));
+    controllers.push(
+      render.add(values, 'backend').name('Backend'),
+      render.add(values, 'phase').name('Phase'),
+    );
     for (const c of controllers) c.disable();
 
     // Qualité et options modifiables (réglages du moteur via le bus).
@@ -81,7 +84,11 @@ export function DebugPanel() {
       .onChange((v: boolean) => bus.emit('settings:update', { showFps: v }));
 
     const refresh = (state: AppState, previous: AppState) => {
-      if (state.stats !== previous.stats || state.renderer !== previous.renderer || state.phase !== previous.phase) {
+      if (
+        state.stats !== previous.stats ||
+        state.renderer !== previous.renderer ||
+        state.phase !== previous.phase
+      ) {
         Object.assign(values, readout(state));
         for (const c of controllers) c.updateDisplay();
       }

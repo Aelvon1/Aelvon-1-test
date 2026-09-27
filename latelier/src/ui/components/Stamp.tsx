@@ -26,7 +26,11 @@ export function DifficultyStamp({ level }: { level: 1 | 2 | 3 | 4 | 5 }) {
   const label = difficultyLabel(level);
   const tone = level >= 4 ? 'is-hard' : level >= 3 ? 'is-medium' : 'is-easy';
   return (
-    <span className={`difficulty-stamp ${tone}`} role="img" aria-label={`Difficulté ${level} sur 5 : ${label}`}>
+    <span
+      className={`difficulty-stamp ${tone}`}
+      role="img"
+      aria-label={`Difficulté ${level} sur 5 : ${label}`}
+    >
       <span className="difficulty-number" aria-hidden="true">
         {level}
       </span>

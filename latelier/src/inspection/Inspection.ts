@@ -452,6 +452,8 @@ export class Inspection {
       target,
       direction,
       distance,
+      // Rayon cadré : la vue initiale est recadrée dans la zone libre de l'écran (panneaux).
+      radius: sphere.radius,
       minDistance: pres?.minSurfaceDistance ?? 0.002,
       instant,
     });

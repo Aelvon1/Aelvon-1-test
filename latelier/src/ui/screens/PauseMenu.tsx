@@ -56,10 +56,20 @@ export function PauseMenu() {
           >
             <Icon name="play" /> Reprendre
           </button>
-          <button type="button" className="btn btn-ink btn-block" onMouseEnter={hover} onClick={() => open('settings')}>
+          <button
+            type="button"
+            className="btn btn-ink btn-block"
+            onMouseEnter={hover}
+            onClick={() => open('settings')}
+          >
             <Icon name="gear" /> Réglages
           </button>
-          <button type="button" className="btn btn-ink btn-block" onMouseEnter={hover} onClick={() => open('controls')}>
+          <button
+            type="button"
+            className="btn btn-ink btn-block"
+            onMouseEnter={hover}
+            onClick={() => open('controls')}
+          >
             <Icon name="keyboard" /> Commandes
           </button>
           <button

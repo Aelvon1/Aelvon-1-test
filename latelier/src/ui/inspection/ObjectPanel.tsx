@@ -199,12 +199,22 @@ export function ObjectPanel() {
             >
               Oui, tout remonter
             </button>
-            <button type="button" className="btn btn-ghost" onClick={() => setConfirmReset(false)} {...focusProps}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setConfirmReset(false)}
+              {...focusProps}
+            >
               Annuler
             </button>
           </div>
         ) : (
-          <button type="button" className="btn btn-ghost" onClick={() => setConfirmReset(true)} {...focusProps}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setConfirmReset(true)}
+            {...focusProps}
+          >
             <Icon name="reset" /> Réinitialiser l’objet (tout remonter)
           </button>
         )}

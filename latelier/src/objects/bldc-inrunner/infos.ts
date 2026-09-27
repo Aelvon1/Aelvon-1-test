@@ -190,8 +190,8 @@ export function infos(d: BldcDims): Record<string, PartInfo> {
     },
     'sensors.hall': {
       role: 'Capteurs à effet Hall : chaque capteur bascule quand le pôle de l’aimant qui passe devant lui change (sortie tout-ou-rien, verrouillée).',
-      material: 'Puce silicium, boîtier époxy SIP-3 (TO-92S)',
-      dimensions: '4 × 3 × 1,5 mm, 3 pattes au pas de 1,27 mm',
+      material: 'Puce silicium, boîtier époxy SIP-3 miniature',
+      dimensions: 'Boîtier ≈ 3 × 3 × 1,5 mm, 3 pattes au pas de 1,27 mm (typique)',
       reference:
         'Capteur Hall bipolaire à verrouillage, marquage « 41F » (référence générique), sortie collecteur ouvert',
       tip: 'Diagnostic : alimenter en 5 V et tourner le rotor à la main ; chaque sortie doit basculer à chaque passage de pôle (LED + résistance de tirage, ou oscilloscope). Un capteur mort fait démarrer le moteur par à-coups.',
