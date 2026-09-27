@@ -14,7 +14,7 @@ import type { AppContext } from '../../core/context';
 import type { Assembly } from '../Assembly';
 import type { InspectionCamera } from '../camera/InspectionCamera';
 import type { CameraPointerListener } from '../camera/types';
-import type { Picker, PickHit } from './Picker';
+import { resetPickHit, type Picker, type PickHit } from './Picker';
 
 /** Intervalle minimal entre deux lancers de survol (s). */
 const HOVER_INTERVAL = 0.05;
@@ -176,6 +176,7 @@ export class Selection implements CameraPointerListener {
   detach(): void {
     this.cancelPendingToggle();
     this.assembly = null;
+    resetPickHit(this.hit);
     this.hoverProxy.release();
     this.selectedProxy.release();
     this.hoverOutline = { partId: null, instance: null };

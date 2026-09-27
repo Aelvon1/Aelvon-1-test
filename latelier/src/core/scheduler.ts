@@ -58,9 +58,18 @@ export class TimeSlicer {
 export class IdleQueue {
   private readonly tasks: { run: () => void; priority: number }[] = [];
 
-  push(run: () => void, priority = 0): void {
-    this.tasks.push({ run, priority });
+  /**
+   * Ajoute une tâche ; retourne sa fonction d'annulation (un propriétaire libéré retire ses
+   * tâches en attente : leurs fermetures ne retiennent plus ses données jusqu'à leur exécution).
+   */
+  push(run: () => void, priority = 0): () => void {
+    const task = { run, priority };
+    this.tasks.push(task);
     this.tasks.sort((a, b) => b.priority - a.priority);
+    return () => {
+      const index = this.tasks.indexOf(task);
+      if (index >= 0) this.tasks.splice(index, 1);
+    };
   }
 
   /** À appeler une fois par image : exécute des tâches tant que le budget n'est pas épuisé. */

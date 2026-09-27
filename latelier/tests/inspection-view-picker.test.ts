@@ -186,3 +186,31 @@ describe('miniatures — planche de sprites', () => {
     expect([...flipped]).toEqual([...dst]);
   });
 });
+
+describe('libération — tâches en attente et références', () => {
+  it('détacher le sélecteur annule ses constructions de BVH en attente', () => {
+    const idle = new IdleQueue();
+    const other = new Picker(idle);
+    other.attach(assembly);
+    expect(idle.size).toBeGreaterThan(0);
+    other.detach();
+    // Les fermetures (qui retiennent les géométries de l'objet) ont quitté la file.
+    expect(idle.size).toBe(0);
+    expect(other.treeStats.pending).toBe(0);
+  });
+
+  it('file des temps morts : annulation d’une tâche, sans effet une fois exécutée', () => {
+    const idle = new IdleQueue();
+    const done: string[] = [];
+    const cancelA = idle.push(() => done.push('a'));
+    idle.push(() => done.push('b'), 1);
+    cancelA();
+    idle.run(1000);
+    expect(done).toEqual(['b']);
+    const cancelC = idle.push(() => done.push('c'));
+    idle.run(1000);
+    cancelC();
+    expect(done).toEqual(['b', 'c']);
+    expect(idle.size).toBe(0);
+  });
+});

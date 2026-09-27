@@ -42,6 +42,8 @@ export class DetailManager {
   private timer = 0;
   private clock = 0;
   private generation = 0;
+  /** Annulations des constructions de détail en attente dans la file des temps morts. */
+  private readonly pendingTasks = new Map<DetailEntry, () => void>();
   /** Les maillages d'une pièce ont changé (détail affiché, masqué ou libéré) : vue à resynchroniser. */
   onChange: ((partId: string) => void) | null = null;
 
@@ -91,10 +93,14 @@ export class DetailManager {
     entry.state = 'queued';
     const generation = this.generation;
     // Priorité plus haute pour les pièces les plus proches (la file exécute les priorités hautes d'abord).
-    this.idle.push(() => {
-      if (generation !== this.generation || this.assembly.isDisposed || entry.state !== 'queued') return;
-      this.build(entry);
-    }, -distance);
+    this.pendingTasks.set(
+      entry,
+      this.idle.push(() => {
+        this.pendingTasks.delete(entry);
+        if (generation !== this.generation || this.assembly.isDisposed || entry.state !== 'queued') return;
+        this.build(entry);
+      }, -distance),
+    );
   }
 
   private build(entry: DetailEntry): void {
@@ -196,6 +202,8 @@ export class DetailManager {
 
   dispose(): void {
     this.generation++;
+    for (const cancel of this.pendingTasks.values()) cancel();
+    this.pendingTasks.clear();
     for (const entry of this.entries) if (entry.object) this.free(entry);
     this.entries.length = 0;
   }

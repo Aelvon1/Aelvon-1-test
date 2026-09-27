@@ -18,7 +18,7 @@ import '../labels.css';
 import type { Assembly, PartRuntime } from '../Assembly';
 import type { PoseComposer } from '../poses';
 import type { KnollingLabel } from '../knollingPlan';
-import type { Picker, PickHit } from '../selection/Picker';
+import { resetPickHit, type Picker, type PickHit } from '../selection/Picker';
 import type { ScreenInsets } from '../camera/types';
 import { readUiInsets, sameInsets } from '../view/uiInsets';
 import {
@@ -180,6 +180,7 @@ export class InspectionLabels {
   detach(): void {
     this.assembly = null;
     this.composer = null;
+    resetPickHit(this.hit);
     this.infos = [];
     for (const node of this.nodes.values()) this.removeNode(node);
     this.nodes.clear();

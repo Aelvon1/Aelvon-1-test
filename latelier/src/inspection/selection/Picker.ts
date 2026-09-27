@@ -30,6 +30,18 @@ export interface PickHit {
   ghost: boolean;
 }
 
+/** Maillage neutre des résultats de sélection au repos. */
+const NO_MESH = new THREE.Mesh();
+
+/** Remet un résultat de sélection à vide : il ne retient plus le maillage d'un objet libéré. */
+export function resetPickHit(hit: PickHit): void {
+  hit.partId = '';
+  hit.instance = null;
+  hit.mesh = NO_MESH;
+  hit.distance = 0;
+  hit.ghost = false;
+}
+
 interface Entry {
   mesh: THREE.Mesh;
   partId: string;
@@ -76,6 +88,8 @@ export class Picker implements CameraSceneQuery {
   private readonly raycaster = new THREE.Raycaster();
   private readonly hits: THREE.Intersection[] = [];
   private readonly scratch = new THREE.Mesh();
+  /** Annulations des constructions de BVH en attente dans la file des temps morts. */
+  private readonly pendingTasks = new Map<THREE.BufferGeometry, () => void>();
   private readonly bothSides = doubleSideMaterial();
   private readonly ray = new THREE.Ray();
   // --- État de la recherche du point le plus proche (rappels réutilisés, sans fermeture) ---
@@ -129,6 +143,9 @@ export class Picker implements CameraSceneQuery {
     this.assembly = null;
     this.entries = [];
     this.queued.clear();
+    for (const cancel of this.pendingTasks.values()) cancel();
+    this.pendingTasks.clear();
+    resetPickHit(this.tmpHit);
     for (const [geometry, tree] of this.trees) {
       if (geometry.boundsTree === tree) geometry.boundsTree = undefined;
     }
@@ -165,10 +182,14 @@ export class Picker implements CameraSceneQuery {
       this.queued.add(g);
       const triangles = (g.index ? g.index.count : (g.getAttribute('position')?.count ?? 0)) / 3;
       // Les petites géométries d'abord : la sélection devient rapide au plus tôt.
-      this.idle.push(() => {
-        if (generation !== this.generation || !this.queued.delete(g)) return;
-        this.buildTree(g);
-      }, -triangles);
+      this.pendingTasks.set(
+        g,
+        this.idle.push(() => {
+          this.pendingTasks.delete(g);
+          if (generation !== this.generation || !this.queued.delete(g)) return;
+          this.buildTree(g);
+        }, -triangles),
+      );
     }
   }
 
