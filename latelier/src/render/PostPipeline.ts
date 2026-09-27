@@ -77,7 +77,6 @@ export class PostPipeline {
 
     // --- Passe de scène (HDR linéaire) ---
     this.scenePass = pass(scene, camera, { samples: config.msaaSamples });
-    this.scenePass.name = 'PostFX [ Scène ]';
     this.disposables.push(this.scenePass);
     const sceneColor = this.scenePass.getTextureNode('output');
     const viewZ = this.scenePass.getViewZNode();

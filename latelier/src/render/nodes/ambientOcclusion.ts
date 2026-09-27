@@ -168,9 +168,7 @@ export class AmbientOcclusion {
       depthBuffer: false,
     } as const;
     this.blurH = rtt(bilateralBlur(aoTexture, depth, options.camera, this.stepH), null, null, rttOptions);
-    this.blurH.name = 'PostFX.aoBlurH';
     this.blurV = rtt(bilateralBlur(this.blurH, depth, options.camera, this.stepV), null, null, rttOptions);
-    this.blurV.name = 'PostFX.aoBlurV';
     this.factor = this.blurV.r;
   }
 
