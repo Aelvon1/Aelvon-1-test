@@ -1,0 +1,849 @@
+/*
+ * Direction artistique « atelier » : fiches cartonnées, ruban de masquage, tampons encreurs,
+ * étiquettes de titreuse, liège, tôle peinte. Palette : vert olive, orange brûlé, bleu pétrole,
+ * crème, rouille, relevés de jaune « ruban ». Polices système uniquement ; toutes les matières
+ * sont des dégradés CSS et des SVG en URI de données (aucun fichier externe).
+ *
+ * Ce fichier : jetons, matières, typographie, boutons et contrôles de formulaire communs.
+ */
+:root {
+  --text-scale: 1;
+
+  /* Palette */
+  --olive-950: #171a10;
+  --olive-900: #1f2316;
+  --olive-800: #2a2f1e;
+  --olive-700: #363c27;
+  --olive-600: #454d31;
+  --olive: #5b6340;
+  --olive-400: #7a8456;
+  --olive-300: #a2ab7c;
+  --orange: #c05a24;
+  --orange-700: #8f3e14;
+  --orange-600: #a54a1a;
+  --orange-400: #da7440;
+  --petrol: #1f4e5a;
+  --petrol-800: #12303a;
+  --petrol-700: #173b44;
+  --petrol-400: #2f6e7d;
+  --petrol-300: #6aa7b4;
+  --cream: #eee4c8;
+  --cream-dim: #cfc5a8;
+  --paper: #f3ecd8;
+  --kraft: #cdb084;
+  --kraft-dark: #a88657;
+  --rust: #8a4a2a;
+  --rust-400: #b0613a;
+  --tape: #f2c21b;
+  --tape-soft: rgba(242, 194, 27, 0.8);
+  --masking: rgba(233, 222, 180, 0.88);
+  --ink: #1c1a17;
+  --ink-soft: #3a352c;
+  --ink-muted: #625a4c;
+  --stamp-red: #b2362b;
+  --stamp-blue: #2a5a7a;
+  --ok: #7da556;
+  --danger: #cf4a33;
+  --shadow: rgba(0, 0, 0, 0.45);
+  --shadow-strong: rgba(0, 0, 0, 0.62);
+
+  /* Polices (système) */
+  --font-ui: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', 'Liberation Sans', Arial, sans-serif;
+  --font-display:
+    Bahnschrift, 'DIN Alternate', 'DIN Condensed', 'Roboto Condensed', 'Arial Narrow',
+    'Liberation Sans Narrow', system-ui, sans-serif;
+  --font-type: 'Courier Prime', 'Courier New', 'Nimbus Mono PS', 'Liberation Mono', ui-monospace, monospace;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+
+  /* Matières (SVG en URI de données) */
+  /* Grain : points sombres fins (papier, peinture). */
+  --tex-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .42 -.16'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Fibres claires du papier. */
+  --tex-fibers: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .35' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 .95 0 0 0 1.1 -.52'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23f)'/%3E%3C/svg%3E");
+  /* Liège : granulés sombres et clairs. */
+  --tex-cork: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='m' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.045' numOctaves='2' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .17 0 0 0 0 .07 0 0 0 -1.6 .95'/%3E%3C/filter%3E%3Cfilter id='a' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.38' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .24 0 0 0 0 .12 0 0 0 0 .04 0 0 0 -5 2.2'/%3E%3C/filter%3E%3Cfilter id='b' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.3' numOctaves='2' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .98 0 0 0 0 .84 0 0 0 0 .6 0 0 0 5 -3'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23m)'/%3E%3Crect width='256' height='256' filter='url(%23a)'/%3E%3Crect width='256' height='256' filter='url(%23b)'/%3E%3C/svg%3E");
+  /* Usure d'encre (masque des tampons). */
+  --tex-worn: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='g' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -5 3.45'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23g)'/%3E%3C/svg%3E");
+
+  --paper-bg: var(--tex-grain), var(--tex-fibers), linear-gradient(170deg, #f6efdb 0%, #ece0bf 100%);
+  --kraft-bg: var(--tex-grain), var(--tex-fibers), linear-gradient(170deg, #d6bb8f 0%, #c3a371 100%);
+  --metal-bg:
+    var(--tex-grain), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, #3f4630 0%, #323824 100%);
+  --metal-dark-bg:
+    var(--tex-grain), linear-gradient(180deg, rgba(34, 38, 26, 0.94) 0%, rgba(24, 27, 18, 0.94) 100%);
+
+  /* Rayons et ombres */
+  --radius: 4px;
+  --radius-lg: 8px;
+  --drop: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 0.5rem 1.4rem var(--shadow);
+  --paper-drop: 0 1px 1px rgba(0, 0, 0, 0.25), 0 0.6rem 1.6rem rgba(0, 0, 0, 0.42);
+
+  /* Taille de base : 16 px en 1920 × 1080, ≈ 13 px en 1280 × 720, multipliée par le réglage. */
+  font-size: calc(clamp(12.5px, 0.42vw + 7.9px, 16px) * var(--text-scale));
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0b0c0e;
+  font-family: var(--font-ui);
+  color: var(--cream);
+  -webkit-font-smoothing: antialiased;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  outline: none;
+}
+
+#ui-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  line-height: 1.35;
+}
+
+.ui {
+  position: absolute;
+  inset: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus clavier visible : liseré jaune ruban. */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tape);
+  outline-offset: 2px;
+}
+
+.paper :focus-visible,
+.kraft :focus-visible {
+  outline-color: var(--petrol);
+}
+
+/* Barres de défilement discrètes (thème sombre). */
+.scroll {
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(238, 228, 200, 0.28) transparent;
+  overscroll-behavior: contain;
+}
+
+.paper .scroll,
+.paper.scroll {
+  scrollbar-color: rgba(28, 26, 23, 0.32) transparent;
+}
+
+/* --- Matières --------------------------------------------------------------------------- */
+
+.paper {
+  background: var(--paper-bg);
+  color: var(--ink);
+  box-shadow: var(--paper-drop);
+}
+
+.kraft {
+  background: var(--kraft-bg);
+  color: var(--ink);
+  box-shadow: var(--paper-drop);
+}
+
+.metal {
+  background: var(--metal-bg);
+  color: var(--cream);
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 0.4rem 1.2rem var(--shadow);
+}
+
+.metal-dark {
+  background: var(--metal-dark-bg);
+  color: var(--cream);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0.5rem 1.4rem var(--shadow);
+}
+
+/* Rivets aux quatre coins d'une tôle. */
+.rivets {
+  position: relative;
+}
+
+.rivets::after {
+  content: '';
+  position: absolute;
+  inset: 0.35rem;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) left top / 0.42rem
+      0.42rem no-repeat,
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) right top / 0.42rem
+      0.42rem no-repeat,
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) left bottom /
+      0.42rem 0.42rem no-repeat,
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.5) 70%) right bottom /
+      0.42rem 0.42rem no-repeat;
+  opacity: 0.55;
+}
+
+/* Bande de ruban de masquage (bords déchirés). Placer dans un parent positionné. */
+.tape {
+  position: absolute;
+  width: 5.2rem;
+  height: 1.35rem;
+  background: var(--tex-grain), linear-gradient(180deg, rgba(240, 230, 190, 0.9), rgba(226, 213, 168, 0.86));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  clip-path: polygon(
+    2% 0,
+    98% 0,
+    100% 16%,
+    97% 32%,
+    100% 48%,
+    97% 64%,
+    100% 80%,
+    98% 100%,
+    2% 100%,
+    0 84%,
+    3% 68%,
+    0 52%,
+    3% 36%,
+    0 20%
+  );
+  pointer-events: none;
+}
+
+.tape.is-yellow {
+  background: var(--tex-grain), linear-gradient(180deg, rgba(246, 204, 52, 0.92), rgba(232, 184, 24, 0.9));
+}
+
+.tape.top-center {
+  top: -0.6rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+}
+
+.tape.top-left {
+  top: -0.45rem;
+  left: -1.2rem;
+  transform: rotate(-32deg);
+}
+
+.tape.top-right {
+  top: -0.45rem;
+  right: -1.2rem;
+  transform: rotate(32deg);
+}
+
+/* Punaise. */
+.pin {
+  position: absolute;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #ffc79b 0%, var(--orange) 42%, #5e2408 100%);
+  box-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.45),
+    0.25rem 0.35rem 0.3rem rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.pin.is-petrol {
+  background: radial-gradient(circle at 35% 32%, #9fd3df 0%, var(--petrol-400) 42%, #0b242b 100%);
+}
+
+.pin.is-olive {
+  background: radial-gradient(circle at 35% 32%, #d7dfab 0%, var(--olive-400) 42%, #25290f 100%);
+}
+
+.pin.is-yellow {
+  background: radial-gradient(circle at 35% 32%, #fff0a8 0%, var(--tape) 42%, #6a5000 100%);
+}
+
+/* Tampon encreur (encre usée). */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3em;
+  padding: 0.12em 0.5em;
+  border: 0.14em solid currentColor;
+  border-radius: 0.25em;
+  color: var(--stamp-red);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  transform: rotate(-4deg);
+  -webkit-mask-image: var(--tex-worn);
+  mask-image: var(--tex-worn);
+  -webkit-mask-size: 7rem;
+  mask-size: 7rem;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+.stamp.is-blue {
+  color: var(--stamp-blue);
+}
+
+.stamp.is-olive {
+  color: #4d6a2c;
+}
+
+.stamp.is-double {
+  box-shadow:
+    inset 0 0 0 0.1em transparent,
+    inset 0 0 0 0.2em currentColor;
+  padding: 0.2em 0.6em;
+}
+
+/* Étiquette de titreuse (lettres en relief sur ruban plastique). */
+.dymo {
+  display: inline-block;
+  padding: 0.18em 0.6em 0.14em;
+  border-radius: 0.22em;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #2b6878 0%, var(--petrol) 55%, #173f49 100%);
+  color: #f4f0e2;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.55),
+    0 -1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
+}
+
+.dymo.is-black {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #34322d 0%, #1a1916 60%, #11100e 100%);
+}
+
+.dymo.is-orange {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #d4703a 0%, var(--orange) 55%, #97411a 100%);
+}
+
+.dymo.is-olive {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #737c4e 0%, var(--olive) 55%, #444a2c 100%);
+}
+
+/* Titres */
+.display {
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  letter-spacing: 0.02em;
+}
+
+.type {
+  font-family: var(--font-type);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  opacity: 0.72;
+}
+
+/* --- Boutons ------------------------------------------------------------------------------ */
+
+.btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  font: inherit;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.55em 1.1em;
+  border-radius: var(--radius);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  background: var(--tex-grain), linear-gradient(180deg, #535b3c 0%, #40472d 100%);
+  color: var(--cream);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.25),
+    0 2px 3px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  transition:
+    filter 0.12s,
+    transform 0.08s,
+    box-shadow 0.12s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn:hover {
+  filter: brightness(1.14);
+}
+
+.btn:active,
+.btn.is-pressed-anim {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.4),
+    0 1px 1px rgba(0, 0, 0, 0.3);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  cursor: not-allowed;
+  filter: grayscale(0.7) brightness(0.8);
+  opacity: 0.65;
+}
+
+.btn .icon {
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+}
+
+.btn-primary {
+  background: var(--tex-grain), linear-gradient(180deg, #d66d34 0%, var(--orange) 55%, #a44a1b 100%);
+  border-color: #6d2d0c;
+  color: #fff8ec;
+}
+
+.btn-petrol {
+  background: var(--tex-grain), linear-gradient(180deg, #2f6c7b 0%, var(--petrol) 60%, #173c46 100%);
+  border-color: #0c2429;
+}
+
+.btn-danger {
+  background: var(--tex-grain), linear-gradient(180deg, #a85a36 0%, var(--rust) 60%, #6c371d 100%);
+  border-color: #3e1c0b;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: rgba(238, 228, 200, 0.28);
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.btn-ghost:hover {
+  background: rgba(238, 228, 200, 0.08);
+  filter: none;
+}
+
+/* Bouton sur papier (encre, cadre crayonné). */
+.btn-ink {
+  background: rgba(255, 255, 255, 0.28);
+  color: var(--ink);
+  border: 1.5px solid rgba(28, 26, 23, 0.55);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  text-shadow: none;
+}
+
+.btn-ink:hover {
+  background: rgba(255, 255, 255, 0.5);
+  filter: none;
+}
+
+.btn-lg {
+  font-size: 1.2rem;
+  padding: 0.7em 1.6em;
+}
+
+.btn-sm {
+  font-size: 0.82rem;
+  padding: 0.35em 0.7em;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.icon-btn {
+  pointer-events: auto;
+  display: inline-grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.icon-btn:hover {
+  background: rgba(238, 228, 200, 0.1);
+  border-color: rgba(238, 228, 200, 0.18);
+}
+
+.icon-btn .icon {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: none;
+  vertical-align: -0.15em;
+}
+
+/* Touche de clavier (capuchon). */
+.key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.7em;
+  height: 1.7em;
+  padding: 0 0.42em;
+  border-radius: 0.3em;
+  border: 1px solid rgba(20, 18, 14, 0.9);
+  background: linear-gradient(180deg, #f2ead3 0%, #d9ceb0 100%);
+  box-shadow:
+    inset 0 -0.16em 0 rgba(0, 0, 0, 0.22),
+    0 1px 1px rgba(0, 0, 0, 0.45);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78em;
+  line-height: 1;
+  text-shadow: none;
+  white-space: nowrap;
+  vertical-align: 0.05em;
+}
+
+.key.is-mouse {
+  background: linear-gradient(180deg, #d4dfe2 0%, #adbec3 100%);
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+
+.key-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  flex-wrap: wrap;
+}
+
+.key-combo .plus {
+  opacity: 0.7;
+  font-size: 0.8em;
+}
+
+/* --- Contrôles de formulaire -------------------------------------------------------------- */
+
+.field {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.field-label {
+  font-weight: 600;
+}
+
+.field-help {
+  font-size: 0.82em;
+  opacity: 0.75;
+}
+
+.field-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  min-width: 4.2em;
+  text-align: right;
+}
+
+/* Interrupteur à bascule (role="switch"). */
+.switch {
+  pointer-events: auto;
+  position: relative;
+  flex: none;
+  width: 2.9rem;
+  height: 1.55rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.65);
+  background: linear-gradient(180deg, #1c1e17, #2c3022);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 0.14rem;
+  left: 0.16rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #efe6cc, #b9ae90);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  transition: transform 0.16s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.switch[aria-checked='true'] {
+  background: linear-gradient(180deg, #b9541f, var(--orange));
+}
+
+.switch[aria-checked='true']::after {
+  transform: translateX(1.32rem);
+}
+
+.paper .switch {
+  border-color: rgba(28, 26, 23, 0.6);
+  background: linear-gradient(180deg, #b8ad90, #d6ccb0);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.3);
+}
+
+.paper .switch[aria-checked='true'] {
+  background: linear-gradient(180deg, #b9541f, var(--orange));
+}
+
+/* Curseur (input range) : glissière en creux, bouton de tôle. */
+.slider {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 1.4rem;
+  background: transparent;
+  cursor: pointer;
+  --fill: 50%;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 0.42rem;
+  border-radius: 0.3rem;
+  background:
+    linear-gradient(90deg, var(--orange) 0 var(--fill), transparent var(--fill)),
+    linear-gradient(180deg, #121410, #262a1d);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.slider::-moz-range-track {
+  height: 0.42rem;
+  border-radius: 0.3rem;
+  background:
+    linear-gradient(90deg, var(--orange) 0 var(--fill), transparent var(--fill)),
+    linear-gradient(180deg, #121410, #262a1d);
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: -0.32rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  background: radial-gradient(circle at 40% 35%, #fbf4de, #c9bd9b 70%, #8f8469);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.slider::-moz-range-thumb {
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  background: radial-gradient(circle at 40% 35%, #fbf4de, #c9bd9b 70%, #8f8469);
+}
+
+.slider:focus-visible {
+  outline-offset: 0;
+}
+
+.paper .slider::-webkit-slider-runnable-track {
+  background:
+    linear-gradient(90deg, var(--orange) 0 var(--fill), transparent var(--fill)),
+    linear-gradient(180deg, #b3a887, #d5caa9);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Sélecteur segmenté (boutons radio natifs : flèches au clavier). */
+.segmented {
+  pointer-events: auto;
+  display: inline-flex;
+  border-radius: var(--radius);
+  border: 1px solid rgba(0, 0, 0, 0.65);
+  background: linear-gradient(180deg, #16180f, #262a1d);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmented label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.35em 0.8em;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--cream-dim);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.segmented label:hover {
+  color: var(--cream);
+  background: rgba(238, 228, 200, 0.06);
+}
+
+.segmented label.is-checked {
+  color: #fff8ec;
+  background: linear-gradient(180deg, #d66d34 0%, var(--orange) 60%, #a44a1b 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--tape);
+  outline-offset: 1px;
+}
+
+.paper .segmented {
+  border-color: rgba(28, 26, 23, 0.55);
+  background: rgba(28, 26, 23, 0.1);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.paper .segmented label {
+  color: var(--ink-soft);
+}
+
+.paper .segmented label.is-checked {
+  color: #fff8ec;
+}
+
+/* Liste déroulante et champ de saisie. */
+.select,
+.input {
+  pointer-events: auto;
+  font: inherit;
+  color: var(--cream);
+  background: linear-gradient(180deg, #16180f, #232619);
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  border-radius: var(--radius);
+  padding: 0.4em 0.6em;
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(255, 255, 255, 0.06);
+  min-width: 0;
+}
+
+.select option {
+  background: #22251a;
+  color: var(--cream);
+}
+
+.paper .select,
+.paper .input {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.45);
+  border-color: rgba(28, 26, 23, 0.5);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.paper .select option {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.input::placeholder {
+  color: inherit;
+  opacity: 0.55;
+}
+
+/* Surlignage d'une correspondance de recherche (feutre jaune). */
+mark.hl {
+  background: linear-gradient(
+    180deg,
+    transparent 12%,
+    rgba(242, 194, 27, 0.6) 12%,
+    rgba(242, 194, 27, 0.6) 88%,
+    transparent 88%
+  );
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.dymo mark.hl {
+  color: var(--ink);
+  text-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}

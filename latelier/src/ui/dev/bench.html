@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>L'Atelier — banc de l'interface</title>
+    <style>
+      /* Fond simulant la salle (le banc n'a pas de rendu 3D). */
+      body {
+        background: radial-gradient(ellipse at 55% 45%, #6b5a40 0%, #3a3226 45%, #15130f 100%) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene" tabindex="0"></canvas>
+    <div id="ui-root"></div>
+    <script type="module" src="./bench.tsx"></script>
+  </body>
+</html>
