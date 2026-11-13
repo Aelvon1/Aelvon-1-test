@@ -1,198 +1,313 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import PageHero from '../components/editorial/PageHero';
+import {
+  MESSAGE_MAX,
+  NAME_MAX,
+  ORDER_EXAMPLE,
+  SUBJECTS,
+  buildContactMessage,
+  contactDefaults,
+  normalizeOrderNumber,
+  validateContact,
+  validateContactField,
+} from '../components/editorial/contact-message';
+import { CONTACT_EMAIL } from '../components/layout/navigation';
+import { Button, Eyebrow, Field, Icon, Input, Reveal, Section, Select, TextLink, Textarea, useToast } from '../components/ui';
+import { scrollToTarget, usePageMeta } from '../hooks';
 
-const Contact = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: ''
-  });
-  const [submitted, setSubmitted] = useState(false);
+// Coordonnées et horaires de la maison.
+const PHONE = { label: '+33 1 23 45 67 89', href: 'tel:+33123456789' };
+const ADDRESS = ['123 Rue de la Mode', '75001 Paris, France'];
+const HOURS = [
+  { days: 'Lundi – vendredi', hours: '9\xa0h – 18\xa0h' },
+  { days: 'Samedi', hours: '10\xa0h – 16\xa0h' },
+  { days: 'Dimanche', hours: 'Fermé' },
+];
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+/** Une coordonnée de la bande d'en-tête : libellé discret, valeur en caractères de titre. */
+function Coordinate({ label, children, note }) {
+  return (
+    <div className="border-b border-line py-6 last:border-b-0 lg:border-b-0 lg:py-8 lg:pr-8 lg:not-first:border-l lg:not-first:pl-12">
+      <p className="eyebrow text-muted">{label}</p>
+      <div className="mt-2 font-display text-[clamp(1.375rem,1.9vw,1.75rem)] leading-snug lining-nums">{children}</div>
+      {note ? <p className="mt-2 text-[0.8125rem] leading-snug text-muted">{note}</p> : null}
+    </div>
+  );
+}
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Ici, vous intégrerez l'envoi d'email (backend, API, etc.)
-    console.log('Form submitted:', formData);
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({ name: '', email: '', subject: '', message: '' });
-    }, 3000);
+/** Copie un texte dans le presse-papiers ; repli sur l'ancienne commande si l'API moderne est refusée ou absente. */
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // contexte non sécurisé, permission refusée : on tente la sélection classique
+  }
+  const previous = document.activeElement;
+  const area = document.createElement('textarea');
+  try {
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.setAttribute('aria-hidden', 'true');
+    area.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(area);
+    area.select();
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    area.remove();
+    if (previous instanceof HTMLElement) previous.focus({ preventScroll: true });
+  }
+}
+
+/** Dernière étape : le message est prêt, il reste à l'envoyer depuis sa propre messagerie. */
+function ReadyMessage({ mail, onEdit, panelRef }) {
+  const toast = useToast();
+
+  const copy = async () => {
+    const copied = await copyText(`À\xa0: ${mail.to}\nObjet\xa0: ${mail.subject}\n\n${mail.body}`);
+    if (copied) toast({ title: 'Message copié', description: `À coller dans un e-mail adressé à ${mail.to}.` });
+    else toast({ title: 'Copie impossible', description: 'Sélectionnez le message ci-dessus pour le copier.', icon: 'alert' });
   };
 
   return (
-    <div className="py-12">
-      <div className="container-custom">
-        {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h1 className="text-5xl font-display font-bold mb-6">Contactez-nous</h1>
-          <p className="text-lg text-gray-700">
-            Une question ? Une suggestion ? Nous sommes à votre écoute.
-          </p>
-        </div>
+    <div ref={panelRef} tabIndex={-1} aria-labelledby="message-pret-titre" className="outline-none">
+      <p className="eyebrow flex items-center gap-3 text-accent">
+        <Icon name="check" size={18} />
+        Votre message est prêt
+      </p>
+      <h2 id="message-pret-titre" className="text-title mt-5 max-w-[16ch]">
+        Il ne reste qu’à l’<em className="italic">envoyer</em>.
+      </h2>
+      <p className="mt-5 max-w-[54ch] text-lead text-muted">
+        Ce site n’envoie aucun message lui-même&nbsp;: rien n’est encore parti. Ouvrez votre messagerie, votre message y est déjà
+        rédigé. Un envoi, et il nous parvient.
+      </p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 max-w-6xl mx-auto">
-          {/* Contact Info */}
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-xl font-display font-semibold mb-4">Informations de contact</h2>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <svg className="w-6 h-6 text-dag-accent flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  <div>
-                    <p className="font-medium">Email</p>
-                    <a href="mailto:contact@dag-belts.com" className="text-gray-600 hover:text-dag-accent transition-colors">
-                      contact@dag-belts.com
-                    </a>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <svg className="w-6 h-6 text-dag-accent flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  <div>
-                    <p className="font-medium">Téléphone</p>
-                    <a href="tel:+33123456789" className="text-gray-600 hover:text-dag-accent transition-colors">
-                      +33 1 23 45 67 89
-                    </a>
-                    <p className="text-sm text-gray-500">Lun-Ven, 9h-18h</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <svg className="w-6 h-6 text-dag-accent flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <div>
-                    <p className="font-medium">Adresse</p>
-                    <p className="text-gray-600">
-                      123 Rue de la Mode<br />
-                      75001 Paris, France
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-dag-light p-6">
-              <h3 className="font-semibold mb-3">Délais de réponse</h3>
-              <p className="text-sm text-gray-700 mb-4">
-                Nous nous engageons à répondre à tous vos messages dans un délai de 24h ouvrées.
-              </p>
-              <div className="space-y-2 text-sm text-gray-700">
-                <p>• Lundi - Vendredi : 9h - 18h</p>
-                <p>• Samedi : 10h - 16h</p>
-                <p>• Dimanche : Fermé</p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-3">Suivez-nous</h3>
-              <div className="flex space-x-4">
-                <a href="#" className="w-10 h-10 bg-dag-black text-white flex items-center justify-center hover:bg-dag-gray transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                  </svg>
-                </a>
-                <a href="#" className="w-10 h-10 bg-dag-black text-white flex items-center justify-center hover:bg-dag-gray transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Contact Form */}
-          <div className="lg:col-span-2">
-            <div className="bg-white border border-gray-200 p-8">
-              <h2 className="text-2xl font-display font-semibold mb-6">Envoyez-nous un message</h2>
-
-              {submitted && (
-                <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-800">
-                  ✓ Message envoyé avec succès ! Nous vous répondrons dans les plus brefs délais.
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Nom complet *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:border-dag-black transition-colors"
-                    placeholder="Jean Dupont"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Email *</label>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:border-dag-black transition-colors"
-                    placeholder="jean.dupont@email.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Sujet *</label>
-                  <select
-                    name="subject"
-                    required
-                    value={formData.subject}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:border-dag-black transition-colors"
-                  >
-                    <option value="">Sélectionnez un sujet</option>
-                    <option value="order">Question sur une commande</option>
-                    <option value="product">Question sur un produit</option>
-                    <option value="return">Retour ou échange</option>
-                    <option value="partnership">Partenariat</option>
-                    <option value="other">Autre</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Message *</label>
-                  <textarea
-                    name="message"
-                    required
-                    rows="6"
-                    value={formData.message}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:border-dag-black transition-colors resize-none"
-                    placeholder="Votre message..."
-                  />
-                </div>
-
-                <button type="submit" className="w-full btn-primary">
-                  Envoyer le message
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
+      <div className="mt-9 border border-line bg-surface">
+        <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-4 gap-y-2 border-b border-line px-5 py-5 text-[0.9375rem] sm:px-7">
+          <dt className="eyebrow pt-1 text-muted">À</dt>
+          <dd className="break-words">{mail.to}</dd>
+          <dt className="eyebrow pt-1 text-muted">Objet</dt>
+          <dd className="break-words lining-nums">{mail.subject}</dd>
+        </dl>
+        <p className="scroll-area max-h-80 whitespace-pre-wrap break-words px-5 py-6 text-[0.9375rem] leading-relaxed sm:px-7" data-lenis-prevent>
+          {mail.body}
+        </p>
       </div>
+
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Button href={mail.mailto} variant="solid" icon="mail">
+          Ouvrir ma messagerie
+        </Button>
+        <Button variant="outline" onClick={copy}>
+          Copier le message
+        </Button>
+      </div>
+      <TextLink variant="label" arrow="left" onClick={onEdit} className="mt-5">
+        Modifier le message
+      </TextLink>
+      <p className="mt-6 max-w-[54ch] border-t border-line pt-6 text-[0.8125rem] leading-relaxed text-muted">
+        Rien ne s’ouvre&nbsp;? Copiez le message et envoyez-le à{' '}
+        <TextLink href={`mailto:${CONTACT_EMAIL}`} underline="always" tone="fg">
+          {CONTACT_EMAIL}
+        </TextLink>{' '}
+        depuis la messagerie de votre choix.
+      </p>
     </div>
   );
-};
+}
 
-export default Contact;
+export default function Contact() {
+  usePageMeta({
+    title: 'Contact',
+    description:
+      'Une question, une suggestion, un échange\xa0? Écrivez à la maison DAG\xa0: contact@dag-belts.com, du lundi au samedi. Réponse sous 24\xa0h ouvrées.',
+  });
+
+  const [searchParams] = useSearchParams();
+  const [values, setValues] = useState(() => contactDefaults(searchParams));
+  const [errors, setErrors] = useState({});
+  const [mail, setMail] = useState(null);
+  const formRef = useRef(null);
+  const panelRef = useRef(null);
+  const wasReady = useRef(false);
+
+  // Le focus suit l'étape : vers le message prêt, puis de retour dans le formulaire.
+  useEffect(() => {
+    if (mail) {
+      wasReady.current = true;
+      scrollToTarget(panelRef.current, { focus: true });
+    } else if (wasReady.current) {
+      wasReady.current = false;
+      const field = formRef.current?.querySelector('[name="message"]');
+      scrollToTarget(formRef.current);
+      field?.focus({ preventScroll: true });
+    }
+  }, [mail]);
+
+  const set = (field, value) => {
+    const next = { ...values, [field]: value };
+    setValues(next);
+    // un champ signalé se corrige à la frappe ; les autres attendent l'envoi
+    if (errors[field]) setErrors({ ...errors, [field]: validateContactField(field, next) });
+  };
+  const bind = (field) => ({
+    name: field,
+    value: values[field],
+    onChange: (event) => set(field, event.target.value),
+  });
+
+  const onSubmit = (event) => {
+    event.preventDefault();
+    const result = validateContact(values);
+    setErrors(result.errors);
+    if (!result.valid) {
+      formRef.current?.querySelector(`[name="${result.firstInvalid}"]`)?.focus();
+      return;
+    }
+    setMail(buildContactMessage(values));
+  };
+
+  const errorCount = Object.values(errors).filter(Boolean).length;
+  const length = values.message.trim().length;
+
+  return (
+    <>
+      <PageHero
+        eyebrow="Contact"
+        title="Écrivez-*nous*."
+        lead="Une question&nbsp;? Une suggestion&nbsp;? Nous sommes à votre écoute."
+      >
+        <Reveal delay={0.35}>
+          <address className="mt-12 grid border-t border-line not-italic lg:mt-16 lg:grid-cols-3">
+            <Coordinate label="E-mail">
+              <TextLink href={`mailto:${CONTACT_EMAIL}`} underline="always" className="min-h-11 break-words">
+                {CONTACT_EMAIL}
+              </TextLink>
+            </Coordinate>
+            <Coordinate label="Téléphone" note="Du lundi au vendredi, de 9&nbsp;h à 18&nbsp;h.">
+              <TextLink href={PHONE.href} className="min-h-11 whitespace-nowrap">
+                {PHONE.label}
+              </TextLink>
+            </Coordinate>
+            <Coordinate label="Adresse">
+              {ADDRESS.map((line) => (
+                <span key={line} className="block">
+                  {line}
+                </span>
+              ))}
+            </Coordinate>
+          </address>
+        </Reveal>
+      </PageHero>
+
+      <Section tone="ivoire" className="!pt-[clamp(3.5rem,7vw,7rem)]">
+        <div className="grid gap-y-16 lg:grid-cols-12 lg:gap-x-6">
+          <div className="lg:col-span-7">
+            {mail ? (
+              <ReadyMessage mail={mail} panelRef={panelRef} onEdit={() => setMail(null)} />
+            ) : (
+              <>
+                <Eyebrow index={1} rule className="mb-6">
+                  Votre message
+                </Eyebrow>
+                <h2 className="text-title max-w-[18ch]">
+                  Dites-nous <em className="italic">tout</em>.
+                </h2>
+                <p className="mt-5 max-w-[52ch] text-muted">
+                  Les champs marqués d’un astérisque sont nécessaires. À l’étape suivante, votre message s’ouvre dans votre propre
+                  messagerie, prêt à partir&nbsp;: ce site n’envoie rien lui-même.
+                </p>
+
+                <form ref={formRef} onSubmit={onSubmit} noValidate className="mt-10 flex flex-col gap-6">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <Field label="Nom complet" required error={errors.name}>
+                      <Input {...bind('name')} autoComplete="name" maxLength={NAME_MAX} />
+                    </Field>
+                    <Field label="E-mail" required error={errors.email} hint="Pour vous répondre, uniquement.">
+                      <Input {...bind('email')} type="email" inputMode="email" autoComplete="email" maxLength={254} />
+                    </Field>
+                  </div>
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <Field label="Sujet" required error={errors.subject}>
+                      <Select {...bind('subject')} placeholder="Choisir un sujet" options={SUBJECTS} />
+                    </Field>
+                    <Field label="Numéro de commande" optional error={errors.order} hint={`Il figure sur votre confirmation. Exemple\xa0: ${ORDER_EXAMPLE}`}>
+                      <Input
+                        {...bind('order')}
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        spellCheck={false}
+                        maxLength={16}
+                        onBlur={() => set('order', normalizeOrderNumber(values.order))}
+                      />
+                    </Field>
+                  </div>
+                  <Field
+                    label="Message"
+                    required
+                    error={errors.message}
+                    hint={`${length}\xa0/\xa0${MESSAGE_MAX} caractères`}
+                  >
+                    <Textarea {...bind('message')} rows={7} maxLength={MESSAGE_MAX + 200} />
+                  </Field>
+
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+                    <Button type="submit" variant="solid" size="lg" icon="arrow-right">
+                      Préparer mon message
+                    </Button>
+                    <p role="alert" className="text-[0.8125rem] leading-snug text-danger">
+                      {errorCount > 0 ? (errorCount > 1 ? `${errorCount} champs sont à corriger.` : 'Un champ est à corriger.') : null}
+                    </p>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+
+          <aside className="lg:col-span-4 lg:col-start-9">
+            <div className="flex flex-col gap-12 lg:sticky lg:top-header">
+              <div>
+                <h2 className="eyebrow text-muted">Horaires</h2>
+                <dl className="mt-4 border-t border-line">
+                  {HOURS.map((row) => (
+                    <div key={row.days} className="flex items-baseline justify-between gap-6 border-b border-line py-3.5">
+                      <dt className="whitespace-nowrap">{row.days}</dt>
+                      <dd className="whitespace-nowrap tabular-nums text-muted">{row.hours}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+
+              <div>
+                <h2 className="eyebrow text-muted">Délai de réponse</h2>
+                <p className="text-subtitle mt-4 max-w-[18ch] lining-nums">Sous 24&nbsp;h ouvrées.</p>
+                <p className="mt-3 max-w-[40ch] text-[0.9375rem] leading-relaxed text-muted">
+                  Nous nous engageons à répondre à tous vos messages dans ce délai.
+                </p>
+              </div>
+
+              <div>
+                <h2 className="eyebrow text-muted">Avant d’écrire</h2>
+                <p className="mt-4 max-w-[40ch] text-[0.9375rem] leading-relaxed text-muted">
+                  Livraison, retours, entretien, tailles&nbsp;: la réponse est peut-être déjà là.
+                </p>
+                <div className="mt-2 flex flex-col items-start">
+                  <TextLink to="/faq" variant="label" arrow>
+                    Consulter l’aide
+                  </TextLink>
+                  <TextLink to="/guide-des-tailles" variant="label" arrow>
+                    Guide des tailles
+                  </TextLink>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </Section>
+    </>
+  );
+}
