@@ -1,218 +1,493 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { products } from '../data/products';
+import { useId, useRef, useState } from 'react';
+import { useHref, useParams, useSearchParams } from 'react-router-dom';
+import BeltViewer from '../components/product/BeltViewer';
+import Breadcrumb from '../components/product/Breadcrumb';
+import MonogramOption from '../components/product/MonogramOption';
+import ProductCard from '../components/product/ProductCard';
+import ProductGallery from '../components/product/ProductGallery';
+import Reassurance from '../components/product/Reassurance';
+import SizeGuideDrawer from '../components/product/SizeGuideDrawer';
+import StickyBuyBar from '../components/product/StickyBuyBar';
+import StickyPanel from '../components/product/StickyPanel';
+import {
+  collectionUrl,
+  productJsonLd,
+  readColorParam,
+  relatedProducts,
+  sizeRange,
+  sortProducts,
+  withColorParam,
+} from '../components/product/catalogue';
+import { useJsonLd } from '../components/product/useJsonLd';
+import { CONTACT_EMAIL } from '../components/layout/navigation';
+import {
+  Accordion,
+  Badge,
+  Button,
+  Eyebrow,
+  FavoriteButton,
+  Icon,
+  OptionGrid,
+  Price,
+  Reveal,
+  RevealGroup,
+  Section,
+  SectionHeading,
+  SplitText,
+  Swatches,
+  TextLink,
+} from '../components/ui';
 import { useCart } from '../context/CartContext';
+import { MONOGRAM_STYLES, getMonogramStyle } from '../data/atelier';
+import { findColor, findProduct, productGallery, productImage, productPath, products } from '../data/products';
+import { scrollToTarget, usePageMeta } from '../hooks';
+import { formatPrice } from '../lib/format';
+import { FREE_SHIPPING_THRESHOLD, MONOGRAM_PRICE, SHIPPING_COST, catalogPrice } from '../lib/pricing';
+import { SIZE_ALLOWANCE_CM } from '../lib/sizing';
 
-const ProductDetail = () => {
-  const { id } = useParams();
-  const product = products.find(p => p.id === parseInt(id));
-  const { addToCart } = useCart();
+const CONTAINER_BLEED = '-mx-[clamp(1.25rem,4vw,4rem)] px-[clamp(1.25rem,4vw,4rem)] scroll-px-[clamp(1.25rem,4vw,4rem)]';
 
-  const [selectedColor, setSelectedColor] = useState(product?.colors[0]);
-  const [selectedSize, setSelectedSize] = useState(product?.sizes[0]);
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [showSuccess, setShowSuccess] = useState(false);
+/** Rangée de tuiles : bande à faire défiler sur mobile, grille de trois colonnes ensuite. */
+function CardRow({ items }) {
+  return (
+    <RevealGroup
+      as="ul"
+      className={`${CONTAINER_BLEED} flex snap-x snap-mandatory gap-4 overflow-x-auto [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-x-5 sm:overflow-visible sm:px-0 lg:gap-x-6 [&::-webkit-scrollbar]:hidden`}
+    >
+      {items.map((item) => (
+        <Reveal as="li" key={item.id} className="w-[72%] shrink-0 snap-start sm:w-auto">
+          <ProductCard product={item} />
+        </Reveal>
+      ))}
+    </RevealGroup>
+  );
+}
 
-  if (!product) {
-    return (
-      <div className="container-custom py-20 text-center">
-        <h1 className="text-3xl font-display font-bold mb-4">Produit introuvable</h1>
-        <Link to="/shop" className="btn-primary">
-          Retour à la boutique
-        </Link>
-      </div>
-    );
-  }
-
-  const handleAddToCart = () => {
-    addToCart(product, selectedColor, selectedSize);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
-  };
+function ProductNotFound() {
+  usePageMeta({
+    title: 'Ceinture introuvable',
+    description: 'Cette ceinture ne fait pas, ou plus, partie de la collection DAG.',
+  });
+  const suggestions = sortProducts(products, 'selection').slice(0, 3);
 
   return (
-    <div className="py-12">
-      <div className="container-custom">
-        {/* Breadcrumb */}
-        <nav className="mb-8 text-sm">
-          <Link to="/" className="text-gray-600 hover:text-dag-black">Accueil</Link>
-          <span className="mx-2 text-gray-400">/</span>
-          <Link to="/shop" className="text-gray-600 hover:text-dag-black">Boutique</Link>
-          <span className="mx-2 text-gray-400">/</span>
-          <span className="font-medium">{product.name}</span>
-        </nav>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Images */}
-          <div>
-            <div className="aspect-square bg-dag-light mb-4 overflow-hidden">
-              <img
-                src={product.images[selectedImage]}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {product.images.length > 1 && (
-              <div className="grid grid-cols-4 gap-4">
-                {product.images.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedImage(index)}
-                    className={`aspect-square bg-dag-light overflow-hidden border-2 transition-colors ${
-                      selectedImage === index ? 'border-dag-black' : 'border-transparent hover:border-gray-300'
-                    }`}
-                  >
-                    <img
-                      src={image}
-                      alt={`${product.name} ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
+    <>
+      <Section tone="noir" first>
+        <SectionHeading
+          as="h1"
+          eyebrow="Introuvable"
+          title={'Cette ceinture\nn’existe *pas*.'}
+          lead="Elle a peut-être quitté la collection, ou l’adresse est incomplète. Les autres vous attendent."
+        >
+          <div className="flex flex-wrap gap-3">
+            <Button to="/shop" icon="arrow-right">
+              Voir la collection
+            </Button>
+            <Button to="/atelier" variant="outline">
+              Composer la vôtre
+            </Button>
           </div>
-
-          {/* Product Info */}
-          <div>
-            <div className="mb-6">
-              <p className="text-sm text-gray-600 uppercase tracking-wider mb-2">
-                Collection {product.collection}
-              </p>
-              <h1 className="text-4xl font-display font-bold mb-4">{product.name}</h1>
-              <p className="text-3xl font-semibold mb-6">{product.price}€</p>
-              <p className="text-lg text-gray-700 leading-relaxed">{product.longDescription}</p>
-            </div>
-
-            {/* Color Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold mb-3">
-                Couleur : <span className="font-normal text-gray-600">{selectedColor.name}</span>
-              </label>
-              <div className="flex flex-wrap gap-3">
-                {product.colors.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => setSelectedColor(color)}
-                    className={`w-12 h-12 rounded-full border-4 transition-all ${
-                      selectedColor.value === color.value
-                        ? 'border-dag-black scale-110'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                    style={{ backgroundColor: color.hex }}
-                    title={color.name}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Size Selection */}
-            <div className="mb-8">
-              <label className="block text-sm font-semibold mb-3">
-                Taille : <span className="font-normal text-gray-600">{selectedSize}cm</span>
-              </label>
-              <div className="grid grid-cols-6 gap-2">
-                {product.sizes.map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setSelectedSize(size)}
-                    className={`py-3 border-2 font-medium transition-all ${
-                      selectedSize === size
-                        ? 'border-dag-black bg-dag-black text-white'
-                        : 'border-gray-300 hover:border-dag-black'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-              <p className="text-sm text-gray-600 mt-3">
-                💡 Pour trouver votre taille : mesurez votre tour de taille habituel et ajoutez 15cm.
-              </p>
-            </div>
-
-            {/* Add to Cart */}
-            <div className="mb-8">
-              <button
-                onClick={handleAddToCart}
-                disabled={!product.stock}
-                className="w-full btn-primary disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {product.stock ? 'Ajouter au panier' : 'Épuisé'}
-              </button>
-              {showSuccess && (
-                <div className="mt-4 p-4 bg-green-50 border border-green-200 text-green-800 text-center">
-                  ✓ Produit ajouté au panier
-                </div>
-              )}
-            </div>
-
-            {/* Product Details */}
-            <div className="border-t pt-6 space-y-4">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Matière</span>
-                <span className="font-medium">{product.material}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Largeur</span>
-                <span className="font-medium">{product.width}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Boucle</span>
-                <span className="font-medium">{product.buckle}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Disponibilité</span>
-                <span className={product.stock ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                  {product.stock ? 'En stock' : 'Épuisé'}
-                </span>
-              </div>
-            </div>
-
-            {/* Additional Info */}
-            <div className="mt-8 bg-dag-light p-6">
-              <h3 className="font-semibold mb-3">Livraison & Retours</h3>
-              <ul className="text-sm text-gray-700 space-y-2">
-                <li>• Livraison gratuite dès 100€ d'achat</li>
-                <li>• Retours gratuits sous 30 jours</li>
-                <li>• Livraison en 3-5 jours ouvrés</li>
-                <li>• Garantie 2 ans sur tous nos produits</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Related Products */}
-        <div className="mt-20">
-          <h2 className="text-3xl font-display font-bold mb-8">Vous aimerez aussi</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {products
-              .filter(p => p.id !== product.id && p.collection === product.collection)
-              .slice(0, 4)
-              .map((relatedProduct) => (
-                <Link
-                  key={relatedProduct.id}
-                  to={`/product/${relatedProduct.id}`}
-                  className="group bg-white border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow"
-                >
-                  <div className="aspect-square overflow-hidden bg-dag-light">
-                    <img
-                      src={relatedProduct.images[0]}
-                      alt={relatedProduct.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold mb-2">{relatedProduct.name}</h3>
-                    <p className="text-lg font-semibold">{relatedProduct.price}€</p>
-                  </div>
-                </Link>
-              ))}
-          </div>
-        </div>
-      </div>
-    </div>
+        </SectionHeading>
+      </Section>
+      <Section tone="ivoire">
+        <Reveal y={12}>
+          <Eyebrow rule className="mb-10 lg:mb-14">
+            La sélection de la maison
+          </Eyebrow>
+        </Reveal>
+        <CardRow items={suggestions} />
+      </Section>
+    </>
   );
-};
+}
 
-export default ProductDetail;
+function ProductView({ product }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { addToCart } = useCart();
+  const ids = useId();
+  const colorLabelId = `${ids}-coloris`;
+  const sizeLabelId = `${ids}-taille`;
+  const sizeFieldId = `${ids}-choix-taille`;
+
+  const color = findColor(product, readColorParam(searchParams));
+  const [size, setSize] = useState(null);
+  const [sizeError, setSizeError] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [monogramOn, setMonogramOn] = useState(false);
+  const [monogram, setMonogram] = useState('');
+  const [monogramStyle, setMonogramStyle] = useState(MONOGRAM_STYLES[0].id);
+  const [monogramError, setMonogramError] = useState('');
+  const [viewerRequested, setViewerRequested] = useState(false);
+  const addRef = useRef(null);
+  const monogramRef = useRef(null);
+
+  const appliedMonogram = monogramOn ? monogram : '';
+  const price = catalogPrice(product, { monogram: appliedMonogram });
+  const gallery = productGallery(product, color.value);
+  const related = relatedProducts(product, 3);
+  const pageHref = useHref(productPath(product));
+
+  usePageMeta({
+    title: product.name,
+    description: `${product.description} ${formatPrice(product.price)}. Livraison offerte dès ${formatPrice(FREE_SHIPPING_THRESHOLD)}, retours gratuits sous 30\xa0jours.`,
+  });
+
+  useJsonLd(
+    productJsonLd(product, {
+      url: new URL(pageHref, window.location.href).href,
+      images: gallery.map((shot) => new URL(shot.src, window.location.href).href),
+    }),
+  );
+
+  // Le coloris vit dans l'URL : il remplace l'entrée d'historique, sans en ajouter.
+  const chooseColor = (value) => {
+    setSearchParams((previous) => withColorParam(previous, product, value), { replace: true, preventScrollReset: true });
+  };
+
+  const chooseSize = (value) => {
+    setSize(String(value));
+    setSizeError(false);
+  };
+
+  /** Amène un champ à l'écran s'il n'y est pas déjà (barre d'achat mobile, panneau défilé). */
+  const bringIntoView = (element) => {
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    if (rect.top < 96 || rect.bottom > window.innerHeight - 96) scrollToTarget(element, { offset: -32 });
+  };
+
+  const add = () => {
+    if (!product.stock) return;
+    if (!size) {
+      setSizeError(true);
+      const field = document.getElementById(sizeFieldId);
+      bringIntoView(field);
+      field?.querySelector('input')?.focus({ preventScroll: true });
+      return;
+    }
+    if (monogramOn && !monogram) {
+      setMonogramError('Saisissez votre monogramme, ou décochez l’option.');
+      bringIntoView(monogramRef.current);
+      monogramRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    addToCart(product, color, size, { monogram: appliedMonogram, monogramStyle });
+  };
+
+  const show3d = () => {
+    setViewerRequested(true);
+    scrollToTarget('#vue-3d', { focus: true });
+  };
+
+  const crumbs = [
+    { label: 'Accueil', to: '/' },
+    { label: 'Collection', to: '/shop' },
+    { label: product.collection, to: collectionUrl(product.collection) },
+    { label: product.name },
+  ];
+
+  const specs = [
+    ['Matière', product.material],
+    ['Largeur', product.width],
+    ['Boucle', product.buckle],
+    ['Tailles', sizeRange(product.sizes)],
+    ['Coloris', product.colors.map((entry) => entry.name).join(', ')],
+  ];
+
+  const accordion = [
+    {
+      id: 'details',
+      title: 'Détails',
+      content: (
+        <ul className="flex flex-col gap-2.5">
+          {product.details.map((detail) => (
+            <li key={detail} className="flex gap-3.5">
+              <span aria-hidden="true" className="mt-[0.8em] h-px w-4 shrink-0 bg-accent" />
+              <span>{detail}</span>
+            </li>
+          ))}
+        </ul>
+      ),
+    },
+    {
+      id: 'entretien',
+      title: 'Matière et entretien',
+      content: (
+        <>
+          <p>
+            {product.material}. Boucle&nbsp;: {product.buckle.toLowerCase()}.
+          </p>
+          <p className="mt-3">
+            Nettoyez votre ceinture régulièrement, avec un chiffon doux et sec. Pour nourrir le cuir, utilisez un produit d’entretien
+            adapté deux à trois fois par an. Évitez l’exposition prolongée à l’eau et à la chaleur directe.
+          </p>
+        </>
+      ),
+    },
+    {
+      id: 'livraison',
+      title: 'Livraison et retours',
+      content: (
+        <>
+          <p>
+            La livraison est offerte dès {formatPrice(FREE_SHIPPING_THRESHOLD)} d’achat&nbsp;; elle est de {formatPrice(SHIPPING_COST)} en
+            deçà. Votre commande arrive en 3 à 5&nbsp;jours ouvrés en France métropolitaine.
+          </p>
+          <p className="mt-3">
+            Les retours sont gratuits pendant 30&nbsp;jours après réception, pour une ceinture non portée, dans son emballage d’origine.
+          </p>
+        </>
+      ),
+    },
+    {
+      id: 'garantie',
+      title: 'Garantie',
+      content: (
+        <p>
+          Chaque ceinture DAG est garantie 2&nbsp;ans contre les défauts de fabrication. Une question&nbsp;? Écrivez-nous à{' '}
+          <TextLink href={`mailto:${CONTACT_EMAIL}`} underline="always" tone="fg">
+            {CONTACT_EMAIL}
+          </TextLink>
+          .
+        </p>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      {/* ------------------------------------------------------------------ Achat */}
+      <section className="theme-ivoire relative pt-header">
+        <div className="container-luxe pb-[clamp(4rem,8vw,8rem)] pt-1 lg:pt-8">
+          <Breadcrumb items={crumbs} className="lg:hidden" />
+
+          <div className="grid gap-y-7 lg:grid-cols-12 lg:gap-x-6">
+            {/* min-w-0 : une cellule de grille ne doit pas s'élargir au contenu insécable qu'elle porte (légende tronquée). */}
+            <div className="min-w-0 lg:col-span-7">
+              <ProductGallery product={product} color={color} onView3d={show3d} />
+              {/* Bureau : les engagements suivent la galerie, pour que le panneau d'achat, plus court, reste collé. */}
+              <div className="mt-10 hidden lg:block">
+                <Reassurance />
+              </div>
+            </div>
+
+            <div className="min-w-0 lg:col-span-5 lg:pl-6 xl:col-span-4 xl:col-start-9 xl:pl-0">
+              <StickyPanel>
+                <Breadcrumb items={crumbs} className="-mt-3 mb-5 hidden lg:block" />
+
+                <div className="flex min-h-6 items-center justify-between gap-4">
+                  <Eyebrow>Collection {product.collection}</Eyebrow>
+                  {product.badge ? <Badge>{product.badge}</Badge> : null}
+                </div>
+                <SplitText as="h1" className="mt-4 text-title" text={product.name} />
+                {product.tagline ? <p className="mt-1.5 font-display text-subtitle italic text-muted">{product.tagline}</p> : null}
+
+                <p className="mt-6 flex flex-wrap items-baseline gap-x-4 gap-y-1" aria-live="polite" aria-atomic="true">
+                  <Price amount={price} className="font-display text-[2rem] leading-none" />
+                  {appliedMonogram ? (
+                    <span className="text-[0.8125rem] text-muted">dont monogramme {formatPrice(MONOGRAM_PRICE)}</span>
+                  ) : null}
+                </p>
+
+                <p className="mt-5 max-w-[46ch] text-[0.9375rem] leading-relaxed text-muted">{product.description}</p>
+
+                <div className="mt-7 flex flex-col gap-7 border-t border-line pt-6">
+                  {/* Coloris */}
+                  <div>
+                    <p className="flex items-baseline justify-between gap-4 text-[0.8125rem]">
+                      <span id={colorLabelId} className="font-medium tracking-[0.02em]">
+                        Coloris
+                      </span>
+                      <span className="text-muted" aria-live="polite">
+                        {color.name}
+                      </span>
+                    </p>
+                    <Swatches
+                      className="mt-1.5"
+                      size="lg"
+                      labelledBy={colorLabelId}
+                      options={product.colors}
+                      value={color.value}
+                      onChange={chooseColor}
+                    />
+                  </div>
+
+                  {/* Taille */}
+                  <div id={sizeFieldId}>
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="flex items-baseline gap-3 text-[0.8125rem]">
+                        <span id={sizeLabelId} className="font-medium tracking-[0.02em]">
+                          Taille
+                        </span>
+                        <span className="text-muted">{size ? `${size}\xa0cm` : 'en centimètres'}</span>
+                      </p>
+                      <TextLink variant="label" onClick={() => setGuideOpen(true)} aria-haspopup="dialog">
+                        <span className="flex items-center gap-2.5">
+                          <Icon name="ruler" size={16} />
+                          Guide des tailles
+                        </span>
+                      </TextLink>
+                    </div>
+                    <OptionGrid
+                      className="mt-1"
+                      labelledBy={sizeLabelId}
+                      columns={Math.min(product.sizes.length, 6)}
+                      options={product.sizes.map((entry) => ({ value: entry, label: entry }))}
+                      value={size}
+                      onChange={chooseSize}
+                    />
+                    {sizeError ? (
+                      <p role="alert" className="mt-3 flex items-start gap-1.5 text-[0.8125rem] leading-snug text-danger">
+                        <Icon name="alert" size={15} className="mt-px" />
+                        <span>Choisissez votre taille pour ajouter la ceinture au panier.</span>
+                      </p>
+                    ) : (
+                      <p className="mt-3 text-[0.8125rem] leading-snug text-muted">
+                        Votre tour de taille, plus {SIZE_ALLOWANCE_CM}&nbsp;cm. Entre deux tailles, prenez la plus grande.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Monogramme */}
+                  <MonogramOption
+                    enabled={monogramOn}
+                    onEnabledChange={(enabled) => {
+                      setMonogramOn(enabled);
+                      setMonogramError('');
+                    }}
+                    value={monogram}
+                    onValueChange={(value) => {
+                      setMonogram(value);
+                      setMonogramError('');
+                    }}
+                    styleId={monogramStyle}
+                    onStyleChange={setMonogramStyle}
+                    error={monogramError}
+                    inputRef={monogramRef}
+                  />
+                </div>
+
+                {/* Achat */}
+                <div ref={addRef} className="mt-7 flex gap-3">
+                  <Button size="lg" variant="solid" fullWidth onClick={add} disabled={!product.stock}>
+                    {product.stock ? 'Ajouter au panier' : 'Épuisé'}
+                  </Button>
+                  <FavoriteButton
+                    product={product}
+                    className="h-15 w-15 shrink-0 border border-fg/40 transition-[color,border-color] duration-500 ease-luxe hover:border-fg"
+                  />
+                </div>
+                {product.stock ? (
+                  <p className="mt-4 flex items-center gap-2.5 text-[0.8125rem] text-muted">
+                    <span aria-hidden="true" className="size-1.5 rounded-full bg-positive" />
+                    En stock. Chez vous sous 3 à 5&nbsp;jours ouvrés.
+                  </p>
+                ) : null}
+
+                {/* Mobile : les engagements viennent juste sous le bouton d'achat. */}
+                <div className="mt-6 lg:hidden">
+                  <Reassurance variant="list" />
+                </div>
+              </StickyPanel>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ Vue 3D */}
+      <Section tone="noir" id="vue-3d" className="outline-none" aria-label="Vue 3D">
+        <div className="grid gap-y-10 lg:grid-cols-12 lg:items-end lg:gap-x-6">
+          <div className="lg:col-span-4 lg:pb-6">
+            <SectionHeading
+              eyebrow="Vue 3D"
+              title={'Sous tous\nles *angles*.'}
+              size="title"
+              lead="Faites-la tourner. Approchez-vous de la boucle, du cuir, de la couture. Votre monogramme y apparaît dès que vous l’ajoutez."
+            />
+          </div>
+          <Reveal className="lg:col-span-8">
+            <BeltViewer
+              belt={color.belt}
+              monogram={appliedMonogram}
+              monogramStyle={monogramStyle}
+              poster={productImage(product, color.value, 'studio')}
+              alt={`${product.name}, ${color.name}`}
+              requested={viewerRequested}
+              className="aspect-[4/5] sm:aspect-[16/10]"
+            />
+            <p className="eyebrow mt-4 flex flex-wrap justify-between gap-x-6 gap-y-1 text-[0.625rem] text-muted">
+              <span>
+                {product.name} — {color.name}
+              </span>
+              <span>
+                {appliedMonogram ? `Monogramme ${appliedMonogram} · ${getMonogramStyle(monogramStyle).name}` : 'Sans monogramme'}
+              </span>
+            </p>
+          </Reveal>
+        </div>
+      </Section>
+
+      {/* ------------------------------------------------------------------ Détail */}
+      <Section tone="ivoire">
+        <div className="grid gap-y-14 lg:grid-cols-12 lg:gap-x-6">
+          <div className="lg:col-span-5">
+            <SectionHeading eyebrow="La pièce" title={'Ce qui la\n*distingue*.'} size="title" />
+            <Reveal delay={0.2}>
+              <p className="mt-7 max-w-[52ch] text-[1.0625rem] leading-[1.75] text-muted">{product.longDescription}</p>
+              <dl className="mt-10 border-t border-line">
+                {specs.map(([term, value]) => (
+                  <div key={term} className="flex items-baseline justify-between gap-6 border-b border-line py-3.5">
+                    <dt className="eyebrow shrink-0 text-[0.625rem] text-muted">{term}</dt>
+                    <dd className="text-right text-[0.9375rem]">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Reveal>
+          </div>
+          <Reveal className="lg:col-span-6 lg:col-start-7" delay={0.1}>
+            <Accordion items={accordion} defaultOpen="details" headingLevel={3} />
+          </Reveal>
+        </div>
+      </Section>
+
+      {/* ------------------------------------------------------------------ À découvrir */}
+      {related.length > 0 ? (
+        <Section tone="noir">
+          <div className="mb-10 flex items-end justify-between gap-8 lg:mb-14">
+            <SectionHeading eyebrow="À découvrir" title="Vous aimerez *aussi*." size="title" />
+            <div className="hidden shrink-0 sm:block">
+              <TextLink to="/shop" variant="label" arrow>
+                Toute la collection
+              </TextLink>
+            </div>
+          </div>
+          <CardRow items={related} />
+          <div className="mt-8 sm:hidden">
+            <TextLink to="/shop" variant="label" arrow>
+              Toute la collection
+            </TextLink>
+          </div>
+        </Section>
+      ) : null}
+
+      <StickyBuyBar
+        anchorRef={addRef}
+        name={product.name}
+        detail={size ? `${color.name} · ${size}\xa0cm` : color.name}
+        price={price}
+        label={!product.stock ? 'Épuisé' : size ? 'Ajouter' : 'Choisir la taille'}
+        onAction={add}
+        disabled={!product.stock}
+      />
+
+      <SizeGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} product={product} selected={size} onApply={chooseSize} />
+    </>
+  );
+}
+
+export default function ProductDetail() {
+  const { id } = useParams();
+  const product = findProduct(id);
+  if (!product) return <ProductNotFound />;
+  return <ProductView key={product.id} product={product} />;
+}
