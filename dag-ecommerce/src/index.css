@@ -44,10 +44,14 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-positive: var(--positive);
 }
 
 :root,
-.theme-noir {
+.theme-noir,
+.tone-noir,
+[data-tone="noir"] {
   --bg: #0b0a09;
   --surface: #151311;
   --fg: #f1ebe1;
@@ -55,10 +59,16 @@
   --line: rgb(241 235 225 / 0.14);
   --accent: #c9a96e;
   --on-accent: #0b0a09;
+  --danger: #e59184;
+  --positive: #9dbb97;
   color-scheme: dark;
 }
 
-.theme-ivoire {
+.theme-ivoire,
+.tone-ivoire,
+.tone-papier,
+.tone-craie,
+[data-tone="ivoire"] {
   --bg: #f1ebe1;
   --surface: #faf7f2;
   --fg: #171412;
@@ -66,7 +76,39 @@
   --line: rgb(23 20 18 / 0.16);
   --accent: #7a5f30;
   --on-accent: #faf7f2;
+  --danger: #a3372b;
+  --positive: #3f6b3d;
   color-scheme: light;
+}
+
+/* Tuiles studio (packshots) : palette ivoire posée sur papier ou craie. */
+.tone-papier {
+  --bg: #e7dfd1;
+  --surface: #f1ebe1;
+  --muted: #5f574d;
+}
+
+.tone-craie {
+  --bg: #faf7f2;
+  --surface: #f1ebe1;
+}
+
+/* .tone-* : mêmes variables que .theme-*, sans peindre de fond (en-tête, tuiles, calques).
+   La couleur de texte est posée en couche « base » : une utilitaire text-* sur le même
+   élément garde la main (contrairement à .theme-*, hors couche, qui l'emporte toujours). */
+@layer base {
+  .tone-noir,
+  .tone-ivoire,
+  .tone-papier,
+  .tone-craie,
+  [data-tone] {
+    color: var(--fg);
+  }
+
+  /* Zones de l'en-tête : le ton est écrit par useSurfaceTone, la couleur suit en douceur. */
+  [data-tone] {
+    transition: color 0.5s var(--ease-luxe);
+  }
 }
 
 .theme-noir,
@@ -215,5 +257,271 @@
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Coque & primitives (src/components/ui, src/components/layout)
+   ========================================================================== */
+
+:root {
+  /* Hauteur de l'en-tête fixe ; --header-offset vaut 0px quand il est replié. */
+  --header-h: 4rem;
+  --header-offset: var(--header-h);
+  /* Largeur de la barre de défilement compensée pendant un verrouillage. */
+  --scroll-lock-gap: 0px;
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --header-h: 4.75rem;
+  }
+}
+
+html {
+  scroll-padding-top: calc(var(--header-h) + 1rem);
+}
+
+/* --- Défilement : Lenis + verrouillage par les calques ------------------- */
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+.lenis [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+html.scroll-locked {
+  overflow: hidden;
+}
+
+html.scroll-locked body {
+  padding-right: var(--scroll-lock-gap);
+}
+
+/* Zone de défilement interne des calques (tiroir, fenêtre, menu). */
+@utility scroll-area {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+/* --- Rythme sous l'en-tête fixe ----------------------------------------- */
+
+/* Réserve exactement la hauteur de l'en-tête. */
+@utility pt-header {
+  padding-top: var(--header-h);
+}
+
+/* Tête de page courante : en-tête + respiration éditoriale. */
+@utility page-top {
+  padding-top: calc(var(--header-h) + clamp(3rem, 7vw, 7rem));
+}
+
+/* Pour un élément sticky : se cale sous l'en-tête, remonte quand il se replie. */
+@utility top-header {
+  top: calc(var(--header-offset) + 1.5rem);
+  transition: top 0.7s var(--ease-luxe);
+}
+
+/* --- Liens -------------------------------------------------------------- */
+
+/* Filet qui se trace de gauche à droite au survol (fonctionne sur plusieurs lignes). */
+@utility link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  padding-bottom: 0.2em;
+  transition: background-size 0.7s var(--ease-luxe);
+
+  &:hover,
+  &:focus-visible,
+  .group\/link:hover &,
+  .group\/link:focus-visible & {
+    /* --underline-trim : retire l'espace laissé par l'interlettrage après la dernière lettre */
+    background-size: calc(100% - var(--underline-trim, 0em)) 1px;
+  }
+}
+
+/* Variante soulignée en permanence : filet discret, retracé au survol. */
+@utility link-underline-always {
+  background-image:
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(
+      color-mix(in srgb, currentColor 32%, transparent),
+      color-mix(in srgb, currentColor 32%, transparent)
+    );
+  background-repeat: no-repeat;
+  background-position:
+    0 100%,
+    0 100%;
+  background-size:
+    0% 1px,
+    calc(100% - var(--underline-trim, 0em)) 1px;
+  padding-bottom: 0.2em;
+  transition: background-size 0.7s var(--ease-luxe);
+
+  &:hover,
+  &:focus-visible,
+  .group\/link:hover &,
+  .group\/link:focus-visible & {
+    background-size:
+      calc(100% - var(--underline-trim, 0em)) 1px,
+      calc(100% - var(--underline-trim, 0em)) 1px;
+  }
+}
+
+/* --- Lumière de studio sur les tuiles produit --------------------------- */
+
+@utility studio-light {
+  background-image: radial-gradient(
+    120% 80% at 50% 0%,
+    rgb(255 255 255 / 0.55),
+    rgb(255 255 255 / 0) 64%
+  );
+}
+
+/* --- Packshot : fondu croisé au survol ---------------------------------- */
+
+.packshot-img {
+  transition: opacity 0.9s var(--ease-luxe);
+}
+
+@media (hover: hover) {
+  .packshot[data-hover-ready="true"]:hover .packshot-base,
+  .group:hover .packshot[data-hover-ready="true"] .packshot-base,
+  .group:focus-visible .packshot[data-hover-ready="true"] .packshot-base {
+    opacity: 0;
+  }
+
+  .packshot[data-hover-ready="true"]:hover .packshot-hover,
+  .group:hover .packshot[data-hover-ready="true"] .packshot-hover,
+  .group:focus-visible .packshot[data-hover-ready="true"] .packshot-hover {
+    opacity: 1;
+  }
+}
+
+/* --- Marquee ------------------------------------------------------------ */
+
+@keyframes marquee-scroll {
+  to {
+    transform: translateX(calc(-100% - var(--marquee-gap, 3rem)));
+  }
+}
+
+.marquee {
+  display: flex;
+  overflow: hidden;
+  gap: var(--marquee-gap, 3rem);
+  user-select: none;
+}
+
+.marquee[data-fade="true"] {
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+
+.marquee-group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-around;
+  gap: var(--marquee-gap, 3rem);
+  min-width: 100%;
+  animation: marquee-scroll var(--marquee-duration, 40s) linear infinite;
+  animation-direction: var(--marquee-direction, normal);
+}
+
+.marquee[data-pause="true"]:hover .marquee-group,
+.marquee[data-pause="true"]:focus-within .marquee-group {
+  animation-play-state: paused;
+}
+
+/* --- Transition de page (opacité seule : ni transform ni filter au repos) - */
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+.page-stage[data-leaving="true"] {
+  opacity: 0;
+  transition: opacity 0.32s var(--ease-soie);
+}
+
+.page-enter {
+  animation: page-enter 0.9s var(--ease-luxe);
+}
+
+/* --- Panier : les lignes entrent en cascade à l'ouverture et à l'ajout --- */
+
+@keyframes cart-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+
+.cart-line-in {
+  animation: cart-line-in 0.8s var(--ease-luxe) backwards;
+  animation-delay: calc(0.22s + var(--i, 0) * 0.07s);
+}
+
+/* --- Champs : saisie automatique du navigateur aux couleurs du thème ------ */
+
+.control:autofill {
+  -webkit-text-fill-color: var(--fg);
+  caret-color: var(--fg);
+  box-shadow: inset 0 0 0 100vmax var(--surface);
+}
+
+/* --- Divers ------------------------------------------------------------- */
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility animate-spin-slow {
+  animation: spin-slow 0.9s linear infinite;
+}
+
+/* Champ numérique sans flèches natives. */
+@utility no-spinner {
+  appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-group {
+    animation: none;
+  }
+
+  .page-enter,
+  .cart-line-in {
+    animation: none;
+  }
+
+  .page-stage[data-leaving="true"] {
+    transition: none;
+  }
+
+  .top-header {
+    transition: none;
   }
 }

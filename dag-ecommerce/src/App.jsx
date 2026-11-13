@@ -1,49 +1,65 @@
-import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
+import { lazy, useEffect } from 'react';
+import { BrowserRouter, HashRouter, Route, Routes, matchPath, useLocation } from 'react-router-dom';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import Shop from './pages/Shop';
-import ProductDetail from './pages/ProductDetail';
-import Atelier from './pages/Atelier';
-import Checkout from './pages/Checkout';
-import OrderConfirmation from './pages/OrderConfirmation';
-import About from './pages/About';
-import FAQ from './pages/FAQ';
-import Contact from './pages/Contact';
-import Legal from './pages/Legal';
-import SizeGuide from './pages/SizeGuide';
-import Wishlist from './pages/Wishlist';
-import NotFound from './pages/NotFound';
+import ErrorBoundary from './components/layout/ErrorBoundary';
+import Layout from './components/layout/Layout';
 
 // Build statique (VITE_STATIC=1) : HashRouter, aucune réécriture d'URL requise côté serveur.
 const Router = import.meta.env.VITE_STATIC === '1' ? HashRouter : BrowserRouter;
 
+// Table des routes. Chaque page est chargée à la demande (React.lazy) ; l'attente et la
+// transition entre pages sont gérées par la coque (components/layout/PageTransition).
+const ROUTES = [
+  { path: '/', load: () => import('./pages/Home') },
+  { path: '/shop', load: () => import('./pages/Shop') },
+  { path: '/product/:id', load: () => import('./pages/ProductDetail') },
+  { path: '/atelier', load: () => import('./pages/Atelier') },
+  { path: '/checkout', load: () => import('./pages/Checkout') },
+  { path: '/confirmation/:orderId', load: () => import('./pages/OrderConfirmation') },
+  { path: '/about', load: () => import('./pages/About') },
+  { path: '/faq', load: () => import('./pages/FAQ') },
+  { path: '/contact', load: () => import('./pages/Contact') },
+  { path: '/legal', load: () => import('./pages/Legal') },
+  { path: '/guide-des-tailles', load: () => import('./pages/SizeGuide') },
+  { path: '/favoris', load: () => import('./pages/Wishlist') },
+  // Référence vivante du design system : en développement uniquement.
+  ...(import.meta.env.DEV ? [{ path: '/styleguide', load: () => import('./pages/Styleguide') }] : []),
+  { path: '*', load: () => import('./pages/NotFound') },
+].map((route) => ({ ...route, Page: lazy(route.load) }));
+
+/** Dès qu'une navigation démarre, on charge la page visée : elle est prête quand l'ancienne s'efface. */
+function RoutePreloader() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const route = ROUTES.find((entry) => matchPath(entry.path, pathname));
+    route?.load().catch(() => {});
+  }, [pathname]);
+  return null;
+}
+
+function AppRoutes({ location }) {
+  return (
+    <Routes location={location}>
+      {ROUTES.map((route) => (
+        <Route key={route.path} path={route.path} element={<route.Page />} />
+      ))}
+    </Routes>
+  );
+}
+
 function App() {
   return (
-    <Router>
-      <CartProvider>
-        <WishlistProvider>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/shop" element={<Shop />} />
-              <Route path="/product/:id" element={<ProductDetail />} />
-              <Route path="/atelier" element={<Atelier />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/confirmation/:orderId" element={<OrderConfirmation />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/faq" element={<FAQ />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/legal" element={<Legal />} />
-              <Route path="/guide-des-tailles" element={<SizeGuide />} />
-              <Route path="/favoris" element={<Wishlist />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Layout>
-        </WishlistProvider>
-      </CartProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <CartProvider>
+          <WishlistProvider>
+            <RoutePreloader />
+            <Layout>{(location) => <AppRoutes location={location} />}</Layout>
+          </WishlistProvider>
+        </CartProvider>
+      </Router>
+    </ErrorBoundary>
   );
 }
 
