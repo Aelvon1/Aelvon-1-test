@@ -1,12 +1,18 @@
 import { lazy, useEffect } from 'react';
-import { BrowserRouter, HashRouter, Route, Routes, matchPath, useLocation } from 'react-router-dom';
+import { BrowserRouter, HashRouter, MemoryRouter, Route, Routes, matchPath, useLocation } from 'react-router-dom';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
 import ErrorBoundary from './components/layout/ErrorBoundary';
 import Layout from './components/layout/Layout';
+import { ROUTER_MODE } from './components/layout/router-mode';
 
-// Build statique (VITE_STATIC=1) : HashRouter, aucune réécriture d'URL requise côté serveur.
-const Router = import.meta.env.VITE_STATIC === '1' ? HashRouter : BrowserRouter;
+// Trois modes (voir components/layout/router-mode.js) :
+//   « browser » — URL propres, le serveur réécrit vers index.html ;
+//   « hash » (VITE_STATIC=1 ou VITE_ROUTER=hash) — aucune réécriture d'URL requise côté serveur ;
+//   « memory » (VITE_ROUTER=memory) — site embarqué dans un cadre isolé : l'URL réelle ne change
+//   jamais, la navigation vit en mémoire et démarre sur l'accueil.
+const Router = { browser: BrowserRouter, hash: HashRouter, memory: MemoryRouter }[ROUTER_MODE];
+const ROUTER_PROPS = ROUTER_MODE === 'memory' ? { initialEntries: ['/'] } : {};
 
 // Table des routes. Chaque page est chargée à la demande (React.lazy) ; l'attente et la
 // transition entre pages sont gérées par la coque (components/layout/PageTransition).
@@ -51,7 +57,7 @@ function AppRoutes({ location }) {
 function App() {
   return (
     <ErrorBoundary>
-      <Router>
+      <Router {...ROUTER_PROPS}>
         <CartProvider>
           <WishlistProvider>
             <RoutePreloader />

@@ -7,7 +7,8 @@
  * normalizePostalCode) ; `where` ouvre le message d'erreur (« En France, … »).
  */
 export const COUNTRIES = [
-  { code: 'FR', name: 'France', where: 'En France', postal: /^(?!00)\d{5}$/, postalDigits: 5, postalExample: '75003', phoneExample: '06 12 34 56 78' },
+  // France métropolitaine, Corse comprise : départements 01 à 95 (voir FR_NOT_DELIVERED pour l'outre-mer et Monaco)
+  { code: 'FR', name: 'France', where: 'En France', postal: /^(?:0[1-9]|[1-8]\d|9[0-5])\d{3}$/, postalDigits: 5, postalExample: '75003', phoneExample: '06 12 34 56 78' },
   { code: 'BE', name: 'Belgique', where: 'En Belgique', postal: /^[1-9]\d{3}$/, postalDigits: 4, postalExample: '1000', phoneExample: '0470 12 34 56' },
   { code: 'CH', name: 'Suisse', where: 'En Suisse', postal: /^[1-9]\d{3}$/, postalDigits: 4, postalExample: '1204', phoneExample: '079 123 45 67' },
   { code: 'LU', name: 'Luxembourg', where: 'Au Luxembourg', postal: /^[1-9]\d{3}$/, postalDigits: 4, postalExample: '1249', phoneExample: '621 123 456' },
@@ -30,17 +31,20 @@ export const MAX_LENGTHS = Object.freeze({
   giftNote: GIFT_NOTE_MAX,
 });
 
-/** Champs du formulaire, dans l'ordre d'affichage (sert à trouver le premier champ en erreur). */
+/**
+ * Champs du formulaire, dans l'ordre d'affichage (sert à trouver le premier champ en erreur).
+ * Le pays vient avant le code postal et le téléphone, qui se valident d'après lui.
+ */
 export const CHECKOUT_FIELDS = [
   'email',
   'firstName',
   'lastName',
-  'phone',
+  'country',
   'address',
   'addressComplement',
   'postalCode',
   'city',
-  'country',
+  'phone',
   'giftNote',
 ];
 
@@ -60,7 +64,15 @@ export const EMPTY_CHECKOUT = Object.freeze({
 });
 
 const NBSP = '\u00a0';
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Partie locale : lettres, chiffres et signes admis par les navigateurs (ni < > ( ) , ; : " ni espace),
+// en segments séparés par un point — jamais en tête, en queue ou doublé. Domaine : des libellés de
+// lettres, chiffres et tirets séparés par des points, puis une extension en lettres (ou en punycode).
+// Une ponctuation restée collée à l'adresse — « jean@exemple.fr. », « <jean@exemple.fr> » — ne passe pas.
+const EMAIL_ATOM = "[\\p{L}\\p{M}\\d!#$%&'*+/=?^_`{|}~-]+";
+const EMAIL_LABEL = '[\\p{L}\\p{M}\\d](?:[\\p{L}\\p{M}\\d-]*[\\p{L}\\p{M}\\d])?';
+const EMAIL_PATTERN = new RegExp(`^${EMAIL_ATOM}(?:\\.${EMAIL_ATOM})*@(?:${EMAIL_LABEL}\\.)+(?:\\p{L}{2,}|xn--[a-z\\d-]*[a-z\\d])$`, 'iu');
+// codes postaux français hors de la zone livrée : outre-mer (97, 98) et Monaco (98000)
+const FR_NOT_DELIVERED = /^9[78]\d{3}$/;
 // lettres (accents compris), espaces, tirets, apostrophes et points : « Jean-Noël », « O’Brien », « St. John »
 const NAME_PATTERN = /^[\p{L}\p{M}][\p{L}\p{M}\s'’.-]*$/u;
 const HAS_LETTER = /\p{L}/u;
@@ -95,7 +107,7 @@ export function normalizePostalCode(value, country = DEFAULT_COUNTRY) {
 export function validateEmail(value) {
   const email = clean(value);
   if (!email) return 'Indiquez votre adresse e-mail.';
-  if (email.length > MAX_LENGTHS.email || !EMAIL_PATTERN.test(email) || email.includes('..')) {
+  if (email.length > MAX_LENGTHS.email || !EMAIL_PATTERN.test(email)) {
     return `Cette adresse semble incomplète. Exemple${NBSP}: prenom@exemple.fr`;
   }
   return '';
@@ -149,6 +161,9 @@ export function validatePostalCode(value, country = DEFAULT_COUNTRY) {
   const entry = getCountry(country) ?? COUNTRIES[0];
   const postalCode = normalizePostalCode(value, entry.code);
   if (!postalCode) return 'Indiquez votre code postal.';
+  if (entry.code === 'FR' && FR_NOT_DELIVERED.test(postalCode)) {
+    return `Ce code postal est hors de France métropolitaine${NBSP}: nous ne livrons pas encore l’outre-mer ni Monaco.`;
+  }
   if (!entry.postal.test(postalCode)) {
     return `${entry.where}, le code postal compte ${entry.postalDigits}${NBSP}chiffres. Exemple${NBSP}: ${entry.postalExample}`;
   }

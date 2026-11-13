@@ -7,6 +7,8 @@ export function formatPrice(amount) {
   return Number.isInteger(value) ? euros.format(value) : eurosCents.format(value);
 }
 
+/** « 13 novembre 2026 » ; le premier du mois s'écrit « 1er décembre 2026 ». */
 export function formatDate(date) {
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(date));
+  const text = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(date));
+  return text.replace(/^1(?=\s)/, '1er');
 }

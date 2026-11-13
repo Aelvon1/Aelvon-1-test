@@ -16,7 +16,12 @@
 // pas importer directement les modules de src/. Le script est idempotent : relancé, il réécrit les
 // mêmes fichiers.
 //
+// Le Chromium sans écran rend en logiciel (SwiftShader). En production, <BeltCanvas /> s'en tient
+// alors au poster ; la page de studio lève cette réserve (window.__DAG_BELT_SOFTWARE_OK__), si bien
+// que les rendus sont produits par la vraie scène, pixel pour pixel.
+//
 // Options :  --only=<slug>   ne rendre qu'un produit      --no-posters   sauter posters et image OG
+//            --posters       ne rendre que les posters et l'image OG
 //            --size=1200     côté des visuels produit     --quality=0.9  qualité WebP
 // ---------------------------------------------------------------------------
 import { execSync } from 'node:child_process';
@@ -119,6 +124,7 @@ async function main() {
     // --- Visuels produit ---------------------------------------------------
     let variants = await page.evaluate(() => window.__studio.variants());
     if (args.only) variants = variants.filter((v) => v.slug === args.only);
+    if (args.posters) variants = [];
     console.log(`\n${variants.length} variante(s) × ${SHOTS.length} plans, ${SIZE}×${SIZE} px\n`);
     for (const variant of variants) {
       await page.evaluate(

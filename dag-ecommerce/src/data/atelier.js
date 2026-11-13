@@ -55,10 +55,11 @@ export const STITCHES = [
   { id: 'sans', name: 'Bords francs', hex: false },
 ];
 
+// Espace insécable (\u00a0) entre le nombre et l'unité : « 35 mm » ne se coupe jamais en fin de ligne.
 export const WIDTHS = [
-  { id: 30, name: '30 mm', label: 'Habillée' },
-  { id: 35, name: '35 mm', label: 'Classique' },
-  { id: 38, name: '38 mm', label: 'Casual' },
+  { id: 30, name: '30\u00a0mm', label: 'Habillée' },
+  { id: 35, name: '35\u00a0mm', label: 'Classique' },
+  { id: 38, name: '38\u00a0mm', label: 'Casual' },
 ];
 
 export const MONOGRAM_STYLES = [

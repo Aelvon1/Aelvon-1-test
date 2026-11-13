@@ -57,7 +57,7 @@ export default function MobileMenu({ open, onClose, pathname, wishCount = 0 }) {
           animate="shown"
           exit="hidden"
         >
-          <div className="container-luxe flex h-[var(--header-h)] shrink-0 items-center justify-between">
+          <div className="container-luxe flex h-[var(--header-h)] shrink-0 items-center justify-between pt-[env(safe-area-inset-top,0px)]">
             <Link
               to="/"
               onClick={onClose}
@@ -78,7 +78,7 @@ export default function MobileMenu({ open, onClose, pathname, wishCount = 0 }) {
           </div>
 
           <div data-lenis-prevent className="scroll-area flex min-h-0 flex-1 flex-col">
-            <div className="container-luxe flex flex-1 flex-col justify-between gap-12 pb-[max(2rem,env(safe-area-inset-bottom))] pt-4">
+            <div className="container-luxe flex flex-1 flex-col justify-between gap-12 pb-[max(2rem,env(safe-area-inset-bottom,0px))] pt-4">
               <nav aria-label="Navigation principale">
                 <ul className="border-t border-line">
                   {PRIMARY_NAV.map((item, index) => (

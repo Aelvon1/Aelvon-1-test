@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { FAQ_CATEGORIES, FAQ_COUNT, answerText, faqJsonLd, filterFaq, fold, highlightParts } from './faq-content';
+import {
+  FAQ_CATEGORIES,
+  FAQ_COUNT,
+  answerText,
+  faqJsonLd,
+  filterFaq,
+  fold,
+  highlightParts,
+  paramsWithQuery,
+  queryFromParams,
+} from './faq-content';
 
 const count = (categories) => categories.reduce((total, category) => total + category.questions.length, 0);
 
@@ -20,7 +30,13 @@ describe('contenu de l’aide', () => {
     expect(text).toContain('tour de taille de 85\xa0cm, choisissez une ceinture en taille 100');
     expect(text).toMatch(/100\s€/);
     expect(text).toMatch(/7,90\s€/);
-    expect(text).toContain('France, Belgique, Suisse et Luxembourg');
+  });
+
+  it('nomme les pays livrés avec leur préposition', () => {
+    const question = FAQ_CATEGORIES.flatMap((category) => category.questions).find((entry) => entry.id === 'international');
+    expect(answerText(question.a)).toContain('nous livrons en France, en Belgique, en Suisse et au Luxembourg.');
+    const entry = faqJsonLd().mainEntity.find((item) => item.name.startsWith('Livrez-vous'));
+    expect(entry.acceptedAnswer.text).toContain('en France, en Belgique, en Suisse et au Luxembourg');
   });
 
   it('reste exact sur le paiement : Stripe, aucune donnée bancaire conservée', () => {
@@ -57,6 +73,27 @@ describe('recherche', () => {
     const parts = highlightParts('Quels sont les délais de livraison\xa0?', 'DELAIS');
     expect(parts.filter((part) => part.match).map((part) => part.text)).toEqual(['délais']);
     expect(parts.map((part) => part.text).join('')).toBe('Quels sont les délais de livraison\xa0?');
+  });
+});
+
+describe('recherche portée par l’adresse', () => {
+  it('lit la recherche de « /faq?q=… »', () => {
+    expect(queryFromParams(new URLSearchParams('q=retour'))).toBe('retour');
+    expect(queryFromParams(new URLSearchParams('q=%20d%C3%A9lais%20livraison%20'))).toBe('délais livraison');
+    expect(queryFromParams(new URLSearchParams(''))).toBe('');
+    expect(queryFromParams(null)).toBe('');
+  });
+
+  it('inscrit la recherche sans toucher aux autres paramètres, et la retire quand elle est vide', () => {
+    expect(paramsWithQuery(new URLSearchParams('utm=lettre'), ' rgpd ').toString()).toBe('utm=lettre&q=rgpd');
+    expect(paramsWithQuery(new URLSearchParams('q=retour&utm=lettre'), '   ').toString()).toBe('utm=lettre');
+    expect(paramsWithQuery(new URLSearchParams('q=retour'), 'échange taille').get('q')).toBe('échange taille');
+  });
+
+  it('ne modifie pas les paramètres reçus', () => {
+    const params = new URLSearchParams('q=retour');
+    paramsWithQuery(params, 'taille');
+    expect(params.get('q')).toBe('retour');
   });
 });
 

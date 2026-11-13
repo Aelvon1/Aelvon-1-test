@@ -11,10 +11,18 @@ import { BeltRig } from './rig';
 
 const PIXEL_BUDGET = 2.4e6; // pixels rendus au maximum (GPU intégrés)
 
-// React Three Fiber 9 instancie encore THREE.Clock, déprécié depuis three r183 : on écarte ce seul
-// avis (hors de notre portée), tout le reste des messages de three passe normalement.
+// Fluidité : au-delà de ces durées moyennes par image, la scène s'allège, puis cède la place au poster.
+const SLOW_FRAME = 40; // ms : densité de pixels ramenée à 1, puis plus de mouvement continu
+const STALLED_FRAME = 120; // ms : scène décorative → poster
+const WATCH_WINDOW = 20; // images consécutives
+
+// Deux avis de three sont écartés, tout le reste passe normalement :
+//  - React Three Fiber 9 instancie encore THREE.Clock, déprécié depuis three r183 (hors de notre portée) ;
+//  - au démontage, R3F force la perte du contexte : s'il est déjà perdu, l'extension n'existe plus.
 setConsoleFunction((type, message, ...rest) => {
-  if (type === 'warn' && typeof message === 'string' && message.startsWith('THREE.Clock:')) return;
+  if (type === 'warn' && typeof message === 'string') {
+    if (message.startsWith('THREE.Clock:') || message.includes('WEBGL_lose_context extension not supported')) return;
+  }
   const trace = rest[0];
   if (trace && trace.isStackTrace) console[type](trace.getError(message));
   else console[type](message, ...rest);
@@ -32,7 +40,7 @@ function isLightSurface(element) {
   }
 }
 
-function Driver({ resolved, configKey, pose, view, backdrop, interactive, autoRotate, parallax, reducedMotion, intro, active, target, onDpr, onFrame, onReady, onLost, onRestored }) {
+function Driver({ resolved, configKey, pose, view, backdrop, interactive, autoRotate, parallax, reducedMotion, intro, lowPower, watchdog, active, target, onDpr, onFrame, onReady, onLost, onRestored, onSluggish }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
@@ -41,10 +49,12 @@ function Driver({ resolved, configKey, pose, view, backdrop, interactive, autoRo
 
   const rigRef = useRef(null);
   const framed = useRef(false);
+  const [capped, setCapped] = useState(false); // le chien de garde a ramené la densité de pixels à 1
+  const watch = useRef({ last: 0, live: false, sum: 0, peak: 0, count: 0, stalls: 0, skip: 10, stage: 0 });
   const [generation, setGeneration] = useState(0); // +1 à chaque restauration du contexte WebGL
   const latest = useRef({});
   useEffect(() => {
-    latest.current = { resolved, pose, view, interactive, autoRotate, parallax, reducedMotion, intro, onFrame, onReady, onLost, onRestored, size };
+    latest.current = { resolved, pose, view, interactive, autoRotate, parallax, reducedMotion, intro, lowPower, watchdog, onFrame, onReady, onLost, onRestored, onSluggish, size };
   });
 
   // Création / destruction de la ceinture (supporte le double montage du StrictMode).
@@ -60,11 +70,13 @@ function Driver({ resolved, configKey, pose, view, backdrop, interactive, autoRo
       reducedMotion: now.reducedMotion,
       intro: now.intro,
     });
+    rig.setStill(!!now.lowPower || watch.current.stage >= 2);
     rig.setAspect(now.size.width / Math.max(1, now.size.height));
     rig.setPose(now.pose, true);
     rig.setView(now.view, true);
     let cancelled = false;
-    Promise.all([rig.setConfig(now.resolved), rig.prepareFonts()])
+    // La police du monogramme n'est attendue que s'il y a un monogramme, et jamais plus de 1,5 s.
+    Promise.all([rig.setConfig(now.resolved), rig.prepareFonts(now.resolved.monogram ? 1500 : 0)])
       .then(() => {
         if (cancelled) return;
         rig.ready = true;
@@ -109,11 +121,16 @@ function Driver({ resolved, configKey, pose, view, backdrop, interactive, autoRo
     rigRef.current?.setView(view);
   }, [view]);
   useEffect(() => {
-    if (active) invalidate();
+    if (!active) return;
+    watch.current.live = false; // reprise après une pause (hors écran, onglet masqué) : l'intervalle ne compte pas
+    invalidate();
   }, [active, invalidate]);
   useEffect(() => {
     rigRef.current?.setOptions({ interactive, autoRotate, parallax, reducedMotion });
   }, [interactive, autoRotate, parallax, reducedMotion]);
+  useEffect(() => {
+    if (lowPower) rigRef.current?.setStill(true);
+  }, [lowPower]);
 
   // Support clair ou sombre : l'éclairage d'ambiance s'y accorde (reflets du papier sur les faces).
   useEffect(() => {
@@ -127,9 +144,11 @@ function Driver({ resolved, configKey, pose, view, backdrop, interactive, autoRo
     const h = Math.max(1, size.height);
     rigRef.current?.setAspect(w / h);
     const device = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    onDpr(Math.round(Math.max(1, Math.min(device, 2, Math.sqrt(PIXEL_BUDGET / (w * h)))) * 100) / 100);
+    // Le budget de pixels vaut aussi pour un grand canvas à densité 1 (écran 4K) : le plancher est 0,5.
+    const limit = lowPower || capped ? 1 : 2;
+    onDpr(Math.round(Math.max(0.5, Math.min(device, limit, Math.sqrt(PIXEL_BUDGET / (w * h)))) * 100) / 100);
     invalidate();
-  }, [size, onDpr, invalidate]);
+  }, [size, onDpr, invalidate, lowPower, capped]);
 
   // Glisser pour faire tourner ; le défilement vertical de la page reste libre (touch-action: pan-y).
   useEffect(() => {
@@ -167,13 +186,22 @@ function Driver({ resolved, configKey, pose, view, backdrop, interactive, autoRo
       target.style.cursor = 'grab';
       rigRef.current?.dragEnd();
     };
+    // Clavier : flèches gauche / droite, une fois le conteneur ciblé.
+    const key = (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      e.preventDefault();
+      rigRef.current?.nudge(e.key === 'ArrowLeft' ? -1 : 1);
+    };
     target.style.cursor = 'grab';
+    target.addEventListener('keydown', key);
     target.addEventListener('pointerdown', down);
     target.addEventListener('pointermove', move);
     target.addEventListener('pointerup', up);
     target.addEventListener('pointercancel', up);
     target.addEventListener('lostpointercapture', up);
     return () => {
+      target.removeEventListener('keydown', key);
       target.removeEventListener('pointerdown', down);
       target.removeEventListener('pointermove', move);
       target.removeEventListener('pointerup', up);
@@ -205,7 +233,7 @@ function Driver({ resolved, configKey, pose, view, backdrop, interactive, autoRo
   useFrame((state, delta) => {
     const rig = rigRef.current;
     if (!rig || !rig.ready) return;
-    const active = rig.update(delta);
+    const moving = rig.update(delta);
     rig.render();
     if (!framed.current) {
       framed.current = true;
@@ -215,22 +243,68 @@ function Driver({ resolved, configKey, pose, view, backdrop, interactive, autoRo
         // Réservé au studio : termine immédiatement les transitions et rend l'image.
         settle: () => rigRef.current?.settle() ?? Promise.resolve(),
         features: () => rigRef.current?.features() ?? null,
+        flowExcursion: (options) => rigRef.current?.flowExcursion(options) ?? null,
       });
     }
-    if (active) state.invalidate();
+
+    // Chien de garde : durée moyenne des images qui s'enchaînent (les premières, qui compilent les
+    // shaders, sont ignorées, ainsi que la plus longue de chaque série : un à-coup isolé ne compte pas).
+    const w = watch.current;
+    const now = performance.now();
+    const gap = now - w.last;
+    const chained = w.live; // l'image précédente en avait demandé une autre
+    w.last = now;
+    w.live = moving;
+    if (latest.current.watchdog && !latest.current.lowPower && w.stage < 3 && chained && gap < 5000) {
+      if (w.skip > 0) w.skip--;
+      else {
+        w.sum += gap;
+        w.peak = Math.max(w.peak, gap);
+        w.count++;
+        if (gap > 5 * STALLED_FRAME) w.stalls++;
+        // quatre images de plus d'une demi-seconde : inutile d'attendre la fin de la série
+        const stalled = w.stalls >= 4;
+        if (w.count >= WATCH_WINDOW || stalled) {
+          const mean = stalled ? Infinity : (w.sum - w.peak) / (w.count - 1);
+          w.sum = 0;
+          w.peak = 0;
+          w.count = 0;
+          w.stalls = 0;
+          if (mean > STALLED_FRAME && latest.current.onSluggish) {
+            w.stage = 3;
+            latest.current.onSluggish(); // scène décorative : le poster prend le relais
+          } else if (mean > SLOW_FRAME) {
+            w.stage++;
+            w.skip = 6;
+            if (w.stage === 1 && !stalled) setCapped(true);
+            else {
+              w.stage = 3;
+              rig.setStill(true); // plus de mouvement continu : la scène ne rend que sur demande
+            }
+          }
+        }
+      }
+    } else if (!chained) {
+      w.sum = 0;
+      w.peak = 0;
+      w.count = 0;
+    }
+    if (moving) state.invalidate();
   }, 1);
 
   return null;
 }
 
-export default function BeltScene({ active = true, ...props }) {
+export default function BeltScene({ active = true, lowPower = false, onGone, ...props }) {
   const [dpr, setDpr] = useState(1);
+  // Démontage (moins d'animations, rendu trop lent, perte de contexte) : le conteneur repasse au poster.
+  useEffect(() => () => onGone?.(), [onGone]);
   return (
     <Canvas
       frameloop={active ? 'demand' : 'never'}
       events={null}
       dpr={dpr}
-      gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+      gl={{ antialias: !lowPower, alpha: true, powerPreference: 'high-performance' }}
       camera={{ manual: true, fov: 30, near: 5, far: 4000, position: [0, 80, 420] }}
       resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
       onCreated={({ gl }) => {
@@ -241,7 +315,7 @@ export default function BeltScene({ active = true, ...props }) {
       }}
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
     >
-      <Driver {...props} active={active} onDpr={setDpr} />
+      <Driver {...props} lowPower={lowPower} active={active} onDpr={setDpr} />
     </Canvas>
   );
 }

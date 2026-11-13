@@ -1,4 +1,4 @@
-import { cn } from './cn';
+import { cn, yieldDisplay } from './cn';
 
 const VARIANTS = {
   outline: 'border border-fg/30 text-fg',
@@ -15,7 +15,10 @@ export default function Badge({ variant = 'outline', className, children, ...res
   return (
     <span
       className={cn(
-        'inline-flex h-6 items-center px-2.5 font-sans text-[0.625rem] font-semibold uppercase leading-none tracking-[0.2em] whitespace-nowrap',
+        yieldDisplay(
+          'inline-flex h-6 items-center px-2.5 font-sans text-[0.625rem] font-semibold uppercase leading-none tracking-[0.2em] whitespace-nowrap',
+          className,
+        ),
         VARIANTS[variant] ?? VARIANTS.outline,
         className,
       )}

@@ -4,7 +4,7 @@ import { SIZE_ALLOWANCE_CM, TROUSER_SIZES_FR, WAIST_MAX_CM, WAIST_MIN_CM } from 
 import { sizeRange } from '../product/catalogue';
 import { Button, EASE_LUXE, Icon, OptionGrid, TextLink, cn } from '../ui';
 import SizeRuler from './SizeRuler';
-import { ALL_SIZES, FINDER_MODES, INCH_MAX, INCH_MIN, clampMeasure, cleanMeasure, parseMeasure } from './size-finder';
+import { ALL_SIZES, FINDER_MODES, INCH_MAX, INCH_MIN, clampMeasure, cleanMeasure, parseMeasure, stepMeasure } from './size-finder';
 
 const NUMBER = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 const fr = (value) => NUMBER.format(value);
@@ -29,7 +29,7 @@ function MeasureInput({ label, hint, unit, unitLabel, name, min, max, value, onC
   const middle = Math.round((min + max) / 2);
   const current = clampMeasure(parseMeasure(value), min, max, middle);
   const fill = `${((current - min) / (max - min)) * 100}%`;
-  const step = (delta) => onChange(String(clampMeasure(Math.round(parseMeasure(value)) + delta, min, max, current)));
+  const step = (direction) => onChange(String(stepMeasure(value, direction, min, max, current)));
 
   return (
     <div>

@@ -1,19 +1,35 @@
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion as Motion, useReducedMotion } from 'motion/react';
 import { useCart } from '../../context/CartContext';
+import { atelierPath } from '../../lib/atelier-url';
 import { formatPrice } from '../../lib/format';
 import { FREE_SHIPPING_THRESHOLD, roundMoney } from '../../lib/pricing';
 import Button from '../ui/Button';
 import Drawer from '../ui/Drawer';
 import FreeShippingBar from '../ui/FreeShippingBar';
+import Icon from '../ui/Icon';
 import Packshot from '../ui/Packshot';
 import Price from '../ui/Price';
 import QuantityStepper from '../ui/QuantityStepper';
 import { EASE_LUXE } from '../ui/motion-presets';
 
+/**
+ * Description d'une ligne, sans coupure malvenue : ni entre un nombre et son unité (« 35 mm »,
+ * « 95 cm » — y compris dans un panier enregistré avant), ni avant un point médian en début de ligne.
+ */
+const tidySubtitle = (text) =>
+  String(text ?? '')
+    .replace(/(\d) (?=(?:mm|cm)\b)/g, '$1\u00a0')
+    .replace(/ · /g, '\u00a0· ');
+
+/**
+ * Ligne du panier. Une ceinture du catalogue mène à sa fiche ; une création de l'Atelier
+ * (item.custom) n'a pas de fiche : sa vignette, son nom et le lien « Modifier » rouvrent
+ * l'Atelier sur cette configuration, à cette taille.
+ */
 function CartLine({ item, index, onQuantity, onRemove, onNavigate }) {
   const reduced = useReducedMotion();
-  const to = item.slug ? `/product/${item.slug}` : '/atelier';
+  const to = item.custom ? atelierPath(item.belt, item.selectedSize) : item.slug ? `/product/${item.slug}` : '/atelier';
   return (
     <Motion.li
       layout={reduced ? false : 'position'}
@@ -36,7 +52,18 @@ function CartLine({ item, index, onQuantity, onRemove, onNavigate }) {
             </h3>
             <Price amount={roundMoney(item.price * item.quantity)} className="pt-1 text-[0.9375rem] font-medium" />
           </div>
-          <p className="mt-1.5 text-[0.8125rem] leading-snug text-muted">{item.subtitle}</p>
+          <p className="mt-1.5 text-[0.8125rem] leading-snug text-muted">{tidySubtitle(item.subtitle)}</p>
+          {item.custom ? (
+            <Link
+              to={to}
+              onClick={onNavigate}
+              aria-label={`Modifier ${item.name} à l’Atelier`}
+              className="group/link -mb-3 flex min-h-11 w-fit items-center gap-2 text-[0.8125rem] text-muted transition-colors duration-300 hover:text-fg"
+            >
+              <Icon name="pen" size={14} />
+              <span className="link-underline-always">Modifier</span>
+            </Link>
+          ) : null}
           <div className="mt-auto flex items-center justify-between gap-4 pt-4">
             <QuantityStepper
               value={item.quantity}

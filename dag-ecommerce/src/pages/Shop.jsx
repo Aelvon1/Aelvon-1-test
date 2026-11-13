@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, MotionConfig, motion as Motion } from 'motion/react';
 import AtelierTile from '../components/product/AtelierTile';
@@ -15,11 +15,14 @@ import {
 } from '../components/product/catalogue';
 import { Button, EASE_LUXE, Eyebrow, Icon, Reveal, Section, SplitText, TextLink, cn } from '../components/ui';
 import { collections, products } from '../data/products';
-import { useMediaQuery, usePageMeta } from '../hooks';
+import { scrollToTarget, useMediaQuery, usePageMeta } from '../hooks';
 
 const COLOR_COUNT = products.reduce((total, product) => total + product.colors.length, 0);
 const ALL_ALIASES = ['', 'all', 'toutes'];
 const SPAN = { 1: 'col-span-1', 2: 'col-span-2', 3: 'col-span-3' };
+const TITLE_ID = 'catalogue-titre';
+const TILE_HIDDEN = { opacity: 0, y: 28 };
+const TILE_SHOWN = { opacity: 1, y: 0 };
 
 /** Onglets discrets : chaque collection est un lien, l'URL fait foi (retour arrière, rechargement). */
 function CollectionTabs({ tabs, active }) {
@@ -101,6 +104,31 @@ function SortSelect({ value, onChange }) {
   );
 }
 
+/**
+ * Cellule de la grille : elle apparaît quand elle entre dans la fenêtre, puis reste affichée.
+ * L'apparition passe par `animate`, et non par `whileInView` : une tuile retirée puis remise pendant
+ * que ses voisines finissent de sortir (aller-retour rapide entre deux collections) repart de son état
+ * `initial`, et motion ne rejoue alors que `animate`. Déjà vue, elle serait restée invisible.
+ */
+function GridCell({ ref, className, delay, children }) {
+  const [seen, setSeen] = useState(false);
+  return (
+    <Motion.li
+      ref={ref}
+      layout="position"
+      className={className}
+      initial={TILE_HIDDEN}
+      animate={seen ? TILE_SHOWN : TILE_HIDDEN}
+      onViewportEnter={() => setSeen(true)}
+      viewport={{ once: true, amount: 0.1 }}
+      exit={{ opacity: 0, transition: { duration: 0.3, ease: 'easeOut' } }}
+      transition={{ duration: 0.9, ease: EASE_LUXE, delay, layout: { duration: 0.9, ease: EASE_LUXE } }}
+    >
+      {children}
+    </Motion.li>
+  );
+}
+
 export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const desktop = useMediaQuery('(min-width: 64rem)');
@@ -123,6 +151,23 @@ export default function Shop() {
       ? `${collection.description} Ceintures DAG en cuir, livraison offerte dès 100\xa0€.`
       : `${capitalize(countWords(products.length, 'modèle'))} de ceintures en cuir, ${countWords(COLOR_COUNT, 'coloris', 'coloris')}. Livraison offerte dès 100\xa0€, retours gratuits sous 30\xa0jours.`,
   });
+
+  // Un lien de collection suivi loin du catalogue (pied de page, en-tête, retour arrière) change la
+  // grille sans changer de page : rien ne bouge à l'écran, le lien semble sans effet. Le catalogue
+  // revient alors sous les yeux, et le focus sur son titre. Onglets visibles — c'est l'un d'eux qui
+  // vient d'être activé — la grille change sur place.
+  const toolbarRef = useRef(null);
+  const shownCollection = useRef(active);
+  useEffect(() => {
+    if (shownCollection.current === active) return;
+    shownCollection.current = active;
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+    const { top, bottom } = toolbar.getBoundingClientRect();
+    if (top >= 0 && bottom <= window.innerHeight) return;
+    scrollToTarget(toolbar);
+    document.getElementById(TITLE_ID)?.focus({ preventScroll: true });
+  }, [active]);
 
   const hrefFor = (slug) => {
     const next = new URLSearchParams();
@@ -194,9 +239,12 @@ export default function Shop() {
         </div>
       </Section>
 
-      <section className="theme-ivoire relative pb-[clamp(4.5rem,9vw,9rem)]" aria-labelledby="catalogue-titre">
+      <section className="theme-ivoire relative pb-[clamp(4.5rem,9vw,9rem)]" aria-labelledby={TITLE_ID}>
         <div className="container-luxe">
-          <div className="flex flex-col lg:flex-row lg:items-stretch lg:justify-between lg:gap-10 lg:shadow-[inset_0_-1px_0_var(--line)]">
+          <div
+            ref={toolbarRef}
+            className="flex flex-col lg:flex-row lg:items-stretch lg:justify-between lg:gap-10 lg:shadow-[inset_0_-1px_0_var(--line)]"
+          >
             <CollectionTabs tabs={tabs} active={active} />
             <div className="flex items-center justify-end max-lg:pt-2">
               <SortSelect value={sort} onChange={setSort} />
@@ -205,7 +253,7 @@ export default function Shop() {
 
           <div className="flex flex-col gap-x-10 gap-y-2 pb-8 pt-7 lg:flex-row lg:items-baseline lg:justify-between lg:pb-12 lg:pt-12">
             <div key={active ?? 'introuvable'} className="page-enter flex flex-col gap-x-8 gap-y-2 lg:flex-row lg:items-baseline">
-              <h2 id="catalogue-titre" className="text-subtitle">
+              <h2 id={TITLE_ID} tabIndex={-1} className="text-subtitle outline-none">
                 {heading}
               </h2>
               {blurb ? <p className="max-w-[52ch] text-[0.9375rem] text-muted">{blurb}</p> : null}
@@ -220,23 +268,9 @@ export default function Shop() {
               <ul className="relative grid grid-cols-2 gap-x-4 gap-y-12 sm:gap-x-5 lg:grid-cols-3 lg:gap-x-6 lg:gap-y-20">
                 <AnimatePresence mode="popLayout">
                   {cells.map((cell, index) => (
-                    <Motion.li
-                      key={cell.key}
-                      layout="position"
-                      className={cell.atelier ? SPAN[atelierSpan] : undefined}
-                      initial={{ opacity: 0, y: 28 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, amount: 0.1 }}
-                      exit={{ opacity: 0, transition: { duration: 0.3, ease: 'easeOut' } }}
-                      transition={{
-                        duration: 0.9,
-                        ease: EASE_LUXE,
-                        delay: (index % columns) * 0.08,
-                        layout: { duration: 0.9, ease: EASE_LUXE },
-                      }}
-                    >
+                    <GridCell key={cell.key} className={cell.atelier ? SPAN[atelierSpan] : undefined} delay={(index % columns) * 0.08}>
                       {cell.atelier ? <AtelierTile /> : <ProductCard product={cell.product} priority={index < columns} />}
-                    </Motion.li>
+                    </GridCell>
                   ))}
                 </AnimatePresence>
               </ul>

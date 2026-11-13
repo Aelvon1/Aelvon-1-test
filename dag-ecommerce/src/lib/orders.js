@@ -3,6 +3,7 @@
 // (localStorage, une seule clé, 10 commandes au plus) pour alimenter la page de confirmation.
 import { cartTotals, sanitizeCart } from './cart';
 import { roundMoney } from './pricing';
+import { localStore } from './storage';
 
 export const ORDERS_STORAGE_KEY = 'dag-orders-v1';
 export const MAX_STORED_ORDERS = 10;
@@ -40,15 +41,6 @@ function defaultRandom() {
     return buffer[0] / 2 ** 32;
   } catch {
     return Math.random();
-  }
-}
-
-/** localStorage, ou null s'il est inaccessible (navigation privée, cookies bloqués). */
-function defaultStorage() {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
   }
 }
 
@@ -125,20 +117,25 @@ function sanitizeTotals(raw, items) {
  * @property {{ subtotal: number, shipping: number, total: number, count: number }} totals
  * @property {{ email: string, firstName: string, lastName: string, phone: string, address: string,
  *   addressComplement: string, postalCode: string, city: string, country: string }} customer
- * @property {string} giftNote
+ * @property {boolean} gift      la commande est un cadeau (case cochée), avec ou sans mot d'accompagnement
+ * @property {string} giftNote   mot d'accompagnement, '' s'il n'y en a pas
  * @property {string} status     ORDER_STATUS_DEMO tant qu'aucun paiement n'est branché
  */
 
+/** Une commande est un cadeau si le client l'a dit (true, rien d'autre) ou s'il y a joint un mot. */
+const isGift = (gift, note) => gift === true || note !== '';
+
 /**
  * Construit une commande à partir du panier et des coordonnées saisies. Ne l'enregistre pas.
- * @param {{ items: object[], totals?: object, customer: object, giftNote?: string }} input
+ * @param {{ items: object[], totals?: object, customer: object, gift?: boolean, giftNote?: string }} input
  * @param {{ now?: Date|string|number, random?: () => number, taken?: string[] }} [options]
  *   now : date de la commande · random : source d'aléa du numéro · taken : numéros déjà attribués, à éviter
  * @returns {Order|null} null si le panier ne contient aucune ligne valide
  */
-export function createOrder({ items, totals, customer, giftNote = '' } = {}, { now = new Date(), random = defaultRandom, taken = [] } = {}) {
+export function createOrder({ items, totals, customer, gift = false, giftNote = '' } = {}, { now = new Date(), random = defaultRandom, taken = [] } = {}) {
   const lines = snapshotItems(items);
   if (lines.length === 0) return null;
+  const note = text(giftNote, MAX_NOTE_LENGTH);
 
   let id = generateOrderId(random);
   for (let attempt = 0; attempt < 24 && taken.includes(id); attempt += 1) id = generateOrderId(random);
@@ -150,7 +147,8 @@ export function createOrder({ items, totals, customer, giftNote = '' } = {}, { n
     items: lines,
     totals: sanitizeTotals(totals, lines),
     customer: sanitizeCustomer(customer),
-    giftNote: text(giftNote, MAX_NOTE_LENGTH),
+    gift: isGift(gift, note),
+    giftNote: note,
     status: ORDER_STATUS_DEMO,
   };
 }
@@ -163,13 +161,16 @@ export function sanitizeOrder(raw) {
   if (typeof raw.createdAt !== 'string' || Number.isNaN(new Date(raw.createdAt).getTime())) return null;
   const items = snapshotItems(raw.items);
   if (items.length === 0) return null;
+  const note = text(raw.giftNote, MAX_NOTE_LENGTH);
   return {
     id,
     createdAt: new Date(raw.createdAt).toISOString(),
     items,
     totals: sanitizeTotals(raw.totals, items),
     customer: sanitizeCustomer(raw.customer),
-    giftNote: text(raw.giftNote, MAX_NOTE_LENGTH),
+    // une commande enregistrée avant ce champ est un cadeau dès qu'un mot l'accompagne
+    gift: isGift(raw.gift, note),
+    giftNote: note,
     status: typeof raw.status === 'string' && raw.status ? raw.status : ORDER_STATUS_DEMO,
   };
 }
@@ -177,7 +178,7 @@ export function sanitizeOrder(raw) {
 const byMostRecent = (a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0);
 
 /** Commandes enregistrées, de la plus récente à la plus ancienne. Ne lève jamais d'erreur. */
-export function listOrders(storage = defaultStorage()) {
+export function listOrders(storage = localStore()) {
   try {
     const raw = JSON.parse(storage?.getItem(ORDERS_STORAGE_KEY) ?? '[]');
     if (!Array.isArray(raw)) return [];
@@ -197,7 +198,7 @@ export function listOrders(storage = defaultStorage()) {
 }
 
 /** Retrouve une commande par son numéro (casse et espaces de bord tolérés), ou null. */
-export function getOrder(id, storage = defaultStorage()) {
+export function getOrder(id, storage = localStore()) {
   const key = normalizeOrderId(id);
   if (!key) return null;
   return listOrders(storage).find((order) => order.id === key) ?? null;
@@ -215,7 +216,7 @@ export const withoutEmbeddedImages = (order) => ({
  * les remplace à l'affichage. Ne lève jamais d'erreur.
  * @returns {boolean} true si la commande est enregistrée
  */
-export function saveOrder(order, storage = defaultStorage()) {
+export function saveOrder(order, storage = localStore()) {
   const clean = sanitizeOrder(order);
   if (!clean || !storage) return false;
   const others = listOrders(storage).filter((entry) => entry.id !== clean.id);

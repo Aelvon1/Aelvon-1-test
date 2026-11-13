@@ -205,7 +205,10 @@ export default function Contact() {
       </PageHero>
 
       <Section tone="ivoire" className="!pt-[clamp(3.5rem,7vw,7rem)]">
-        <div className="grid gap-y-16 lg:grid-cols-12 lg:gap-x-6">
+        {/* Formulaire et message prêt se remplacent l'un l'autre : sans overflow-anchor, le navigateur recale le
+            défilement sur un champ en train de disparaître, et le défilement adouci qui suit part d'une position
+            périmée — le message prêt finissait au-dessus de l'écran. */}
+        <div className="grid gap-y-16 [overflow-anchor:none] lg:grid-cols-12 lg:gap-x-6">
           <div className="lg:col-span-7">
             {mail ? (
               <ReadyMessage mail={mail} panelRef={panelRef} onEdit={() => setMail(null)} />
@@ -252,7 +255,8 @@ export default function Contact() {
                     error={errors.message}
                     hint={`${length}\xa0/\xa0${MESSAGE_MAX} caractères`}
                   >
-                    <Textarea {...bind('message')} rows={7} maxLength={MESSAGE_MAX + 200} />
+                    {/* pas de maxLength : le navigateur couperait sans rien dire la fin d'un message collé */}
+                    <Textarea {...bind('message')} rows={7} />
                   </Field>
 
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">

@@ -24,6 +24,7 @@ export function sweepGeometry({ rings, closed = false, closedLength = 0, materia
   const position = new Float32Array(V * 3);
   const normal = new Float32Array(V * 3);
   const uv = new Float32Array(V * 2);
+  const tangent = new Float32Array(V * 4); // le long du chemin : brossage et reflets anisotropes continus dans les coudes
   const occ = new Float32Array(V).fill(1);
 
   const P = (k, j, out) => {
@@ -69,9 +70,25 @@ export function sweepGeometry({ rings, closed = false, closedLength = 0, materia
         nz = -nz;
       }
       const l = Math.hypot(nx, ny, nz) || 1;
-      normal[o * 3] = nx / l;
-      normal[o * 3 + 1] = ny / l;
-      normal[o * 3 + 2] = nz / l;
+      nx /= l;
+      ny /= l;
+      nz /= l;
+      normal[o * 3] = nx;
+      normal[o * 3 + 1] = ny;
+      normal[o * 3 + 2] = nz;
+      // tangente = direction du chemin, ramenée dans le plan tangent ; w = sens de la bitangente (v croissant)
+      const dn = sx * nx + sy * ny + sz * nz;
+      let tx = sx - dn * nx;
+      let ty = sy - dn * ny;
+      let tz = sz - dn * nz;
+      const tl = Math.hypot(tx, ty, tz) || 1;
+      tx /= tl;
+      ty /= tl;
+      tz /= tl;
+      tangent[o * 4] = tx;
+      tangent[o * 4 + 1] = ty;
+      tangent[o * 4 + 2] = tz;
+      tangent[o * 4 + 3] = (ny * tz - nz * ty) * qx + (nz * tx - nx * tz) * qy + (nx * ty - ny * tx) * qz < 0 ? -1 : 1;
       if (j > 0) {
         P(k, j - 1, a);
         per += Math.hypot(p[0] - a[0], p[1] - a[1], p[2] - a[2]);
@@ -129,6 +146,7 @@ export function sweepGeometry({ rings, closed = false, closedLength = 0, materia
       t.map((x) => x / l),
       extra * 3,
     );
+    tangent.set([r.b[0], r.b[1], r.b[2], 1], extra * 4);
     uv[extra * 2] = r.u;
     const m = materialOf(0);
     for (let j = 0; j < M; j++) {
@@ -152,7 +170,9 @@ export function sweepGeometry({ rings, closed = false, closedLength = 0, materia
   geometry.setAttribute('position', new BufferAttribute(position, 3));
   geometry.setAttribute('normal', new BufferAttribute(normal, 3));
   geometry.setAttribute('uv', new BufferAttribute(uv, 2));
+  geometry.setAttribute('tangent', new BufferAttribute(tangent, 4));
   geometry.setAttribute('aOcc', new BufferAttribute(occ, 1));
+  geometry.setAttribute('aShade', new BufferAttribute(new Float32Array(V).fill(1), 1));
   geometry.setIndex(all);
   return geometry;
 }

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Packshot, Price, QuantityStepper, cn } from '../ui';
 import { formatPrice } from '../../lib/format';
 import { roundMoney } from '../../lib/pricing';
-import { NBSP, tidySubtitle } from './format';
+import { NBSP, lineLabel, tidySubtitle } from './format';
 
 /**
  * Ligne d'article d'une commande : vignette, nom, description, quantité, montant.
@@ -18,6 +18,8 @@ export default function OrderLine({ item, editable = false, linked = false, size
   const large = size === 'md';
   const amount = roundMoney(item.price * item.quantity);
   const to = item.slug ? `/product/${item.slug}` : '/atelier';
+  // nom complet de la ligne : deux tailles d'une même ceinture ne doivent pas porter le même nom
+  const label = lineLabel(item);
   return (
     <div className={cn('flex', large ? 'gap-5 sm:gap-7' : 'gap-4', className)}>
       <Packshot
@@ -46,12 +48,12 @@ export default function OrderLine({ item, editable = false, linked = false, size
             <QuantityStepper
               value={item.quantity}
               onChange={(next) => onQuantity?.(item.cartItemId, next)}
-              label={`Quantité — ${item.name}`}
+              label={`Quantité — ${label}`}
             />
             <button
               type="button"
               onClick={() => onRemove?.(item.cartItemId)}
-              aria-label={`Retirer ${item.name} de la commande`}
+              aria-label={`Retirer ${label} de la commande`}
               className="group/link flex min-h-11 min-w-11 items-center justify-end text-[0.8125rem] text-muted transition-colors duration-300 hover:text-fg"
             >
               <span className="link-underline-always">Retirer</span>

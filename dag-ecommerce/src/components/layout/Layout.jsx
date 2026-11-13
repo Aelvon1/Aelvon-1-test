@@ -6,8 +6,13 @@ import CartDrawer from './CartDrawer';
 import Footer from './Footer';
 import Header from './Header';
 import PageTransition from './PageTransition';
+import { ROUTER_MODE } from './router-mode';
 
-/** Liens d'ancre internes (« #id ») : défilement adouci vers la cible, qui reçoit le focus. */
+/**
+ * Liens d'ancre internes (« #id ») : défilement adouci vers la cible, qui reçoit le focus.
+ * L'URL n'est pas modifiée. Hors mode « browser », un lien dont la cible manque est neutralisé :
+ * le fragment de l'URL y porte la route (HashRouter) ou n'appartient pas au site (cadre isolé).
+ */
 function useAnchorLinks() {
   useEffect(() => {
     const onClick = (event) => {
@@ -17,7 +22,7 @@ function useAnchorLinks() {
       const href = anchor?.getAttribute('href');
       // « #/chemin » est une route en mode statique (HashRouter), pas une ancre
       if (!href || !href.startsWith('#') || href.length < 2 || href.startsWith('#/')) return;
-      if (scrollToTarget(href, { focus: true })) event.preventDefault();
+      if (scrollToTarget(href, { focus: true }) || ROUTER_MODE !== 'browser') event.preventDefault();
     };
     document.addEventListener('click', onClick);
     return () => document.removeEventListener('click', onClick);
@@ -34,8 +39,10 @@ export default function Layout({ children }) {
   useLenis();
   useAnchorLinks();
 
+  // La coque restaure elle-même le défilement (PageTransition). En mémoire, l'historique du
+  // navigateur n'est pas le nôtre : on n'y touche pas.
   useEffect(() => {
-    if (!('scrollRestoration' in window.history)) return undefined;
+    if (ROUTER_MODE === 'memory' || !('scrollRestoration' in window.history)) return undefined;
     const previous = window.history.scrollRestoration;
     window.history.scrollRestoration = 'manual';
     return () => {
@@ -47,7 +54,7 @@ export default function Layout({ children }) {
     <ToastProvider>
       <a
         href="#contenu"
-        className="eyebrow sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-4 focus-visible:top-4 focus-visible:z-[100] focus-visible:bg-accent focus-visible:px-5 focus-visible:py-3.5 focus-visible:text-on-accent"
+        className="eyebrow sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-[max(1rem,env(safe-area-inset-left,0px))] focus-visible:top-[max(1rem,env(safe-area-inset-top,0px))] focus-visible:z-[100] focus-visible:bg-accent focus-visible:px-5 focus-visible:py-3.5 focus-visible:text-on-accent"
       >
         Aller au contenu
       </a>

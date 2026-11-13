@@ -45,8 +45,10 @@ export function beltSpec(widthMm = 35) {
   const keeperWidth = 9;
   const keeperThickness = 1.5;
 
-  // Monogramme
-  const monoHeight = W * 0.5;
+  // Monogramme : capitales d'environ 7,5 mm sur une lanière de 35 mm — une signature, pas une enseigne.
+  // La pastille (canvas 640 × 256) est plus haute que les lettres : hauteur de capitale ≈ 0,54 × pastille.
+  const monoCap = W * 0.215;
+  const monoHeight = monoCap / 0.54;
   const monoLength = monoHeight * 2.5;
   const monoAt = 90;
 
@@ -59,13 +61,18 @@ export function beltSpec(widthMm = 35) {
     tipRound: 2.4,
     htMain,
     htFold,
-    edge: 1.15, // rayon horizontal de la tranche arrondie
+    edgeRadius: 0.55, // congés de la tranche : chant plat de 2,7 mm entre deux arêtes adoucies
+    seamAt: -0.3, // joint fleur / doublure sur la tranche (hauteur par rapport à la fibre neutre)
+    seamHalf: 0.1,
+    seamDepth: 0.07,
     dome: 0.42, // bombé de la fleur entre les coutures
     stitchInset: 3.0,
-    grooveHalf: 0.55,
-    grooveDepth: 0.2,
+    grooveHalf: 0.8, // filet de couture : 1,6 mm de large, fond plat de 0,8 mm
+    grooveDepth: 0.11, // simple marque du fer à fileter
+    stitchFrom: 6.5, // premier point après la barrette
     stitchPitch: 3.3,
-    stitchLength: 2.65,
+    stitchLength: 3.0,
+    stitchSlant: 0.23, // 13° : inclinaison du point sellier
     barRadius,
     foldRadius,
     foldLength,
@@ -85,6 +92,7 @@ export function beltSpec(widthMm = 35) {
     keeperWidth,
     keeperThickness,
     crossRows: [15.5, 40.5],
+    monoCap,
     monoHeight,
     monoLength,
     monoAt,

@@ -44,6 +44,19 @@ export function clampMeasure(value, min, max, fallback = min) {
 }
 
 /**
+ * Pas des boutons + / − et des flèches du clavier : l'entier voisin, borné dans [min, max].
+ * Depuis une décimale, on rejoint l'entier le plus proche dans le sens demandé (« 85,5 » : 86 ou 85).
+ * @param {string} value  saisie en cours
+ * @param {1|-1} direction  1 : ajouter · -1 : retirer
+ * @returns {number} une saisie illisible prend `fallback`
+ */
+export function stepMeasure(value, direction, min, max, fallback = min) {
+  const base = parseMeasure(value);
+  const next = direction > 0 ? Math.floor(base) + 1 : Math.ceil(base) - 1;
+  return clampMeasure(next, min, max, fallback);
+}
+
+/**
  * Où trouver une longueur : dans la collection (et sur quels modèles) ou seulement à l'Atelier.
  * @returns {{ inCollection: boolean, models: object[], missing: object[] }}
  */
@@ -62,7 +75,8 @@ export function sizeAvailability(size) {
  *   size: string|null, ideal: number|null, direction: 'short'|'long'|null,
  *   availability: ReturnType<typeof sizeAvailability>|null
  * }}
- *   empty : rien de saisi, ou saisie encore incomplète · invalid : mesure hors des repères de la maison · out : longueur idéale hors
+ *   empty : rien de saisi, ou saisie encore incomplète (aucune mesure retenue : waist et entered valent null) ·
+ *   invalid : mesure hors des repères de la maison · out : longueur idéale hors
  *   de nos tailles (direction « short » : la plus grande taille sera juste ; « long » : la plus petite
  *   sera un peu longue) · exact : la longueur idéale existe · near : arrondie à la taille la plus proche
  *   entered : valeur saisie dans son unité (cm, taille de pantalon, pouces)
@@ -87,12 +101,14 @@ export function finderResult(state) {
   }
 
   const blank = { waist, entered, size: null, ideal: null, direction: null, availability: null };
+  const empty = { ...blank, waist: null, entered: null, status: 'empty' };
   const typed = mode === 'pantalon' ? state.trouser : String(mode === 'pouces' ? state.inches : state.cm).trim();
-  if (!typed) return { ...blank, status: 'empty' };
-  // Saisie en cours : « 8 » ou « 10 » peuvent encore devenir 85 ou 105 — on attend la suite sans rien signaler.
+  if (!typed) return empty;
+  // Saisie en cours : « 8 » ou « 10 » peuvent encore devenir 85 ou 105 — on attend la suite sans rien signaler,
+  // et sans rien retenir : « 3 » n'est pas encore une mesure à convertir.
   if (mode !== 'pantalon' && entered != null && /^\d+$/.test(typed)) {
     const [min, max] = mode === 'pouces' ? [INCH_MIN, INCH_MAX] : [WAIST_MIN_CM, WAIST_MAX_CM];
-    if (entered < min && entered * 10 <= max) return { ...blank, status: 'empty' };
+    if (entered < min && entered * 10 <= max) return empty;
   }
 
   const recommendation = waist == null ? null : recommendSize(waist, ALL_SIZES);

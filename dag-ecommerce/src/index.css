@@ -226,11 +226,14 @@
 
 /* --- Mise en page ------------------------------------------------------- */
 
+/* Marges latérales : au moins la zone sûre de l'appareil (encoche ou barre système en mode
+   paysage, viewport-fit=cover). Sans zone sûre, max(x, 0px) vaut x : rien ne bouge. */
 @utility container-luxe {
   width: 100%;
   max-width: 96rem;
   margin-inline: auto;
-  padding-inline: clamp(1.25rem, 4vw, 4rem);
+  padding-left: max(clamp(1.25rem, 4vw, 4rem), env(safe-area-inset-left, 0px));
+  padding-right: max(clamp(1.25rem, 4vw, 4rem), env(safe-area-inset-right, 0px));
 }
 
 @utility section-pad {
@@ -265,8 +268,9 @@
    ========================================================================== */
 
 :root {
-  /* Hauteur de l'en-tête fixe ; --header-offset vaut 0px quand il est replié. */
-  --header-h: 4rem;
+  /* Hauteur de l'en-tête fixe, zone sûre du haut comprise (encoche, barre d'état d'une app
+     plein écran : 0px ailleurs) ; --header-offset vaut 0px quand il est replié. */
+  --header-h: calc(4rem + env(safe-area-inset-top, 0px));
   --header-offset: var(--header-h);
   /* Largeur de la barre de défilement compensée pendant un verrouillage. */
   --scroll-lock-gap: 0px;
@@ -274,7 +278,7 @@
 
 @media (min-width: 64rem) {
   :root {
-    --header-h: 4.75rem;
+    --header-h: calc(4.75rem + env(safe-area-inset-top, 0px));
   }
 }
 

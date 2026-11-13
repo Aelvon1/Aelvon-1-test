@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button, Eyebrow, Packshot, Price, Reveal, Section, SplitText } from '../ui';
 import { findColor, findProduct, productImage, productPath, products } from '../../data/products';
+import { EMPTY_TITLE_ID } from './steps';
 
 // La pièce qui ouvre la collection, proposée comme point de départ.
 const STARTER = findProduct('essential') ?? products[0];
@@ -19,7 +20,13 @@ export default function EmptyCheckout() {
         <Reveal y={12}>
           <Eyebrow rule>Commande</Eyebrow>
         </Reveal>
-        <SplitText as="h1" className="text-display mt-7 max-w-[13ch]" text="Votre panier est encore *vide*." />
+        <SplitText
+          as="h1"
+          id={EMPTY_TITLE_ID}
+          tabIndex={-1}
+          className="text-display mt-7 max-w-[13ch] outline-none"
+          text="Votre panier est encore *vide*."
+        />
         <Reveal delay={0.25}>
           <p className="text-lead mt-7 max-w-[42ch] text-muted">
             Choisissez une ceinture de la collection, ou composez la vôtre à l’Atelier. Votre commande vous attendra ici.

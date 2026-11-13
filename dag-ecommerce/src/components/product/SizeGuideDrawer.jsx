@@ -1,20 +1,20 @@
 import { useState } from 'react';
 import { SIZES as ATELIER_SIZES } from '../../data/atelier';
-import { SIZE_ALLOWANCE_CM, TROUSER_SIZES_FR, WAIST_MAX_CM, WAIST_MIN_CM, recommendSize, sizeChart } from '../../lib/sizing';
+import { SIZE_ALLOWANCE_CM, TROUSER_SIZES_FR, WAIST_MAX_CM, WAIST_MIN_CM, sizeChart } from '../../lib/sizing';
 import { Button, Drawer, Field, Input, OptionGrid, Select, TextLink, cn } from '../ui';
 import { sizeRange } from './catalogue';
+import { formatCm, parseWaist, sizeAdvice, waistTooLarge } from './size-advice';
 
 const MODES = [
   { value: 'cm', label: 'Tour de taille', hint: 'en centimètres' },
   { value: 'pantalon', label: 'Pantalon', hint: 'taille française' },
 ];
 
-const parseWaist = (text) => Number(String(text).trim().replace(',', '.'));
-
 /**
  * Tiroir « Guide des tailles » de la fiche produit : un trouveur de taille compact (tour de
  * taille en cm ou taille de pantalon française), limité aux tailles du modèle, avec un bouton
  * qui applique la taille conseillée, puis la table de correspondance et le lien vers le guide complet.
+ * Une longueur que le modèle n'a pas est renvoyée vers l'Atelier s'il la réalise, vers le contact sinon.
  * @param {{
  *   open: boolean, onClose: () => void, product: object,
  *   selected?: string|null, onApply: (size: string) => void
@@ -24,12 +24,16 @@ export default function SizeGuideDrawer({ open, onClose, product, selected, onAp
   const [mode, setMode] = useState('cm');
   const [waist, setWaist] = useState('');
   const [trouser, setTrouser] = useState('');
+  // le champ a été quitté, ou validé, depuis la dernière frappe
+  const [settled, setSettled] = useState(false);
 
   const sizes = product.sizes;
   const filled = mode === 'cm' ? waist.trim() !== '' : trouser !== '';
   const waistCm = mode === 'cm' ? parseWaist(waist) : TROUSER_SIZES_FR.find((entry) => entry.fr === trouser)?.waist;
-  const result = filled ? recommendSize(waistCm, sizes) : null;
-  const invalid = filled && !result;
+  const result = filled ? sizeAdvice(waistCm, sizes) : null;
+  // Toute saisie passe par des valeurs trop petites (« 8 » avant « 85 ») : l'erreur attend que le champ
+  // soit quitté ou validé — sauf au-delà du maximum, que rien de plus ne rattrapera.
+  const invalid = mode === 'cm' && filled && !result && (settled || waistTooLarge(waist));
   const usable = result && !result.outOfRange;
   const chart = sizeChart(sizes);
 
@@ -62,6 +66,7 @@ export default function SizeGuideDrawer({ open, onClose, product, selected, onAp
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
+          setSettled(true);
           apply();
         }}
       >
@@ -80,7 +85,11 @@ export default function SizeGuideDrawer({ open, onClose, product, selected, onAp
               placeholder="Ex. 85"
               maxLength={5}
               value={waist}
-              onChange={(event) => setWaist(event.target.value.replace(/[^0-9.,]/g, ''))}
+              onChange={(event) => {
+                setWaist(event.target.value.replace(/[^0-9.,]/g, ''));
+                setSettled(false);
+              }}
+              onBlur={() => setSettled(true)}
             />
           </Field>
         ) : (
@@ -105,23 +114,33 @@ export default function SizeGuideDrawer({ open, onClose, product, selected, onAp
               <span className="text-[1.25rem] text-muted">cm</span>
             </p>
             <p className="mt-4 text-[0.875rem] leading-relaxed text-muted">
-              {result.outOfRange ? (
+              {result.atelier ? (
                 <>
-                  Votre longueur idéale est de {result.ideal}&nbsp;cm&nbsp;: elle sort des tailles de ce modèle ({sizeRange(sizes)}). À
-                  l’Atelier, nous réalisons les longueurs de {sizeRange(ATELIER_SIZES)}.
+                  Votre longueur idéale est de {formatCm(result.ideal)}&nbsp;cm&nbsp;: elle sort des tailles de ce modèle (
+                  {sizeRange(sizes)}). À l’Atelier, nous réalisons les longueurs de {sizeRange(ATELIER_SIZES)}.
+                </>
+              ) : result.outOfRange ? (
+                <>
+                  Votre longueur idéale est de {formatCm(result.ideal)}&nbsp;cm&nbsp;: elle sort des tailles de ce modèle (
+                  {sizeRange(sizes)}), comme de celles que nous réalisons à l’Atelier ({sizeRange(ATELIER_SIZES)}). Écrivez-nous avant de
+                  commander&nbsp;: nous vous conseillerons.
                 </>
               ) : result.exact ? (
-                <>Votre longueur idéale est de {result.ideal}&nbsp;cm, exactement.</>
+                <>Votre longueur idéale est de {formatCm(result.ideal)}&nbsp;cm, exactement.</>
               ) : (
                 <>
-                  Votre longueur idéale est de {result.ideal}&nbsp;cm. Nous vous conseillons la taille la plus proche&nbsp;: le{' '}
+                  Votre longueur idéale est de {formatCm(result.ideal)}&nbsp;cm. Nous vous conseillons la taille la plus proche&nbsp;: le{' '}
                   {result.size}.
                 </>
               )}
             </p>
-            {result.outOfRange ? (
+            {result.atelier ? (
               <TextLink to="/atelier" variant="label" arrow className="mt-2">
                 Composer la vôtre
+              </TextLink>
+            ) : result.outOfRange ? (
+              <TextLink to="/contact?sujet=produit" variant="label" arrow className="mt-2">
+                Nous écrire
               </TextLink>
             ) : selected === result.size ? (
               <p className="mt-3 text-[0.8125rem] text-positive">C’est la taille que vous avez choisie.</p>

@@ -12,7 +12,10 @@ import { CONTACT_EMAIL } from '../layout/navigation';
 const NBSP = '\xa0';
 const FR = deliveryDelay('FR');
 const NEIGHBOURS = deliveryDelay('BE');
-const COUNTRY_LIST = new Intl.ListFormat('fr', { style: 'long', type: 'conjunction' }).format(COUNTRIES.map((country) => country.name));
+// Chaque pays avec sa préposition (« en France », « au Luxembourg »), telle que la donne COUNTRIES[].where.
+const COUNTRY_LIST = new Intl.ListFormat('fr', { style: 'long', type: 'conjunction' }).format(
+  COUNTRIES.map((country) => country.where.charAt(0).toLowerCase() + country.where.slice(1)),
+);
 const EXAMPLE_WAIST = 85;
 const EXAMPLE_SIZE = recommendSize(EXAMPLE_WAIST)?.size ?? String(EXAMPLE_WAIST + SIZE_ALLOWANCE_CM);
 
@@ -49,7 +52,7 @@ export const FAQ_CATEGORIES = [
       {
         id: 'international',
         q: `Livrez-vous à l’international${NBSP}?`,
-        a: [`Actuellement, nous livrons en ${COUNTRY_LIST}. Nous prévoyons d’étendre nos zones de livraison prochainement.`],
+        a: [`Actuellement, nous livrons ${COUNTRY_LIST}. Nous prévoyons d’étendre nos zones de livraison prochainement.`],
       },
     ],
   },
@@ -227,6 +230,24 @@ export function fold(text) {
 
 /** Mots cherchés : la requête repliée, découpée sur les espaces. */
 export const searchTerms = (query) => fold(query).split(' ').filter(Boolean);
+
+/** Paramètre d'URL qui porte la recherche (« /faq?q=retour ») : elle survit ainsi à un aller-retour dans l'historique. */
+export const QUERY_PARAM = 'q';
+
+/** Recherche inscrite dans l'URL, sans espaces autour ; '' s'il n'y en a pas. */
+export const queryFromParams = (searchParams) => (searchParams?.get(QUERY_PARAM) ?? '').trim();
+
+/**
+ * Les paramètres de l'URL avec la recherche en cours ; une recherche vide retire le paramètre.
+ * @returns {URLSearchParams} une copie : les paramètres reçus ne sont pas modifiés
+ */
+export function paramsWithQuery(searchParams, query) {
+  const next = new URLSearchParams(searchParams ?? undefined);
+  const value = String(query ?? '').trim();
+  if (value) next.set(QUERY_PARAM, value);
+  else next.delete(QUERY_PARAM);
+  return next;
+}
 
 /**
  * Filtre l'aide : une question est retenue si chacun des mots cherchés figure dans son intitulé,

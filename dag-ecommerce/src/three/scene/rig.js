@@ -11,19 +11,21 @@ import {
   Matrix4,
   Mesh,
   NoColorSpace,
+  PerspectiveCamera,
   Quaternion,
   Vector2,
   Vector3,
 } from 'three';
 import { buildBuckle, buildKeeper } from './buckle';
 import { createStudioEnvironment } from './environment';
-import { createMaterials } from './materials';
+import { createMaterials, leatherLook } from './materials';
 import { createMonogramCanvases, drawMonogram, loadDisplayFont } from './monogram';
-import { createPose, poseHandedness, sampleFrame, setFlowTime, solvePose } from './pose';
+import { createPose, flowExtremes, poseHandedness, sampleFrame, setFlowParams, setFlowTime, solvePose } from './pose';
 import { createContactShadow, SHADOW_LAYER } from './shadow';
 import { beltSpec, clamp, lerp } from './spec';
+import { leatherMaps } from './textures';
 import { buildCoilOcclusion, createStrap, makeSample, poseStitches, poseStrap, surfaceAt, writeOcclusion } from './strap';
-import { describeView, solveCamera, VIEWS } from './views';
+import { beltPoints, blendViews, describeView, solveCamera, VIEWS } from './views';
 
 // ---------------------------------------------------------------------------
 // BeltRig : la ceinture, sa mise en pose, ses cadrages et ses interactions.
@@ -37,53 +39,118 @@ const VIEW_TIME = 1.5; // s
 const POSE_TIME = 2.2; // s
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-/** Brin de couture : demi-jonc légèrement arqué, le long de X (longueur 1), Z = normale. */
-function stitchGeometry() {
-  const RINGS = 6;
-  const SEG = 5;
+const sstep = (a, b, x) => {
+  const t = clamp((x - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Brin de point sellier : fil rond couché sur la fleur, dont les deux bouts plongent dans leur
+ * perce. Repère local : X le long du brin (longueur 1, mise à l'échelle `len` par l'instance),
+ * Y en travers, Z = normale de la face ; Y et Z en millimètres.
+ * `aShade` assombrit le fil là où il entre dans le cuir ; `aHole` marque les perces (petits disques mats
+ * à la teinte du cuir, sombres au centre).
+ */
+function stitchGeometry(len, { stations, seg, holes }) {
+  const R = 0.36; // rayon du fil ciré (0,72 mm)
+  const RISE = 0.18; // axe du fil au-dessus du fond du filet : les deux tiers du fil sont en relief
+  const A0 = -0.62;
+  const A1 = Math.PI + 0.62;
   const position = [];
   const normal = [];
   const uv = [];
-  const color = [];
+  const shade = [];
+  const hole = [];
   const index = [];
-  const halfW = 0.36;
-  const height = 0.34;
-  for (let i = 0; i < RINGS; i++) {
-    const t = i / (RINGS - 1);
-    const x = t - 0.5;
-    const e = Math.abs(x) * 2;
-    const scale = Math.sqrt(Math.max(0, 1 - Math.pow(e, 5))) * 0.92 + 0.08;
-    const dip = -0.22 * Math.pow(e, 3);
-    for (let j = 0; j <= SEG; j++) {
-      const a = -0.35 + (j / SEG) * (Math.PI + 0.7);
+  const axis = (e) => RISE - 0.62 * Math.pow(sstep(0.6, 1, Math.abs(e)), 1.3);
+  for (const e of stations) {
+    const dive = sstep(0.6, 1, Math.abs(e));
+    const zc = axis(e);
+    const slope = (axis(e + 0.01) - axis(e - 0.01)) / (0.01 * len); // dz/dX en mm
+    const sl = Math.hypot(1, slope);
+    const scale = 1 - 0.22 * dive; // le fil se serre en entrant dans la perce
+    for (let j = 0; j <= seg; j++) {
+      const a = A0 + ((A1 - A0) * j) / seg;
       const cy = Math.cos(a);
       const cz = Math.sin(a);
-      position.push(x, cy * halfW * scale, dip + cz * height * scale);
-      const nx = (x * 2 * Math.pow(e, 4)) / 2.4;
-      const l = Math.hypot(nx, cy / halfW, cz / height) || 1;
-      normal.push(nx / l, cy / halfW / l, cz / height / l);
-      uv.push(t, j / SEG);
-      // le fil s'assombrit là où il plonge dans le cuir
-      const shade = (1 - 0.55 * Math.pow(e, 4)) * (0.82 + 0.18 * Math.max(0, cz));
-      color.push(shade, shade, shade);
+      position.push(e / 2, cy * R * scale, zc + cz * R * scale);
+      // normale en mm : cos(a)·Y + sin(a)·U, U ⟂ à l'axe du fil ; composante X × len (matrice d'instance non uniforme)
+      const nx = ((-slope * cz) / sl) * len;
+      const ny = cy;
+      const nz = cz / sl;
+      const l = Math.hypot(nx, ny, nz) || 1;
+      normal.push(nx / l, ny / l, nz / l);
+      uv.push((e + 1) / 2, j / seg);
+      shade.push((1 - 0.7 * dive * dive) * (0.84 + 0.16 * Math.max(0, cz)));
+      hole.push(0);
     }
   }
-  for (let i = 0; i < RINGS - 1; i++) {
-    for (let j = 0; j < SEG; j++) {
-      const a = i * (SEG + 1) + j;
+  const cols = seg + 1;
+  for (let i = 0; i < stations.length - 1; i++) {
+    for (let j = 0; j < seg; j++) {
+      const a = i * cols + j;
       const b = a + 1;
-      const c = a + SEG + 1;
+      const c = a + cols;
       const d = c + 1;
       index.push(a, b, d, a, d, c);
+    }
+  }
+  if (holes) {
+    // Perces : là où le fil traverse, le cuir s'ouvre en une petite fente sombre.
+    const N = 8;
+    for (const sign of [-1, 1]) {
+      const base = position.length / 3;
+      const cx = sign * (0.5 - 0.2 / len);
+      position.push(cx, 0, 0.02);
+      normal.push(0, 0, 1);
+      uv.push(0.5, 0.5);
+      shade.push(0.06);
+      hole.push(1);
+      for (let k = 0; k < N; k++) {
+        const t = (k / N) * Math.PI * 2;
+        position.push(cx + (Math.cos(t) * 0.4) / len, Math.sin(t) * 0.43, 0.02);
+        normal.push(0, 0, 1);
+        uv.push(0.5, 0.5);
+        shade.push(0.82);
+        hole.push(1);
+      }
+      for (let k = 0; k < N; k++) index.push(base, base + 1 + k, base + 1 + ((k + 1) % N));
     }
   }
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(new Float32Array(position), 3));
   g.setAttribute('normal', new BufferAttribute(new Float32Array(normal), 3));
   g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
-  g.setAttribute('color', new BufferAttribute(new Float32Array(color), 3));
+  g.setAttribute('aShade', new BufferAttribute(new Float32Array(shade), 1));
+  g.setAttribute('aHole', new BufferAttribute(new Float32Array(hole), 1));
   g.setIndex(index);
   return g;
+}
+
+const STITCH_FRONT = { stations: [-1, -0.9, -0.76, -0.55, 0.55, 0.76, 0.9, 1], seg: 8, holes: true };
+const STITCH_BACK = { stations: [-1, -0.8, 0, 0.8, 1], seg: 4, holes: false }; // envers : rarement vu de près
+
+/** Contour d'un perçage oblong (abscisses a → b, rayon r) : [sigma, v, nSigma, nV] ; les flancs suivent la lanière. */
+function cutOutline(c) {
+  const pts = [];
+  const ARC = 10;
+  const sides = Math.max(0, Math.round((c.b - c.a) / 1.1));
+  for (let i = 0; i <= ARC; i++) {
+    const t = -Math.PI / 2 + (i / ARC) * Math.PI;
+    pts.push([c.b + Math.cos(t) * c.r, Math.sin(t) * c.r, Math.cos(t), Math.sin(t)]);
+  }
+  for (let i = 1; i < sides; i++) pts.push([c.b + ((c.a - c.b) * i) / sides, c.r, 0, 1]);
+  for (let i = 0; i <= ARC; i++) {
+    const t = Math.PI / 2 + (i / ARC) * Math.PI;
+    pts.push([c.a + Math.cos(t) * c.r, Math.sin(t) * c.r, Math.cos(t), Math.sin(t)]);
+  }
+  for (let i = 1; i < sides; i++) pts.push([c.a + ((c.b - c.a) * i) / sides, -c.r, 0, -1]);
+  if (!sides) {
+    // perçage rond : les deux demi-cercles se rejoignent, on retire les doublons
+    pts.splice(ARC, 1);
+    pts.pop();
+  }
+  return pts;
 }
 
 export class BeltRig {
@@ -101,10 +168,12 @@ export class BeltRig {
     scene.add(this.root);
 
     this.floor = 0; // 0 = plateau sombre, 1 = papier clair
-    this.envTarget = createStudioEnvironment(renderer, this.floor);
+    this.mood = 0; // 0 = lumière chaude, 1 = lumière neutre (cuirs noirs et froids)
+    this.envTarget = createStudioEnvironment(renderer, this.floor, this.mood);
     scene.environment = this.envTarget.texture;
 
     this.materials = createMaterials(renderer.capabilities.getMaxAnisotropy());
+    this.materials.setEnvironment(this.envTarget.texture);
     this.shadow = createContactShadow();
     this.turntable.add(this.shadow.plane);
 
@@ -122,10 +191,11 @@ export class BeltRig {
     this.monoNormal = mkTex(this.monoCanvases.normal);
     this.materials.setMonogramMaps(this.monoAlpha, this.monoNormal);
     this.monoText = null;
+    this.grain = null; // cartes du fini courant (grain lisible dans le monogramme)
 
-    this.stitchGeo = stitchGeometry();
     this.parts = null; // géométries dépendant de la largeur
     this.width = null;
+    this.reveal = false;
     this.resolved = null;
     this.configToken = 0;
 
@@ -160,6 +230,9 @@ export class BeltRig {
     this.ready = false;
     this.needsRender = true;
     this.shadowDirty = true;
+    this.still = false; // rendu trop lent : plus de mouvement continu (voir setStill)
+    this.poseGoal = null; // cadrage de la pose d'arrivée, pendant un déroulé
+    this.poseFrom = null; // cadrage au départ du déroulé
 
     this._onFonts = () => {
       if (this.disposed) return;
@@ -174,10 +247,10 @@ export class BeltRig {
 
   // --- Construction -------------------------------------------------------
 
-  buildParts(width) {
+  buildParts(width, reveal = false) {
     this.disposeParts();
     const spec = beltSpec(width);
-    const pose = createPose(spec);
+    const pose = createPose(spec, { reveal });
     const strap = createStrap(spec);
     const M = this.materials;
 
@@ -190,29 +263,22 @@ export class BeltRig {
     strapMesh.frustumCulled = false;
     strapMesh.layers.enable(SHADOW_LAYER);
 
-    const count = strap.stitches.count;
-    const stitchGeo = this.stitchGeo.clone();
-    const stitchOcc = new InstancedBufferAttribute(new Float32Array(count).fill(1), 1).setUsage(DynamicDrawUsage);
-    stitchGeo.setAttribute('aOcc', stitchOcc);
-    const stitches = new InstancedMesh(stitchGeo, M.thread, count);
-    stitches.instanceMatrix.setUsage(DynamicDrawUsage);
-    stitches.frustumCulled = false;
+    const stitchSet = (set, detail) => {
+      const geometry = stitchGeometry(spec.stitchLength, detail);
+      const occ = new InstancedBufferAttribute(new Float32Array(set.count).fill(1), 1).setUsage(DynamicDrawUsage);
+      geometry.setAttribute('aOcc', occ);
+      const mesh = new InstancedMesh(geometry, M.thread, set.count);
+      mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+      mesh.frustumCulled = false;
+      return { set, geometry, occ, mesh };
+    };
+    const stitches = [stitchSet(strap.stitches.front, STITCH_FRONT), stitchSet(strap.stitches.back, STITCH_BACK)];
 
     // Perçages : parois des crans et de la fente d'ardillon.
     const cutDefs = spec.holes.map((s) => ({ a: spec.sigma0 + s, b: spec.sigma0 + s, r: spec.holeRadius }));
     cutDefs.push({ a: spec.tailLength - 4, b: spec.sigma0 + 3.2, r: spec.slotHalf });
     cutDefs.forEach((c, i) => M.cuts.value[i].set(c.a, c.b, c.r, 0));
-    const cutOutlines = cutDefs.map((c) => {
-      const pts = [];
-      const N = 20;
-      for (let i = 0; i < N; i++) {
-        const a = (i / N) * Math.PI * 2;
-        const cs = Math.cos(a);
-        const sn = Math.sin(a);
-        pts.push([(cs >= 0 ? c.b : c.a) + cs * c.r, sn * c.r, cs, sn]);
-      }
-      return pts;
-    });
+    const cutOutlines = cutDefs.map(cutOutline);
     const cutCount = cutOutlines.reduce((n, o) => n + o.length, 0);
     const cutGeo = new BufferGeometry();
     cutGeo.setAttribute('position', new BufferAttribute(new Float32Array(cutCount * 6), 3).setUsage(DynamicDrawUsage));
@@ -273,15 +339,13 @@ export class BeltRig {
     keeper.matrixAutoUpdate = false;
     keeper.layers.enable(SHADOW_LAYER);
 
-    this.turntable.add(strapMesh, stitches, cuts, monogram, buckle, keeper);
+    this.turntable.add(strapMesh, stitches[0].mesh, stitches[1].mesh, cuts, monogram, buckle, keeper);
     this.parts = {
       spec,
       pose,
       strap,
       strapMesh,
       stitches,
-      stitchGeo,
-      stitchOcc,
       cuts,
       cutGeo,
       cutOutlines,
@@ -296,17 +360,21 @@ export class BeltRig {
       keeperGeo,
     };
     this.width = width;
+    this.reveal = reveal;
     this.shadowDirty = true;
+    this.viewDirty = true;
     this.poseAll();
   }
 
   disposeParts() {
     const p = this.parts;
     if (!p) return;
-    this.turntable.remove(p.strapMesh, p.stitches, p.cuts, p.monogram, p.buckle, p.keeper);
+    this.turntable.remove(p.strapMesh, p.stitches[0].mesh, p.stitches[1].mesh, p.cuts, p.monogram, p.buckle, p.keeper);
     p.strap.geometry.dispose();
-    p.stitchGeo.dispose();
-    p.stitches.dispose();
+    for (const st of p.stitches) {
+      st.geometry.dispose();
+      st.mesh.dispose();
+    }
     p.cutGeo.dispose();
     p.monoGeo.dispose();
     p.frameGeo.dispose();
@@ -325,9 +393,11 @@ export class BeltRig {
     solvePose(pose, this.blend);
     poseStrap(strap, pose);
     writeOcclusion(strap, this.blend, this.floor);
-    poseStitches(strap, p.stitches.instanceMatrix.array, p.stitchOcc.array);
-    p.stitches.instanceMatrix.needsUpdate = true;
-    p.stitchOcc.needsUpdate = true;
+    for (const st of p.stitches) {
+      poseStitches(strap, st.set, st.mesh.instanceMatrix.array, st.occ.array);
+      st.mesh.instanceMatrix.needsUpdate = true;
+      st.occ.needsUpdate = true;
+    }
 
     // Parois des perçages
     const smp = this._smp || (this._smp = makeSample());
@@ -445,12 +515,20 @@ export class BeltRig {
   async applyConfig(resolved) {
     const token = ++this.configToken;
     this.resolved = resolved;
-    if (resolved.widthMm !== this.width) this.buildParts(resolved.widthMm);
+    // Réversible : la pose du rouleau découvre la doublure (cœur remonté).
+    const reveal = !!resolved.lining;
+    if (resolved.widthMm !== this.width || reveal !== this.reveal) this.buildParts(resolved.widthMm, reveal);
     const p = this.parts;
-    p.stitches.visible = resolved.stitchHex !== false;
+    for (const st of p.stitches) st.mesh.visible = resolved.stitchHex !== false;
+    this.setLighting(this.floor, leatherLook(resolved.leatherHex).cool > 0.5 ? 1 : 0);
     this.updateMonogram();
     const ok = await this.materials.apply(resolved, () => token === this.configToken && !this.disposed);
     if (!ok) return false;
+    // Le grain du fini transparaît dans le monogramme (cartes déjà en cache à ce stade).
+    const grain = await leatherMaps(resolved.finish);
+    if (token !== this.configToken || this.disposed) return false;
+    this.grain = grain;
+    this.updateMonogram();
     this.needsRender = true;
     this.invalidate();
     return true;
@@ -460,9 +538,10 @@ export class BeltRig {
     const p = this.parts;
     if (!p || !this.resolved) return;
     const text = this.resolved.monogram || '';
-    if (text !== this.monoText) {
-      this.monoText = text;
-      const has = drawMonogram(this.monoCanvases, text);
+    const key = `${text}|${this.grain ? this.grain.finish : ''}|${p.spec.W}`;
+    if (key !== this.monoText) {
+      this.monoText = key;
+      const has = drawMonogram(this.monoCanvases, text, this.grain, p.spec.monoHeight);
       this.monoAlpha.needsUpdate = true;
       this.monoNormal.needsUpdate = true;
       const was = p.monogram.visible;
@@ -475,26 +554,43 @@ export class BeltRig {
     }
   }
 
-  /** Charge la police d'affichage puis redessine le monogramme. */
-  prepareFonts() {
+  /**
+   * Charge la police d'affichage puis redessine le monogramme. La promesse renvoyée n'attend la
+   * police que `waitMs` millisecondes au plus (0 : pas d'attente) ; arrivée plus tard, elle déclenche
+   * simplement un nouveau dessin.
+   */
+  prepareFonts(waitMs = 1500) {
     this.fontsPromise = loadDisplayFont().then(() => {
       if (this.disposed) return;
       this.monoText = null;
       this.updateMonogram();
+      this.invalidate();
     });
-    return this.fontsPromise;
+    if (waitMs <= 0) return Promise.resolve();
+    return Promise.race([this.fontsPromise, new Promise((resolve) => setTimeout(resolve, waitMs))]);
   }
 
   /** Ton du support : 1 = surface claire (papier), 0 = sombre. Régénère l'éclairage d'ambiance. */
   setFloor(floor) {
-    const f = floor > 0.5 ? 1 : 0;
-    if (f === this.floor || this.disposed) return;
-    this.floor = f;
+    this.setLighting(floor > 0.5 ? 1 : 0, this.mood);
+  }
+
+  /** Éclairage d'ambiance : support (sombre / papier) et température (chaude / neutre selon le cuir). */
+  setLighting(floor, mood) {
+    if ((floor === this.floor && mood === this.mood) || this.disposed) return;
+    const floorChanged = floor !== this.floor;
+    this.floor = floor;
+    this.mood = mood;
     const old = this.envTarget;
-    this.envTarget = createStudioEnvironment(this.renderer, f);
+    this.envTarget = createStudioEnvironment(this.renderer, floor, mood);
     this.scene.environment = this.envTarget.texture;
+    this.materials.setEnvironment(this.envTarget.texture);
     old.dispose();
-    this.poseAll();
+    if (floorChanged) {
+      this.materials.setFloor(floor);
+      this.poseAll();
+    }
+    this.needsRender = true;
     this.invalidate();
   }
 
@@ -526,23 +622,65 @@ export class BeltRig {
     if (to === this.blendTo && !instant) return;
     this.blendFrom = this.blend;
     this.blendTo = to;
-    this.blendT = instant || this.options.reducedMotion ? 1 : 0;
+    this.blendT = instant || this.calm ? 1 : 0;
     if (this.blendT === 1 && this.blend !== to) {
       this.blend = to;
       this.poseAll();
       if (to === 0) this.shadowDirty = true;
     }
-    this.viewDirty = true;
+    if (this.blendT < 1) {
+      // Déroulé animé : la caméra part de son cadrage actuel puis suit la pose image par image (voir
+      // update) ; elle ne file plus vers le cadrage final pendant que la ceinture est encore en chemin.
+      this.poseFrom = { pos: this.cam.pos.clone(), quat: this.cam.quat.clone(), fov: this.cam.fov, pivot: this.cam.pivot.clone() };
+      this.poseGoal = null;
+    } else {
+      this.viewDirty = true;
+      if (instant) this.snapView = true;
+    }
     this.recenter = true;
-    if (instant) this.snapView = true;
     this.invalidate();
   }
 
   // --- Cadrage ---------------------------------------------------------------
 
+  /** Vrai quand rien ne doit bouger tout seul : moins d'animations demandé, ou rendu trop lent. */
+  get calm() {
+    return this.options.reducedMotion || this.still;
+  }
+
+  /** Débattement de rotation à prévoir dans le cadre, selon les options. */
+  rotateRange() {
+    const { interactive, autoRotate, parallax } = this.options;
+    const { calm } = this;
+    return interactive || (!!autoRotate && !calm) ? Math.PI : parallax && !calm ? 0.09 : 0;
+  }
+
+  /**
+   * Enveloppe de la pose déroulée : réunion des points de la ceinture aux extrêmes de sa respiration.
+   * Cadrer cette enveloppe garantit que la ceinture ne sort jamais de l'image en respirant.
+   */
+  flowEnvelope() {
+    const p = this.parts;
+    if (!p.envelope) {
+      const pts = [];
+      for (const [k1, k2, ph] of flowExtremes()) {
+        setFlowParams(p.pose, k1, k2, ph);
+        solvePose(p.pose, 1);
+        for (const q of beltPoints({ pose: p.pose, spec: p.spec, coil: 0 }, 20)) pts.push(q);
+      }
+      p.envelope = pts;
+      // la pose de travail est remise dans son état courant (la lanière, elle, n'a pas été touchée)
+      setFlowTime(p.pose, this.flowTime);
+      solvePose(p.pose, this.blend);
+    }
+    return p.envelope;
+  }
+
   /** Calcule la caméra d'une vue pour la pose `blend` (0 ou 1) et le format donné. */
   cameraFor(view, blend, aspect, rotate = 0) {
     const p = this.parts;
+    const overview = view === 'hero' || view === 'full';
+    const points = blend >= 0.5 && overview ? this.flowEnvelope() : undefined;
     const restore = this.blend;
     if (restore !== blend) {
       solvePose(p.pose, blend);
@@ -555,6 +693,7 @@ export class BeltRig {
       isCoil: blend < 0.5,
       aspect,
       rotate,
+      points,
     });
     const cam = solveCamera(def, aspect);
     if (restore !== blend) {
@@ -564,11 +703,28 @@ export class BeltRig {
     return { ...cam, pivot: def.pivot, range: def.range };
   }
 
+  /**
+   * Caméra ajustée à la pose en cours de déroulé (ou d'enroulé) : la définition de la vue glisse du
+   * rouleau à la pose déroulée au rythme de `blend`, et les points cadrés sont ceux de l'instant.
+   */
+  liveCamera() {
+    const p = this.parts;
+    const ctx = { pose: p.pose, strap: p.strap, spec: p.spec, aspect: this.aspect, rotate: this.rotateRange(), coil: 1 - this.blend };
+    const overview = this.viewName === 'hero' || this.viewName === 'full';
+    if (overview) ctx.points = beltPoints(ctx);
+    const a = describeView(this.viewName, { ...ctx, isCoil: true });
+    const b = describeView(this.viewName, { ...ctx, isCoil: false });
+    const def = blendViews(a, b, this.blend);
+    const cam = solveCamera(def, this.aspect);
+    return { ...cam, pivot: def.pivot, range: def.range };
+  }
+
   refreshView() {
     if (!this.parts) return;
-    const { interactive, autoRotate, parallax, reducedMotion } = this.options;
-    const rotate = interactive || (!!autoRotate && !reducedMotion) ? Math.PI : parallax && !reducedMotion ? 0.09 : 0;
+    const reducedMotion = this.calm;
+    const rotate = this.rotateRange();
     const goal = this.cameraFor(this.viewName, this.blendTo, this.aspect, rotate);
+    this.poseGoal = goal; // cadrage de la pose d'arrivée (rejoint en fin de déroulé)
     const snap = this.snapView || reducedMotion || !this.introDone;
     if (this.options.intro && !reducedMotion && !this.introDone) {
       // Entrée en scène : on part exactement du cadrage du poster (vue ajustée dans un carré centré,
@@ -660,6 +816,21 @@ export class BeltRig {
     this.invalidate();
   }
 
+  /** Clavier : petite impulsion de rotation (sens = ±1), amortie comme un lâcher de glisser. */
+  nudge(direction) {
+    this.recenter = false;
+    this.omega = clamp(this.omega + direction * 1.5, -4, 4);
+    this.invalidate();
+  }
+
+  /** Rendu trop lent : plus de mouvement continu ni de transition (comme « moins d'animations »). */
+  setStill(still) {
+    if (this.still === !!still) return;
+    this.still = !!still;
+    this.viewDirty = true;
+    this.invalidate();
+  }
+
   /** Position du pointeur dans le conteneur, de -1 à 1 (parallaxe). */
   setPointer(x, y) {
     this.par.tx = clamp(x, -1, 1);
@@ -673,10 +844,12 @@ export class BeltRig {
   update(dt) {
     if (!this.parts || this.disposed) return false;
     dt = Math.min(dt, 0.05);
-    const { interactive, autoRotate, parallax, reducedMotion } = this.options;
+    const { interactive, autoRotate, parallax } = this.options;
+    const reducedMotion = this.calm; // moins d'animations demandé, ou rendu trop lent : ni transition ni mouvement continu
     let active = false;
 
     // Pose : déroulé / enroulé
+    let blending = false;
     if (this.blendT < 1) {
       this.blendT = Math.min(1, this.blendT + dt / POSE_TIME);
       this.blend = lerp(this.blendFrom, this.blendTo, ease(this.blendT));
@@ -685,9 +858,10 @@ export class BeltRig {
         if (this.blend === 0) this.shadowDirty = true;
       }
       this.poseAll();
+      blending = true;
       active = true;
     } else if (this.blend === 1 && !reducedMotion && (this.viewName === 'hero' || this.viewName === 'full')) {
-      // Respiration lente de la lanière déroulée
+      // Respiration lente de la lanière déroulée (le cadrage couvre toute son amplitude)
       this.flowTime += dt;
       setFlowTime(this.parts.pose, this.flowTime);
       this.poseAll();
@@ -695,6 +869,42 @@ export class BeltRig {
     }
 
     if (this.viewDirty) this.refreshView();
+
+    if (blending) {
+      // La caméra est ajustée à la pose de l'instant, puis rejoint le cadrage de la pose d'arrivée.
+      if (!this.poseGoal) this.poseGoal = this.cameraFor(this.viewName, this.blendTo, this.aspect, this.rotateRange());
+      const live = this.liveCamera();
+      const goal = this.poseGoal;
+      const from = this.poseFrom;
+      const w0 = from ? 1 - sstep(0, 0.25, this.blendT) : 0; // quitte en douceur le cadrage de départ
+      const w = sstep(0.7, 1, this.blendT); // rejoint celui de la pose d'arrivée
+      const to = this.camTo;
+      to.pos.copy(live.position);
+      to.quat.copy(live.quaternion);
+      to.fov = live.fov;
+      to.pivot.copy(live.pivot);
+      to.range = live.range;
+      if (w0 > 0) {
+        to.pos.lerp(from.pos, w0);
+        to.quat.slerp(from.quat, w0);
+        to.fov = lerp(to.fov, from.fov, w0);
+        to.pivot.lerp(from.pivot, w0);
+      }
+      if (w > 0) {
+        to.pos.lerp(goal.position, w);
+        to.quat.slerp(goal.quaternion, w);
+        to.fov = lerp(to.fov, goal.fov, w);
+        to.pivot.lerp(goal.pivot, w);
+        to.range = lerp(to.range, goal.range, w);
+      }
+      this.cam.range = to.range;
+      if (this.viewT >= 1) {
+        this.cam.pos.copy(to.pos);
+        this.cam.quat.copy(to.quat);
+        this.cam.fov = to.fov;
+        this.cam.pivot.copy(to.pivot);
+      }
+    }
 
     // Transition de cadrage
     if (this.viewT < 1) {
@@ -715,14 +925,17 @@ export class BeltRig {
       this.cam.quat.copy(a.quat).slerp(b.quat, e);
       this.cam.fov = lerp(a.fov, b.fov, e);
       this.cam.pivot.lerpVectors(a.pivot, b.pivot, e);
-      if (this.recenter) {
+      active = true;
+    }
+    if (this.recenter) {
+      if (this.viewT < 1 || blending) {
         const k = 1 - Math.exp(-dt * 4);
         this.theta += (0 - this.theta) * k;
         this.pitch += (0 - this.pitch) * k;
         this.omega = 0;
-        if (this.viewT >= 1) this.recenter = false;
+      } else {
+        this.recenter = false;
       }
-      active = true;
     }
 
     // Rotation : inertie, rotation automatique, butées
@@ -831,13 +1044,23 @@ export class BeltRig {
     const t0 = performance.now();
     for (let i = 0; i < 5; i++) this.poseAll();
     const info = this.renderer.info.render;
+    // écart maximal de la ceinture au centre de l'image, à l'instant (1 = bord du cadre)
+    let excursion = 0;
+    for (const q of beltPoints({ pose, spec, coil: 1 - this.blend }, 20)) {
+      _v0.copy(q).applyMatrix4(this.turntable.matrix).project(this.camera);
+      excursion = Math.max(excursion, Math.abs(_v0.x), Math.abs(_v0.y));
+    }
     return {
       stats: {
         triangles: info.triangles,
         calls: info.calls,
         frame: this.renderer.info.render.frame,
         poseMs: Math.round(((performance.now() - t0) / 5) * 100) / 100,
+        excursion: Math.round(excursion * 1000) / 1000,
+        blend: Math.round(this.blend * 1000) / 1000,
       },
+      // éclairage : support (0 sombre, 1 papier), température (0 chaude, 1 neutre), intensité reçue par le cuir
+      lighting: { floor: this.floor, mood: this.mood, leather: Math.round(this.materials.strap[0].envMapIntensity * 100) / 100 },
       pose: this.blend < 0.5 ? 'coil' : 'flow',
       width: spec.W,
       buckle: {
@@ -853,6 +1076,38 @@ export class BeltRig {
     };
   }
 
+  /**
+   * Studio : plus grand écart de la ceinture au centre de l'image (|NDC| ; 1 = bord du cadre) sur
+   * `seconds` secondes de respiration en pose déroulée, pour une vue et un format donnés.
+   */
+  flowExcursion({ view = 'hero', aspect = 16 / 9, seconds = 180, step = 0.5, rotate = 0 } = {}) {
+    const p = this.parts;
+    if (!p) return null;
+    const cam = this.cameraFor(view, 1, aspect, rotate);
+    const probe = new PerspectiveCamera(cam.fov, aspect, 1, 20000);
+    probe.position.copy(cam.position);
+    probe.quaternion.copy(cam.quaternion);
+    probe.updateMatrixWorld();
+    probe.updateProjectionMatrix();
+    let worst = 0;
+    let at = 0;
+    for (let t = 0; t <= seconds; t += step) {
+      setFlowTime(p.pose, t);
+      solvePose(p.pose, 1);
+      for (const q of beltPoints({ pose: p.pose, spec: p.spec, coil: 0 }, 10)) {
+        _v0.copy(q).project(probe);
+        const m = Math.max(Math.abs(_v0.x), Math.abs(_v0.y));
+        if (m > worst) {
+          worst = m;
+          at = t;
+        }
+      }
+    }
+    setFlowTime(p.pose, this.flowTime);
+    solvePose(p.pose, this.blend);
+    return { view, aspect: Math.round(aspect * 1000) / 1000, worst: Math.round(worst * 1000) / 1000, at };
+  }
+
   /** Studio : attend la configuration en cours, termine les transitions et rend aussitôt. */
   async settle() {
     await this.configPromise?.catch(() => undefined);
@@ -864,6 +1119,7 @@ export class BeltRig {
       this.poseAll();
       if (this.blend === 0) this.shadowDirty = true;
     }
+    this.viewT = 1;
     this.viewDirty = true;
     this.snapView = true;
     this.recenter = true;
@@ -985,7 +1241,21 @@ export class BeltRig {
     this.render();
 
     try {
-      return out.toDataURL(type, quality);
+      let url = out.toDataURL(type, quality);
+      if (type !== 'image/png' && !url.startsWith(`data:${type}`) && Math.max(w, h) > 384) {
+        // Encodeur absent (WebP sur certains navigateurs) : le navigateur a rendu un PNG, plusieurs
+        // fois plus lourd. On le réduit pour qu'une vignette reste raisonnable (panier, stockage local).
+        const k = 384 / Math.max(w, h);
+        const small = document.createElement('canvas');
+        small.width = Math.max(1, Math.round(w * k));
+        small.height = Math.max(1, Math.round(h * k));
+        const sctx = small.getContext('2d');
+        sctx.imageSmoothingEnabled = true;
+        sctx.imageSmoothingQuality = 'high';
+        sctx.drawImage(out, 0, 0, small.width, small.height);
+        url = small.toDataURL('image/png');
+      }
+      return url;
     } catch {
       return null;
     }
@@ -998,7 +1268,6 @@ export class BeltRig {
       document.fonts.removeEventListener('loadingdone', this._onFonts);
     }
     this.disposeParts();
-    this.stitchGeo.dispose();
     this.materials.dispose();
     this.monoAlpha.dispose();
     this.monoNormal.dispose();

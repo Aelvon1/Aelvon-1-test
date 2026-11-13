@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
-import { cn } from './cn';
+import { cn, yieldDisplay } from './cn';
 
 const SIZES = {
   sm: 'min-h-11 px-5 py-2.5 gap-2.5 text-[0.6875rem] tracking-[0.2em]',
@@ -46,7 +46,11 @@ export default function Button({
   const iconSize = size === 'lg' ? 18 : 16;
 
   const classes = cn(
-    'group/btn relative isolate inline-flex items-center justify-center overflow-hidden text-center font-sans font-semibold uppercase leading-tight',
+    // une classe d'affichage de l'appelant (« hidden sm:inline-flex ») remplace « inline-flex »
+    yieldDisplay(
+      'group/btn relative isolate inline-flex items-center justify-center overflow-hidden text-center font-sans font-semibold uppercase leading-tight',
+      className,
+    ),
     'transition-[color,border-color,opacity] duration-500 ease-luxe select-none',
     SIZES[size] ?? SIZES.md,
     base,

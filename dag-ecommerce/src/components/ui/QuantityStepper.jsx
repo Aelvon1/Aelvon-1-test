@@ -1,6 +1,6 @@
 import Icon from './Icon';
 import { MAX_QUANTITY } from '../../lib/pricing';
-import { cn } from './cn';
+import { cn, yieldDisplay } from './cn';
 
 /**
  * Sélecteur de quantité (− valeur +).
@@ -22,7 +22,7 @@ export default function QuantityStepper({
   const button =
     'grid size-11 place-items-center text-fg transition-colors duration-300 hover:bg-fg/10 disabled:cursor-not-allowed disabled:text-fg/30 disabled:hover:bg-transparent';
   return (
-    <div role="group" aria-label={label} className={cn('inline-flex w-fit items-stretch border border-fg/25', className)}>
+    <div role="group" aria-label={label} className={cn(yieldDisplay('inline-flex w-fit items-stretch border border-fg/25', className), className)}>
       <button
         type="button"
         className={button}

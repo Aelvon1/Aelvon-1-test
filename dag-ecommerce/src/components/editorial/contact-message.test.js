@@ -39,6 +39,12 @@ describe('validation du formulaire de contact', () => {
     expect(validateContactField('message', { message: 'a'.repeat(MESSAGE_MAX) })).toBe('');
   });
 
+  it('dit de combien un message trop long dépasse : le compteur reste lisible dans l’erreur', () => {
+    const error = validateContactField('message', { message: `  ${'a'.repeat(MESSAGE_MAX + 498)}\n` });
+    expect(error).toContain(`${MESSAGE_MAX + 498}\xa0caractères`);
+    expect(error).toContain(String(MESSAGE_MAX));
+  });
+
   it('laisse le numéro de commande facultatif mais vérifie sa forme', () => {
     expect(validateContactField('order', { order: '' })).toBe('');
     expect(validateContactField('order', { order: ' dag-7k2m9q ' })).toBe('');

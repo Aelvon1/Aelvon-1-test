@@ -10,6 +10,7 @@ import {
   finderResult,
   parseMeasure,
   sizeAvailability,
+  stepMeasure,
 } from './size-finder';
 
 const withCm = (cm) => finderResult({ ...FINDER_DEFAULTS, mode: 'cm', cm });
@@ -25,6 +26,22 @@ describe('saisie', () => {
     expect(cleanMeasure('8a5 cm')).toBe('85');
     expect(clampMeasure('200', 60, 115)).toBe(115);
     expect(clampMeasure('abc', 60, 115, 85)).toBe(85);
+  });
+
+  it('avance d’un cran vers l’entier voisin, même depuis une décimale', () => {
+    expect(stepMeasure('85', 1, 60, 115)).toBe(86);
+    expect(stepMeasure('85', -1, 60, 115)).toBe(84);
+    expect(stepMeasure('85,5', 1, 60, 115)).toBe(86);
+    expect(stepMeasure('85,5', -1, 60, 115)).toBe(85);
+    expect(stepMeasure('85,4', 1, 60, 115)).toBe(86);
+    expect(stepMeasure('85,4', -1, 60, 115)).toBe(85);
+  });
+
+  it('borne le pas et part du repli quand la saisie est illisible', () => {
+    expect(stepMeasure('115', 1, 60, 115)).toBe(115);
+    expect(stepMeasure('60', -1, 60, 115)).toBe(60);
+    expect(stepMeasure('200', -1, 60, 115)).toBe(115);
+    expect(stepMeasure('', 1, 60, 115, 88)).toBe(88);
   });
 
   it('garde les pouces dans les repères en centimètres', () => {
@@ -58,6 +75,13 @@ describe('résultat du trouveur', () => {
     expect(withCm('12')).toMatchObject({ status: 'invalid' });
     expect(finderResult({ ...FINDER_DEFAULTS, mode: 'pouces', inches: '3' })).toMatchObject({ status: 'empty' });
     expect(finderResult({ ...FINDER_DEFAULTS, mode: 'pouces', inches: '5' })).toMatchObject({ status: 'invalid' });
+  });
+
+  it('ne retient aucune mesure d’une saisie encore incomplète', () => {
+    // « 3 » sur le chemin de « 34 » : rien à convertir, rien à afficher
+    expect(finderResult({ ...FINDER_DEFAULTS, mode: 'pouces', inches: '3' })).toMatchObject({ status: 'empty', waist: null, entered: null });
+    expect(withCm('8')).toMatchObject({ status: 'empty', waist: null, entered: null });
+    expect(withCm('')).toMatchObject({ status: 'empty', waist: null, entered: null });
   });
 
   it('signale une mesure hors des repères, sans taille', () => {

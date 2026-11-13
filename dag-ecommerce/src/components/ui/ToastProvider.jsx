@@ -93,7 +93,8 @@ export default function ToastProvider({ children }) {
               role="region"
               aria-label="Notifications"
               data-tone-ignore
-              className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6"
+              // marges : au moins la zone sûre de l'appareil, en bas comme sur les côtés (mode paysage)
+              className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] pt-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] sm:pt-6 sm:pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] sm:pl-[max(1.5rem,env(safe-area-inset-left,0px))] sm:pr-[max(1.5rem,env(safe-area-inset-right,0px))]"
             >
               <ul aria-live="polite" aria-relevant="additions" className="flex flex-col items-center gap-2 sm:items-start">
                 <AnimatePresence initial={false}>

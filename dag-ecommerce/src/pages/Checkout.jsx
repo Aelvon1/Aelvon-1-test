@@ -7,14 +7,16 @@ import OrderSummary, { Assurances } from '../components/checkout/OrderSummary';
 import PaymentStep from '../components/checkout/PaymentStep';
 import StepIndicator from '../components/checkout/StepIndicator';
 import { clearDraft, loadDraft, saveDraft } from '../components/checkout/draft';
-import { CHECKOUT_STEPS } from '../components/checkout/steps';
+import { CHECKOUT_STEPS, EMPTY_TITLE_ID } from '../components/checkout/steps';
+import { useToday } from '../components/checkout/useToday';
 import { useCart } from '../context/CartContext';
-import { scrollToTarget, useMediaQuery, usePageMeta } from '../hooks';
+import { getLenis, scrollToTarget, scrollToTop, useMediaQuery, usePageMeta } from '../hooks';
 import { createOrder, listOrders, saveOrder, withoutEmbeddedImages } from '../lib/orders';
 import { normalizeCheckout, toCustomer, validateCheckout, validateField } from '../lib/validation';
 
 const STEP_PARAM = 'etape';
 const PAYMENT = 'paiement';
+const CART_CHANGED = 'Votre panier a été modifié dans un autre onglet. Vérifiez votre commande, puis confirmez-la de nouveau.';
 
 /** Copie de `errors` où `field` porte `message` (ou n'apparaît plus si le message est vide). */
 function withError(errors, field, message) {
@@ -31,7 +33,7 @@ function withError(errors, field, message) {
  * L'étape vit dans l'URL (?etape=paiement) : le bouton Précédent du navigateur revient aux coordonnées.
  */
 export default function Checkout() {
-  const { cartItems, subtotal, shipping, total, count, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { cartItems, subtotal, shipping, total, count, updateQuantity, removeFromCart, clearCart, syncCart } = useCart();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const desktop = useMediaQuery('(min-width: 64rem)');
@@ -39,9 +41,12 @@ export default function Checkout() {
   const [draft, setDraft] = useState(loadDraft);
   const [errors, setErrors] = useState({});
   const [status, setStatus] = useState('');
+  // message affiché près du bouton de confirmation (panier modifié ailleurs entre-temps)
+  const [notice, setNotice] = useState('');
   // commande confirmée : fige l'écran pendant la transition vers la page de confirmation
   const [placed, setPlaced] = useState(null);
-  const [today] = useState(() => new Date());
+  // date du jour suivie en continu : l'estimation de livraison affichée est celle que la commande obtiendra
+  const today = useToday();
   const focusField = useRef(null);
 
   const { values, gift } = draft;
@@ -62,10 +67,26 @@ export default function Checkout() {
     if (!placed) saveDraft(draft);
   }, [draft, placed]);
 
-  // ?etape=paiement sans coordonnées valides (lien direct, session expirée) : retour à l'étape 1
+  // ?etape=paiement sans coordonnées valides (lien direct, session expirée) ou sans panier : retour à l'étape 1
   useEffect(() => {
-    if (wantsPayment && !ready) setSearchParams({}, { replace: true });
-  }, [wantsPayment, ready, setSearchParams]);
+    if (wantsPayment && (!ready || empty)) setSearchParams({}, { replace: true });
+  }, [wantsPayment, ready, empty, setSearchParams]);
+
+  // Le panier se vide alors que le tunnel est affiché (dernier article retiré, commande passée dans un
+  // autre onglet) : l'écran « panier vide » remplace tout, y compris l'élément qui portait le focus.
+  // Celui-ci rejoint le titre du nouvel écran — sauf s'il est tenu ailleurs (tiroir du panier ouvert).
+  const shownEmpty = useRef(empty);
+  useEffect(() => {
+    if (shownEmpty.current === empty) return;
+    shownEmpty.current = empty;
+    if (!empty) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    // un défilement adouci encore en cours (changement d'étape) reprendrait la main sur le retour en haut
+    getLenis()?.reset?.();
+    scrollToTop({ immediate: true });
+    document.getElementById(EMPTY_TITLE_ID)?.focus({ preventScroll: true });
+  }, [empty]);
 
   // changement d'étape : on remonte au fil des étapes et le focus suit (titre, ou champ à modifier)
   const shownStep = useRef(step);
@@ -122,22 +143,32 @@ export default function Checkout() {
       return;
     }
     setStatus('');
+    setNotice('');
     setSearchParams({ [STEP_PARAM]: PAYMENT });
   };
 
   const backToDetails = (field) => {
     focusField.current = field || null;
+    setNotice('');
     setSearchParams({});
   };
 
   const confirm = (event) => {
     event.preventDefault();
     if (placed) return;
+    // Un autre onglet a pu modifier ce panier, ou déjà le commander, sans que celui-ci l'ait su :
+    // on relit le panier enregistré. S'il n'est plus celui affiché, le récapitulatif se met à jour
+    // et rien n'est commandé — le client confirme ce qu'il a sous les yeux, pas un panier périmé.
+    if (!syncCart()) {
+      setNotice(CART_CHANGED);
+      return;
+    }
     const order = createOrder(
       {
         items: cartItems,
         totals: { subtotal, shipping, total, count },
         customer: toCustomer(effective),
+        gift,
         giftNote: normalizeCheckout(effective).giftNote,
       },
       { taken: listOrders().map((entry) => entry.id) },
@@ -203,10 +234,12 @@ export default function Checkout() {
             ) : (
               <PaymentStep
                 customer={toCustomer(effective)}
+                gift={gift}
                 giftNote={normalizeCheckout(effective).giftNote}
                 shipping={placed ? placed.totals.shipping : shipping}
                 today={today}
                 confirming={Boolean(placed)}
+                notice={notice}
                 onEdit={backToDetails}
                 onConfirm={confirm}
               />

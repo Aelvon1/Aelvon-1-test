@@ -100,10 +100,18 @@ export default function Modal({
                 <Icon name="close" size={22} />
               </button>
             </header>
-            <div data-lenis-prevent className={cn('scroll-area min-h-0 flex-1', padded && 'px-6 py-7 sm:px-9 sm:py-8')}>
+            {/* feuille basse (mobile) : le bas s'écarte de la zone sûre, par le pied s'il existe, sinon par la zone défilante */}
+            <div
+              data-lenis-prevent
+              className={cn(
+                'scroll-area min-h-0 flex-1',
+                padded && 'px-6 py-7 sm:px-9 sm:py-8',
+                !footer && (padded ? 'max-sm:pb-[max(1.75rem,env(safe-area-inset-bottom,0px))]' : 'max-sm:pb-[env(safe-area-inset-bottom,0px)]'),
+              )}
+            >
               {children}
             </div>
-            {footer ? <footer className="shrink-0 border-t border-line px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 sm:px-9 sm:pb-5">{footer}</footer> : null}
+            {footer ? <footer className="shrink-0 border-t border-line px-6 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] pt-5 sm:px-9 sm:pb-5">{footer}</footer> : null}
           </Motion.div>
         </div>
       ) : null}

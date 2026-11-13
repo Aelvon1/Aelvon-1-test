@@ -55,8 +55,13 @@ describe('nuancier de l’Atelier', () => {
     expect(beltConfigKey({ leather: 'noir' })).not.toBe(beltConfigKey({ leather: 'ebene' }));
   });
 
+  it('nomme les largeurs avec une espace insécable entre le nombre et l’unité', () => {
+    expect(WIDTHS.map((width) => width.name)).toEqual(['30\u00a0mm', '35\u00a0mm', '38\u00a0mm']);
+  });
+
   it('décrit une ceinture en clair', () => {
-    expect(describeBelt(HERO_BELT)).toBe('Cuir cognac lisse · boucle laiton doré · couture ton sur ton · 35 mm');
+    expect(describeBelt(HERO_BELT)).toBe('Cuir cognac lisse · boucle laiton doré · couture ton sur ton · 35\u00a0mm');
+    expect(describeBelt({ width: 38 })).not.toMatch(/\d mm/);
     expect(describeBelt({ stitch: 'sans', lining: 'marron' })).toContain('bords francs');
     expect(describeBelt({ stitch: 'sans', lining: 'marron' })).toContain('envers marron');
   });
@@ -78,7 +83,8 @@ describe('catalogue', () => {
         expect(ids(BUCKLES)).toContain(color.belt.buckle);
         expect(ids(STITCHES)).toContain(color.belt.stitch);
         expect(ids(WIDTHS)).toContain(color.belt.width);
-        expect(product.width).toBe(`${color.belt.width} mm`);
+        // même largeur que la ceinture, que l'espace avant l'unité soit insécable ou non
+        expect(product.width.replace('\u00a0', ' ')).toBe(`${color.belt.width} mm`);
         if (color.belt.lining) expect(ids(LEATHERS)).toContain(color.belt.lining);
       }
     }

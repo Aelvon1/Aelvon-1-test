@@ -16,10 +16,31 @@ export const STEP = 0.5; // pas d'intégration, mm
 /** Sens d'enroulement : -1 → vue de face, la boucle est à droite de la lanière (B pointe vers le bas). */
 const CHI = -1;
 
-const COIL = { rIn: 19, pitchIn: 5.5, pitchOut: 7.4, straightFrom: 112, straightTo: 20, straightMin: 0.05 };
+// Rouleau : spirale serrée au cœur (les deux premières spires se touchent), puis plus lâche, au pas
+// irrégulier, et déportée d'un côté — une ceinture roulée à la main n'est jamais une spirale parfaite.
+const COIL = {
+  rIn: 19, // rayon de la première spire (fibre neutre)
+  tightTurns: 1.15, // spires jointives au cœur
+  pitch: 6.1, // pas moyen des spires extérieures
+  wobble: 0.7, // variation du pas (± mm)
+  drift: 0.75, // excentrement gagné à chaque tour (mm) : les spires se resserrent d'un côté
+  tightAt: 0.72, // direction du côté resserré, dans le plan du sol (rad depuis +X vers +Z : vers la boucle)
+  straightFrom: 112,
+  straightTo: 20,
+  straightMin: 0.05,
+  // Ceinture réversible : les derniers centimètres, côté pointe, montent en hélice hors du rouleau.
+  revealFrom: 185,
+  revealFull: 115,
+  revealAngle: 0.19, // rad (≈ 11°) : la pointe dépasse d'environ 25 mm
+};
 const FLOW = { amp: 1.02, period: 1.08, phase: 2.2, twist: 0.42, twistPeriod: 1.55, twistPhase: 0.4, rise: 0.0 };
 
-export function createPose(spec) {
+/**
+ * @param spec
+ * @param {{ reveal?: boolean }} [options]  reveal : le cœur du rouleau remonte en hélice (ceinture
+ *        réversible : la doublure, d'une autre teinte, se découvre au-dessus des spires)
+ */
+export function createPose(spec, { reveal = false } = {}) {
   const n = Math.round(spec.length / STEP) + 1;
   const mk = () => new Float32Array(n);
   const mk3 = () => new Float32Array(n * 3);
@@ -34,9 +55,10 @@ export function createPose(spec) {
     T: mk3(),
     B: mk3(),
     N: mk3(),
-    coil: { kappa: mk(), tau: mk(), yoff: mk(), anchor: null, radius: mk() },
+    coil: { kappa: mk(), tau: mk(), yoff: mk(), anchor: null },
     flow: { kappa: mk(), tau: mk(), yoff: mk(), anchor: null, kappaBase: mk(), tauBase: mk() },
     blend: 0,
+    reveal,
   };
   buildCoilProfile(pose);
   buildFlowProfile(pose);
@@ -45,36 +67,104 @@ export function createPose(spec) {
 
 function buildCoilProfile(pose) {
   const { spec, n } = pose;
-  const { kappa, yoff, radius } = pose.coil;
+  const { kappa, tau, yoff } = pose.coil;
   const L = spec.length;
-  // Développante : le rayon croît d'un pas par tour → spires parallèles, jamais sécantes.
-  let r = COIL.rIn;
-  for (let iu = 0; iu < n; iu++) {
-    const u = iu * STEP; // distance à la pointe
-    const i = n - 1 - iu;
-    const s = L - u;
-    radius[i] = r;
-    const straight = lerp(COIL.straightMin, 1, smoothstep(COIL.straightTo, COIL.straightFrom, s));
-    kappa[i] = straight / r;
-    yoff[i] = spec.buckleLift * (1 - smoothstep(0, 210, s));
-    const pitch = lerp(COIL.pitchIn, COIL.pitchOut, smoothstep(0.25 * L, L, u));
-    r += (STEP * pitch) / (2 * Math.PI * r);
-  }
+  const touch = 2 * spec.htMain + 0.15; // pas de deux spires qui se touchent
+  const pitchAt = (turn) =>
+    lerp(touch, COIL.pitch, smoothstep(COIL.tightTurns, COIL.tightTurns + 1.2, turn)) +
+    COIL.wobble * Math.sin(1.9 * turn + 0.8) * smoothstep(COIL.tightTurns + 0.2, COIL.tightTurns + 1.3, turn);
+  const driftAt = (turn) => {
+    const x = turn - COIL.tightTurns;
+    return x > 0 ? (COIL.drift * x * x) / (x + 0.6) : 0;
+  };
 
-  // Placement canonique : axe du rouleau sur Oy, posé sur y = 0, zone boucle/monogramme vers +Z.
-  const a = pose.anchorIndex;
-  const tmp = { pos: [0, 0, 0], T: [CHI, 0, 0], N: [0, 0, 1] };
-  integrate(pose, pose.coil, tmp);
-  const cx = pose.pos[a * 3] - pose.N[a * 3] * radius[a];
-  const cz = pose.pos[a * 3 + 2] - pose.N[a * 3 + 2] * radius[a];
+  // Spirale en coordonnées polaires r(θ), θ = 0 à la pointe ; on en tire la courbure le long de l'abscisse.
+  const H = 0.004;
+  const M = Math.ceil((16 * Math.PI) / H);
+  const r = new Float64Array(M);
+  const arc = new Float64Array(M);
+  const curv = new Float64Array(M);
+  let anchor = null;
+  const build = (theta0) => {
+    let acc = 0;
+    for (let j = 0; j < M; j++) {
+      const th = j * H;
+      if (j > 0) acc += (0.5 * (pitchAt((th - H) / (2 * Math.PI)) + pitchAt(th / (2 * Math.PI))) * H) / (2 * Math.PI);
+      r[j] = COIL.rIn + acc + driftAt(th / (2 * Math.PI)) * Math.cos(th - theta0);
+    }
+    const d1 = (j) => (r[Math.min(M - 1, j + 1)] - r[Math.max(0, j - 1)]) / ((Math.min(M - 1, j + 1) - Math.max(0, j - 1)) * H);
+    let last = 0;
+    for (let j = 0; j < M; j++) {
+      const r1 = d1(j);
+      const r2 = j > 0 && j < M - 1 ? (r[j + 1] - 2 * r[j] + r[j - 1]) / (H * H) : 0;
+      const q = r[j] * r[j] + r1 * r1;
+      curv[j] = (q + r1 * r1 - r[j] * r2) / Math.pow(q, 1.5);
+      const speed = Math.sqrt(q);
+      arc[j] = j > 0 ? arc[j - 1] + 0.5 * (last + speed) * H : 0;
+      last = speed;
+    }
+    let j = 0;
+    for (let iu = 0; iu < n; iu++) {
+      const u = iu * STEP; // distance à la pointe
+      while (j < M - 2 && arc[j + 1] < u) j++;
+      const t = (u - arc[j]) / (arc[j + 1] - arc[j]);
+      const i = n - 1 - iu;
+      const s = L - u;
+      const straight = lerp(COIL.straightMin, 1, smoothstep(COIL.straightTo, COIL.straightFrom, s));
+      const bend = straight * lerp(curv[j], curv[j + 1], t);
+      // Ruban enroulé en hélice sur un cylindre : flexion cos²α / r, torsion sin α · cos α / r.
+      const alpha = pose.reveal ? COIL.revealAngle * smoothstep(COIL.revealFrom, COIL.revealFull, u) : 0;
+      kappa[i] = bend * Math.cos(alpha) * Math.cos(alpha);
+      tau[i] = bend * Math.sin(alpha) * Math.cos(alpha);
+      yoff[i] = spec.buckleLift * (1 - smoothstep(0, 210, s));
+      if (i === pose.anchorIndex) {
+        // Repère d'ancrage exact : x = r·cos θ, z = −r·sin θ ; la lanière va vers la pointe (θ décroissant).
+        const th = (j + t) * H;
+        const rr = lerp(r[j], r[j + 1], t);
+        const r1 = lerp(d1(j), d1(j + 1), t);
+        const c = Math.cos(th);
+        const sn = Math.sin(th);
+        let tx = -(r1 * c - rr * sn);
+        let tz = r1 * sn + rr * c;
+        const l = Math.hypot(tx, tz);
+        tx /= l;
+        tz /= l;
+        // N : normale sortante (fleur vers l'extérieur du rouleau)
+        let nx = -tz;
+        let nz = tx;
+        if (nx * c - nz * sn < 0) {
+          nx = -nx;
+          nz = -nz;
+        }
+        anchor = { pos: [rr * c, spec.hw, -rr * sn], T: [tx, 0, tz], N: [nx, 0, nz] };
+      }
+    }
+  };
+
+  // Placement canonique : rouleau posé sur y = 0, zone boucle/monogramme vers +Z, côté resserré vers COIL.tightAt.
   const f = Math.round(70 / STEP);
-  const yaw = Math.atan2(pose.N[f * 3], pose.N[f * 3 + 2]); // angle de N(70) autour de Y
+  let theta0 = 0;
+  let yaw = 0;
+  for (let pass = 0; pass < 3; pass++) {
+    build(theta0);
+    integrate(pose, pose.coil, anchor);
+    yaw = Math.atan2(pose.N[f * 3], pose.N[f * 3 + 2]); // angle de N(70) autour de Y
+    // direction monde voulue → direction dans le repère de la spirale (rotation inverse), puis θ du côté resserré
+    const wx = Math.cos(COIL.tightAt);
+    const wz = Math.sin(COIL.tightAt);
+    const dx = wx * Math.cos(yaw) + wz * Math.sin(yaw);
+    const dz = -wx * Math.sin(yaw) + wz * Math.cos(yaw);
+    theta0 = Math.atan2(-dz, dx) - Math.PI;
+  }
+  build(theta0);
+  integrate(pose, pose.coil, anchor);
+  yaw = Math.atan2(pose.N[f * 3], pose.N[f * 3 + 2]);
   const c = Math.cos(-yaw);
   const sn = Math.sin(-yaw);
   const rot = (x, z) => [x * c + z * sn, -x * sn + z * c];
-  const [px, pz] = rot(-cx, -cz);
-  const [tx, tz] = rot(CHI, 0);
-  const [nx, nz] = rot(0, 1);
+  const [px, pz] = rot(anchor.pos[0], anchor.pos[2]);
+  const [tx, tz] = rot(anchor.T[0], anchor.T[2]);
+  const [nx, nz] = rot(anchor.N[0], anchor.N[2]);
   pose.coil.anchor = { pos: [px, spec.hw, pz], T: [tx, 0, tz], N: [nx, 0, nz] };
 }
 
@@ -127,20 +217,36 @@ function buildFlowProfile(pose) {
   };
 }
 
-/** Respiration lente de la pose déroulée. */
-export function setFlowTime(pose, t) {
+// Respiration de la pose déroulée : amplitude de la flexion (k1), de la torsion (k2) et onde lente.
+export const FLOW_BREATH = { bend: 0.04, twist: 0.1, wave: 0.0003 };
+
+/** Pose déroulée pour des paramètres de respiration donnés : k1 flexion, k2 torsion, ph phase de l'onde. */
+export function setFlowParams(pose, k1, k2, ph) {
   const { kappa, tau, kappaBase, tauBase } = pose.flow;
   const { n, spec } = pose;
   const L = spec.length;
-  const k1 = 1 + 0.07 * Math.sin(t * 0.42);
-  const k2 = 1 + 0.16 * Math.sin(t * 0.31 + 1.3);
   const w = (2 * Math.PI) / (0.8 * L);
-  const ph = t * 0.27;
   for (let i = 0; i < n; i++) {
     const s = i * STEP;
-    kappa[i] = kappaBase[i] * k1 + 0.00042 * Math.sin(w * s - ph) * Math.sin((Math.PI * s) / L);
+    kappa[i] = kappaBase[i] * k1 + FLOW_BREATH.wave * Math.sin(w * s - ph) * Math.sin((Math.PI * s) / L);
     tau[i] = tauBase[i] * k2;
   }
+}
+
+/** Respiration lente de la pose déroulée. */
+export function setFlowTime(pose, t) {
+  setFlowParams(pose, 1 + FLOW_BREATH.bend * Math.sin(t * 0.42), 1 + FLOW_BREATH.twist * Math.sin(t * 0.31 + 1.3), t * 0.27);
+}
+
+/** Jeux de paramètres extrêmes de la respiration : leur réunion borne tout le mouvement (cadrage). */
+export function flowExtremes() {
+  const out = [];
+  for (const k1 of [1 - FLOW_BREATH.bend, 1 + FLOW_BREATH.bend]) {
+    for (const k2 of [1 - FLOW_BREATH.twist, 1 + FLOW_BREATH.twist]) {
+      for (let q = 0; q < 4; q++) out.push([k1, k2, (q * Math.PI) / 2]);
+    }
+  }
+  return out;
 }
 
 const _q0 = new Quaternion();

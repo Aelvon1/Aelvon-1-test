@@ -11,16 +11,26 @@ import { clamp, halfThicknessAt, halfWidthAt, lerp, smoothstep, stitchApexS, sti
 // → lanière → pointe.
 // ---------------------------------------------------------------------------
 
-// Sommets de la section, dans l'ordre : fleur (21), tranche + (7), doublure (9), tranche − (7).
-const OUTER_N = 21;
-const EDGE_N = 7;
+// Sommets de la section, dans l'ordre : fleur (25), tranche + (11), doublure (9), tranche − (11).
+const GROOVE_N = 7; // sommets d'un filet de couture
+const DOME_N = 9;
+const OUTER_N = 1 + GROOVE_N + DOME_N + GROOVE_N + 1; // 25
+const EDGE_N = 11; // congé haut (4), joint des deux cuirs (3), congé bas (4)
 const INNER_N = 9;
-export const PROFILE_N = OUTER_N + EDGE_N + INNER_N + EDGE_N; // 44
-const IDX_EDGE_A = OUTER_N; // 21
-const IDX_INNER = IDX_EDGE_A + EDGE_N; // 28
-const IDX_EDGE_B = IDX_INNER + INNER_N; // 37
-const IDX_GROOVE_NEG = 3;
-const IDX_GROOVE_POS = 17;
+export const PROFILE_N = OUTER_N + EDGE_N + INNER_N + EDGE_N; // 56
+const IDX_EDGE_A = OUTER_N;
+const IDX_INNER = IDX_EDGE_A + EDGE_N;
+const IDX_EDGE_B = IDX_INNER + INNER_N;
+const IDX_GROOVE_NEG = 1 + (GROOVE_N - 1) / 2; // fond du filet, côté −
+const IDX_GROOVE_POS = 1 + GROOVE_N + DOME_N + (GROOVE_N - 1) / 2;
+const IDX_MID = 1 + GROOVE_N + (DOME_N - 1) / 2;
+
+// Filet de couture : fond plat (le fil s'y couche) puis épaulements doux. x = écart au centre / demi-largeur.
+const GROOVE_FLAT = 0.5;
+const GROOVE_X = [1, (1 + GROOVE_FLAT) / 2, GROOVE_FLAT, 0, GROOVE_FLAT, (1 + GROOVE_FLAT) / 2, 1];
+const grooveShape = (x) => (x <= GROOVE_FLAT ? 1 : x >= 1 ? 0 : 0.5 + 0.5 * Math.cos((Math.PI * (x - GROOVE_FLAT)) / (1 - GROOVE_FLAT)));
+const GROOVE_DARK = 0.3; // le cuir écrasé au fond du filet est plus sombre (teinte, pas seulement ombre)
+const SEAM_DARK = 0.55; // joint entre les deux cuirs, sur la tranche
 
 const REGION_TAIL = 0;
 const REGION_FOLD = 1;
@@ -31,53 +41,97 @@ function tailOffset(spec, sp) {
   return lerp(2 * spec.foldRadius, flat, smoothstep(0, 11, sp));
 }
 
-/** Remplit la section (v le long de B, h le long de N) d'un anneau. */
+/** Remplit la section (v le long de B, h le long de N) d'un anneau, et la teinte de ses sommets. */
 function fillProfile(L, k) {
   const o = k * PROFILE_N;
-  const { lv, lh } = L;
+  const { lv, lh, shade } = L;
+  const { spec } = L;
   const hw = L.rHw[k];
   const ht = L.rHt[k];
-  const e = Math.min(L.spec.edge, hw * 0.6);
-  const a = hw - e;
+  // Tranche : chant plat, deux petits congés. Le congé se referme avec la lanière (pointe, bout du retour).
+  const r = Math.min(spec.edgeRadius, ht * 0.42, hw * 0.6);
+  const a = hw - r;
   const gRaw = L.rG[k];
-  const q = smoothstep(0.5, 1.6, gRaw) * smoothstep(0.2, 1.2, a - gRaw - L.spec.grooveHalf);
-  const gw = L.spec.grooveHalf;
+  const gw = spec.grooveHalf;
+  const q = smoothstep(0.5, 1.6, gRaw) * smoothstep(0.2, 1.2, a - gRaw - gw);
   const g = clamp(gRaw, gw + 0.05, Math.max(gw + 0.05, a - gw - 0.05));
   const gd = L.rGd[k] * q;
   const dome = L.rDome[k] * q * smoothstep(1, 8, g - gw);
   const inner = g - gw;
+  const dark = GROOVE_DARK * (spec.grooveDepth > 0 ? gd / spec.grooveDepth : 0);
 
   // Fleur : bord, filet, bombé, filet, bord.
-  const sv = [-a, -(g + gw), -(g + gw / 2), -g, -(g - gw / 2), -inner];
-  const sh = [0, 0, -0.8 * gd, -gd, -0.8 * gd, 0];
-  for (let i = 1; i <= 9; i++) {
-    const x = -1 + i / 5;
+  const sv = [-a];
+  const sh = [0];
+  const sd = [0];
+  for (let i = 0; i < GROOVE_N; i++) {
+    const side = i < (GROOVE_N - 1) / 2 ? -1 : 1;
+    const f = grooveShape(GROOVE_X[i]);
+    sv.push(-g + side * GROOVE_X[i] * gw);
+    sh.push(-gd * f);
+    sd.push(dark * f);
+  }
+  for (let i = 1; i <= DOME_N; i++) {
+    const x = -1 + (2 * i) / (DOME_N + 1);
     sv.push(x * inner);
     sh.push(dome * (1 - x * x));
+    sd.push(0);
   }
-  sv.push(inner, g - gw / 2, g, g + gw / 2, g + gw, a);
-  sh.push(0, -0.8 * gd, -gd, -0.8 * gd, 0, 0);
+  for (let i = 0; i < GROOVE_N; i++) {
+    const side = i < (GROOVE_N - 1) / 2 ? -1 : 1;
+    const f = grooveShape(GROOVE_X[i]);
+    sv.push(g + side * GROOVE_X[i] * gw);
+    sh.push(-gd * f);
+    sd.push(dark * f);
+  }
+  sv.push(a);
+  sh.push(0);
+  sd.push(0);
   for (let j = 0; j < OUTER_N; j++) {
     const u = -a + (2 * a * j) / (OUTER_N - 1); // répartition uniforme quand la pointe se referme
     lv[o + j] = lerp(u, sv[j], q);
     lh[o + j] = ht + sh[j];
+    shade[o + j] = 1 - sd[j];
   }
-  // Tranche + : demi-ellipse.
-  for (let i = 1; i <= EDGE_N; i++) {
-    const ang = Math.PI / 2 - (i * Math.PI) / (EDGE_N + 1);
-    lv[o + IDX_EDGE_A + i - 1] = a + e * Math.cos(ang);
-    lh[o + IDX_EDGE_A + i - 1] = ht * Math.sin(ang);
+
+  // Tranches : congé, chant plat marqué du joint entre fleur et doublure, congé.
+  const flat = ht - r;
+  const seam = smoothstep(0.45, 1.0, flat);
+  const hs = spec.seamAt * seam;
+  const sw = spec.seamHalf * seam;
+  const sdp = spec.seamDepth * seam;
+  for (let i = 0; i < EDGE_N; i++) {
+    let dv;
+    let h;
+    let tone = 1;
+    if (i < 4) {
+      const ang = Math.PI / 2 - ((i + 1) * Math.PI) / 8;
+      dv = r * Math.cos(ang);
+      h = flat + r * Math.sin(ang);
+    } else if (i < 7) {
+      const step = i - 5; // -1, 0, 1
+      dv = r - (step === 0 ? sdp : 0);
+      h = hs - step * sw;
+      if (step === 0) tone = 1 - SEAM_DARK * seam;
+    } else {
+      const ang = -((i - 7) * Math.PI) / 8;
+      dv = r * Math.cos(ang);
+      h = -flat + r * Math.sin(ang);
+    }
+    // tranche + : de la fleur vers la doublure ; tranche − : parcours inverse, en miroir
+    lv[o + IDX_EDGE_A + i] = a + dv;
+    lh[o + IDX_EDGE_A + i] = h;
+    shade[o + IDX_EDGE_A + i] = tone;
+    const mirror = IDX_EDGE_B + EDGE_N - 1 - i;
+    lv[o + mirror] = -a - dv;
+    lh[o + mirror] = h;
+    shade[o + mirror] = tone;
   }
   // Doublure, de +a à −a.
   for (let i = 0; i < INNER_N; i++) {
     lv[o + IDX_INNER + i] = a - (2 * a * i) / (INNER_N - 1);
     lh[o + IDX_INNER + i] = -ht;
-  }
-  // Tranche −.
-  for (let i = 1; i <= EDGE_N; i++) {
-    const ang = -Math.PI / 2 + (i * Math.PI) / (EDGE_N + 1);
-    lv[o + IDX_EDGE_B + i - 1] = -a - e * Math.cos(ang);
-    lh[o + IDX_EDGE_B + i - 1] = ht * Math.sin(ang);
+    shade[o + IDX_INNER + i] = 1;
   }
   L.rA[k] = a;
   L.rGe[k] = g;
@@ -133,6 +187,7 @@ export function createStrap(spec) {
     rDe: f32(K),
     lv: f32(K * M),
     lh: f32(K * M),
+    shade: f32(V).fill(1), // teinte par sommet (filets, joint de tranche)
     ln: f32(K * M * 3), // normale locale (T, B, N)
     // repères des anneaux pour la pose courante
     rc: f32(K * 3),
@@ -144,6 +199,7 @@ export function createStrap(spec) {
     aoFlow: f32(V).fill(1),
   };
 
+  const apex = stitchApexS(spec);
   for (let k = 0; k < K; k++) {
     const r = rings[k];
     L.region[k] = r.region;
@@ -154,7 +210,8 @@ export function createStrap(spec) {
       L.rHw[k] = halfWidthAt(spec, sm);
       L.rHt[k] = halfThicknessAt(spec, sm);
       L.rG[k] = stitchOffsetAt(spec, sm);
-      L.rGd[k] = spec.grooveDepth * smoothstep(2.5, 8, sm);
+      // Le filet naît et meurt en douceur : aucun décrochement au pli ni à la pointe.
+      L.rGd[k] = spec.grooveDepth * smoothstep(spec.stitchFrom - 2.5, spec.stitchFrom + 10, sm) * (1 - smoothstep(apex - 16, apex - 3, sm));
       L.rDome[k] = spec.dome * smoothstep(10, 46, sm);
     } else {
       L.rHw[k] = spec.hw;
@@ -197,16 +254,11 @@ export function createStrap(spec) {
       const px = d[0] - c[0];
       const py = d[1] - c[1];
       const pz = d[2] - c[2];
-      // n = dP/dj × dP/dk, orientée vers l'extérieur
-      let nx = py * sz - pz * sy;
-      let ny = pz * sx - px * sz;
-      let nz = px * sy - py * sx;
+      // n = dP/dk × dP/dj : sortante par construction (la section est parcourue dans un sens constant)
+      const nx = sy * pz - sz * py;
+      const ny = sz * px - sx * pz;
+      const nz = sx * py - sy * px;
       const o = k * M + j;
-      if (ny * L.lv[o] + nz * L.lh[o] < 0) {
-        nx = -nx;
-        ny = -ny;
-        nz = -nz;
-      }
       const l = Math.hypot(nx, ny, nz) || 1;
       L.ln[o * 3] = nx / l;
       L.ln[o * 3 + 1] = ny / l;
@@ -277,6 +329,9 @@ export function createStrap(spec) {
   geometry.setAttribute('normal', new BufferAttribute(normal, 3).setUsage(DynamicDrawUsage));
   geometry.setAttribute('uv', new BufferAttribute(uv, 2));
   geometry.setAttribute('aOcc', new BufferAttribute(occ, 1).setUsage(DynamicDrawUsage));
+  L.shade[K * M] = 1;
+  L.shade[K * M + 1] = 1;
+  geometry.setAttribute('aShade', new BufferAttribute(L.shade, 1));
   geometry.setIndex(new BufferAttribute(index, 1));
   for (const g of groups) geometry.addGroup(g.start, g.count, g.materialIndex);
 
@@ -447,11 +502,7 @@ function outerHeight(L, k, v) {
     const x = av / Math.max(inner, 1e-3);
     return ht + L.rDe[k] * (1 - x * x);
   }
-  if (av <= g + gw) {
-    const x = Math.abs(av - g) / gw;
-    const depth = x < 0.5 ? lerp(1, 0.8, x / 0.5) : lerp(0.8, 0, (x - 0.5) / 0.5);
-    return ht - L.rGde[k] * depth;
-  }
+  if (av <= g + gw) return ht - L.rGde[k] * grooveShape(Math.abs(av - g) / gw);
   return ht;
 }
 
@@ -489,11 +540,33 @@ export const makeSample = () => ({ pos: [0, 0, 0], T: [0, 0, 0], B: [0, 0, 0], N
 
 function layoutStitches(L) {
   const { spec } = L;
-  const list = []; // [sigma, v, dSigma, dV, face, ringIndex, ringT, profileIndex]
+  const STRIDE = 9; // [sigma, v, dSigma, dV, face, ringIndex, ringT, profileIndex, lift]
+  const front = []; // fleur : rangs de bord et piqûres du passant
+  const back = []; // doublure : envers des rangs de bord
   const pitch = spec.stitchPitch;
   const apex = stitchApexS(spec);
 
-  const pushRow = (sFrom, face, side, slant) => {
+  const add = (list, s, v, ds, dv, face, lift) => {
+    const sigma = spec.sigma0 + s;
+    const [k, t] = ringAt(L, sigma);
+    // Sommet de section le plus proche, pour hériter de son occlusion.
+    let j = v < 0 ? IDX_GROOVE_NEG : IDX_GROOVE_POS;
+    if (face < 0) {
+      let best = Infinity;
+      for (let q = IDX_INNER; q < IDX_INNER + INNER_N; q++) {
+        const dist = Math.abs(L.lv[k * L.M + q] - v);
+        if (dist < best) {
+          best = dist;
+          j = q;
+        }
+      }
+    } else if (Math.abs(v) < Math.abs(L.lv[k * L.M + IDX_GROOVE_POS]) - spec.grooveHalf) {
+      j = IDX_MID;
+    }
+    list.push(sigma, v, ds, dv, face, k, t, j, lift);
+  };
+
+  const pushRow = (list, sFrom, face, side, slant, lift) => {
     // Chemin (s, v = ±g(s)) paramétré par sa longueur d'arc.
     const pts = [];
     const stepS = 0.25;
@@ -521,57 +594,40 @@ function layoutStitches(L) {
       const l = Math.hypot(ds, dv) || 1;
       ds /= l;
       dv /= l;
-      // Inclinaison du point sellier.
+      // Inclinaison du point sellier : chaque brin part du haut d'une perce et rejoint le bas de la suivante.
       const ca = Math.cos(slant * side);
       const sa = Math.sin(slant * side);
       const rs = ds * ca - dv * sa;
       const rv = ds * sa + dv * ca;
-      add(s, v * side, rs, rv * side, face);
+      add(list, s, v * side, rs, rv * side, face, lift);
     }
   };
 
-  const add = (s, v, ds, dv, face) => {
-    const sigma = spec.sigma0 + s;
-    const [k, t] = ringAt(L, sigma);
-    // Sommet de section le plus proche, pour hériter de son occlusion.
-    let j = face > 0 ? (v < 0 ? IDX_GROOVE_NEG : IDX_GROOVE_POS) : IDX_INNER;
-    if (face < 0) {
-      let best = Infinity;
-      for (let q = IDX_INNER; q < IDX_INNER + INNER_N; q++) {
-        const dist = Math.abs(L.lv[k * L.M + q] - v);
-        if (dist < best) {
-          best = dist;
-          j = q;
-        }
-      }
-    } else if (Math.abs(v) < 4) {
-      j = 10;
-    }
-    list.push(sigma, v, ds, dv, face, k, t, j);
-  };
-
-  const slant = 0.2;
-  pushRow(5.5, 1, 1, slant);
-  pushRow(5.5, 1, -1, slant);
-  pushRow(spec.tailLength + 3, -1, 1, 0.05);
-  pushRow(spec.tailLength + 3, -1, -1, 0.05);
-  // Piqûres transversales de part et d'autre du passant.
+  const slant = spec.stitchSlant;
+  pushRow(front, spec.stitchFrom, 1, 1, slant, 0);
+  pushRow(front, spec.stitchFrom, 1, -1, slant, 0);
+  pushRow(back, spec.tailLength + 3, -1, 1, 0.06, -0.1);
+  pushRow(back, spec.tailLength + 3, -1, -1, 0.06, -0.1);
+  // Piqûres transversales de part et d'autre du passant (pas de filet : le fil repose sur la fleur).
   for (const s of spec.crossRows) {
-    const half = spec.hw - spec.stitchInset - 2.2;
+    const half = spec.hw - spec.stitchInset - 2.4;
     const n = Math.floor((2 * half) / pitch);
     const v0 = -((n - 1) * pitch) / 2;
-    for (let i = 0; i < n; i++) add(s + 0.25 * Math.sin(i * 1.7), v0 + i * pitch, Math.sin(slant), Math.cos(slant), 1);
+    for (let i = 0; i < n; i++) add(front, s, v0 + i * pitch, Math.sin(slant), Math.cos(slant), 1, -0.07);
   }
 
-  const STRIDE = 8;
-  return { data: new Float32Array(list), count: list.length / STRIDE, STRIDE };
+  const pack = (list) => ({ data: new Float32Array(list), count: list.length / STRIDE, STRIDE });
+  return { front: pack(front), back: pack(back) };
 }
 
 const _smp = makeSample();
 
-/** Écrit les matrices d'instance (Float32Array 16·n) et l'occlusion des brins. */
-export function poseStitches(L, matrices, occ) {
-  const { data, count, STRIDE } = L.stitches;
+/**
+ * Écrit les matrices d'instance (Float32Array 16·n) et l'occlusion des brins d'un jeu de points
+ * (`L.stitches.front` ou `L.stitches.back`).
+ */
+export function poseStitches(L, set, matrices, occ) {
+  const { data, count, STRIDE } = set;
   const ao = L.geometry.attributes.aOcc.array;
   const len = L.spec.stitchLength;
   for (let i = 0; i < count; i++) {
@@ -581,8 +637,7 @@ export function poseStitches(L, matrices, occ) {
     const ds = data[o + 2];
     const dv = data[o + 3];
     const face = data[o + 4];
-    const lift = face > 0 ? 0.02 : -0.06;
-    surfaceAt(L, sigma, v, face, lift, _smp);
+    surfaceAt(L, sigma, v, face, data[o + 8], _smp);
     const { T, B, N, pos } = _smp;
     // X = direction du brin, Z = normale de la face, Y = Z × X
     let xx = T[0] * ds + B[0] * dv;
@@ -803,4 +858,3 @@ export function buildCoilOcclusion(L) {
   }
 }
 
-export { IDX_GROOVE_NEG, IDX_GROOVE_POS, OUTER_N };

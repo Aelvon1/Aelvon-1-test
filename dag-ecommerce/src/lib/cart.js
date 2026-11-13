@@ -1,7 +1,8 @@
 // Logique pure du panier (aucune dépendance React) — testable unitairement.
-import { beltConfigKey, describeBelt, getLeather, normalizeBeltConfig } from '../data/atelier';
-import { productImage } from '../data/products';
+import { SIZES, beltConfigKey, describeBelt, getLeather, getMonogramStyle, normalizeBeltConfig } from '../data/atelier';
+import { productImage, products } from '../data/products';
 import { MAX_QUANTITY, atelierPrice, catalogPrice, roundMoney, sanitizeMonogram, shippingFor } from './pricing';
+import { localStore } from './storage';
 
 export const CART_STORAGE_KEY = 'dag-cart-v2';
 
@@ -23,17 +24,24 @@ export const CART_STORAGE_KEY = 'dag-cart-v2';
  * @property {boolean} custom  true pour une ceinture sur-mesure
  */
 
+/**
+ * « Monogramme AD (dorure or) ». Le style fait partie de la commande : deux lignes peuvent ne
+ * différer que par lui, et c'est cette description que le client relit avant de confirmer.
+ */
+const monogramLabel = (monogram, style) => `Monogramme ${monogram} (${getMonogramStyle(style).name.toLowerCase()})`;
+
 /** Ligne de panier pour un produit du catalogue. */
 export function createCatalogItem(product, color, size, options = {}) {
   const monogram = sanitizeMonogram(options.monogram);
-  const monogramStyle = monogram ? (options.monogramStyle ?? 'marque') : 'marque';
+  // sans monogramme, ou avec un style inconnu : le premier de la liste (marquage à chaud)
+  const monogramStyle = getMonogramStyle(monogram ? options.monogramStyle : null).id;
   const belt = normalizeBeltConfig({ ...color.belt, monogram, monogramStyle });
   return {
     cartItemId: ['p', product.id, color.value, size, monogram || '-', monogram ? monogramStyle : '-'].join('|'),
     productId: product.id,
     slug: product.slug,
     name: product.name,
-    subtitle: `${color.name} · ${size} cm${monogram ? ` · Monogramme ${monogram}` : ''}`,
+    subtitle: `${color.name} · ${size} cm${monogram ? ` · ${monogramLabel(monogram, monogramStyle)}` : ''}`,
     price: catalogPrice(product, { monogram }),
     quantity: clampQuantity(options.quantity ?? 1),
     selectedColor: { name: color.name, value: color.value, hex: color.hex },
@@ -55,7 +63,7 @@ export function createAtelierItem(config, size, options = {}) {
     productId: null,
     slug: null,
     name: 'DAG Sur-Mesure',
-    subtitle: `${describeBelt(belt)} · ${size} cm${belt.monogram ? ` · Monogramme ${belt.monogram}` : ''}`,
+    subtitle: `${describeBelt(belt)} · ${size} cm${belt.monogram ? ` · ${monogramLabel(belt.monogram, belt.monogramStyle)}` : ''}`,
     price: atelierPrice(belt),
     quantity: clampQuantity(options.quantity ?? 1),
     selectedColor: { name: leather.name, value: leather.id, hex: leather.hex },
@@ -108,7 +116,11 @@ export function cartTotals(items) {
   return { subtotal, shipping, total: roundMoney(subtotal + shipping), count: cartCount(items) };
 }
 
-/** Valide des données lues dans le stockage local ; écarte toute ligne malformée. */
+/**
+ * Valide la forme de lignes relues (stockage, état de navigation) ; écarte toute ligne malformée.
+ * Les valeurs sont gardées telles quelles : c'est ce qu'il faut à une commande passée, figée au prix
+ * et au nom du jour de l'achat. Un panier en cours passe, lui, par reviveCart.
+ */
 export function sanitizeCart(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -126,18 +138,53 @@ export function sanitizeCart(raw) {
     .map((item) => ({ ...item, quantity: clampQuantity(item.quantity), belt: normalizeBeltConfig(item.belt) }));
 }
 
-export function loadCart(storage = globalThis.localStorage) {
+/** Ligne relue, reconstruite sur le catalogue du jour ; null si elle n'est plus commandable. */
+function reviveItem(stored) {
+  const size = String(stored.selectedSize ?? '');
+  const { quantity } = stored;
+  if (stored.custom) {
+    if (!SIZES.includes(size)) return null;
+    return createAtelierItem(stored.belt, size, { quantity, image: typeof stored.image === 'string' && stored.image ? stored.image : null });
+  }
+  const product = products.find((entry) => entry.id === stored.productId);
+  const color = product?.colors.find((entry) => entry.value === stored.selectedColor.value);
+  if (!color || !product.sizes.includes(size)) return null;
+  return createCatalogItem(product, color, size, { monogram: stored.monogram, monogramStyle: stored.monogramStyle, quantity });
+}
+
+/**
+ * Panier relu du stockage, remis d'aplomb sur le catalogue du jour. Une ligne enregistrée ne vaut
+ * que par ce qui l'identifie (produit, coloris, taille, monogramme, configuration de l'Atelier,
+ * quantité) : prix, nom, lien, description et visuel sont recalculés, jamais repris du stockage —
+ * un panier ancien ou retouché ne se commande pas à un prix périmé. Une ligne dont le produit,
+ * le coloris ou la taille n'existe plus est écartée.
+ */
+export function reviveCart(raw) {
+  return sanitizeCart(raw).reduce((items, stored) => {
+    const item = reviveItem(stored);
+    return item ? addItem(items, item) : items;
+  }, []);
+}
+
+/** Panier enregistré, prêt à l'emploi (voir reviveCart). Ne lève jamais d'erreur. */
+export function loadCart(storage = localStore()) {
   try {
-    return sanitizeCart(JSON.parse(storage?.getItem(CART_STORAGE_KEY) ?? '[]'));
+    return reviveCart(JSON.parse(storage?.getItem(CART_STORAGE_KEY) ?? '[]'));
   } catch {
     return [];
   }
 }
 
-export function saveCart(items, storage = globalThis.localStorage) {
+/**
+ * Enregistre le panier. Ne lève jamais d'erreur.
+ * @returns {boolean} false si rien n'a pu être écrit (stockage refusé ou plein) : le panier ne vit alors qu'en mémoire
+ */
+export function saveCart(items, storage = localStore()) {
+  if (!storage) return false;
   try {
-    storage?.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    storage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    return true;
   } catch {
-    // stockage indisponible (navigation privée, quota) : le panier reste en mémoire
+    return false;
   }
 }

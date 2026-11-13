@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useCart } from '../context/CartContext';
-import { LEATHERS, HERO_BELT, SIZES, WIDTHS } from '../data/atelier';
+import { BUCKLES, LEATHERS, HERO_BELT, SIZES, WIDTHS } from '../data/atelier';
 import { productImage, products } from '../data/products';
 import { usePageMeta } from '../hooks/usePageMeta';
+import ProductCard from '../components/product/ProductCard';
 import {
   Accordion,
   Badge,
@@ -21,7 +22,6 @@ import {
   OptionGrid,
   Packshot,
   Price,
-  ProductCard,
   QuantityStepper,
   RadioCard,
   Reveal,
@@ -176,6 +176,22 @@ function Buttons() {
       <Button variant="solid" size="lg" icon="arrow-right" fullWidth>
         Commander
       </Button>
+      <Label>Affichage choisi par l’appelant — hidden sm:inline-flex, sm:hidden</Label>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+          Dès 640&nbsp;px
+        </Button>
+        <Button variant="outline" size="sm" className="sm:hidden">
+          Sous 640&nbsp;px
+        </Button>
+        <TextLink to="/shop" variant="label" arrow className="hidden sm:inline-flex">
+          Lien dès 640&nbsp;px
+        </TextLink>
+        <TextLink to="/shop" variant="label" arrow className="sm:hidden">
+          Lien sous 640&nbsp;px
+        </TextLink>
+        <Badge className="hidden sm:inline-flex">Dès 640&nbsp;px</Badge>
+      </div>
       <Label>Liens de texte</Label>
       <div className="flex flex-col items-start gap-3">
         <p className="max-w-[46ch] text-muted">
@@ -374,6 +390,7 @@ function Selectors() {
   const [size, setSize] = useState('95');
   const [width, setWidth] = useState(35);
   const [leather, setLeather] = useState('cognac');
+  const [buckle, setBuckle] = useState('poli');
   const [color, setColor] = useState('noir-marron');
   const [quantity, setQuantity] = useState(1);
   const colors = [...products[0].colors, ...products[5].colors];
@@ -396,6 +413,8 @@ function Selectors() {
       />
       <Label>Swatches — nuancier de l’Atelier</Label>
       <Swatches label="Cuir" options={LEATHERS} value={leather} onChange={setLeather} />
+      <Label>Swatches — teintes claires (boucles)</Label>
+      <Swatches label="Boucle" options={BUCKLES} value={buckle} onChange={setBuckle} />
       <Label>Swatches — coloris produit, dont bicolore</Label>
       <Swatches options={colors} value={color} onChange={setColor} size="lg" />
       <Swatches options={colors} value={color} onChange={setColor} size="sm" className="mt-2" />
@@ -413,10 +432,29 @@ function ProductDemo() {
   const essential = products[0];
   return (
     <div className="flex flex-col">
-      <Label>ProductCard — visuel réel, sinon dessin de repli</Label>
+      <Label>ProductCard — la tuile de la boutique (components/product)</Label>
       <div className="grid grid-cols-2 gap-4">
         <ProductCard product={products[0]} />
         <ProductCard product={products[5]} />
+      </div>
+      <Label>Packshot — second visuel au survol&nbsp;: hoverFit «&nbsp;cover&nbsp;» (défaut), puis «&nbsp;contain&nbsp;»</Label>
+      <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-4">
+        {[
+          { ratio: '4 / 5', hoverFit: 'cover' },
+          { ratio: '1 / 1', hoverFit: 'cover' },
+          { ratio: '4 / 5', hoverFit: 'contain' },
+          { ratio: '1 / 1', hoverFit: 'contain' },
+        ].map((tile) => (
+          <Packshot
+            key={`${tile.ratio}-${tile.hoverFit}`}
+            src={productImage(essential, 'cognac', 'studio')}
+            hoverSrc={productImage(essential, 'cognac', 'boucle')}
+            hoverFit={tile.hoverFit}
+            ratio={tile.ratio}
+            alt={`DAG Essential cognac, survol ${tile.hoverFit}`}
+            belt={essential.colors[2].belt}
+          />
+        ))}
       </div>
       <Label>Packshot — surfaces craie / papier, image manquante</Label>
       <div className="grid grid-cols-3 gap-3">
@@ -496,7 +534,7 @@ function Overlays() {
           onClick={() =>
             toast({
               title: 'DAG Essential ajoutée au panier',
-              description: 'Noir · 95 cm',
+              description: 'Noir · 95\u00a0cm',
               icon: 'bag',
               action: { label: 'Voir', onClick: openCart },
             })

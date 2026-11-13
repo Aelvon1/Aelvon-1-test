@@ -65,7 +65,10 @@ export function validateContactField(field, values = {}) {
       const message = String(value ?? '').trim();
       if (!message) return 'Écrivez votre message.';
       if (message.length < MESSAGE_MIN) return 'Votre message est un peu court. Dites-nous-en davantage.';
-      if (message.length > MESSAGE_MAX) return `Votre message dépasse ${MESSAGE_MAX}${NBSP}caractères. Raccourcissez-le un peu.`;
+      // le décompte figure dans l'erreur : elle remplace l'aide du champ, où il s'affiche d'ordinaire
+      if (message.length > MESSAGE_MAX) {
+        return `Votre message compte ${message.length}${NBSP}caractères pour ${MESSAGE_MAX} au plus. Raccourcissez-le un peu.`;
+      }
       return '';
     }
     default:

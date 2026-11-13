@@ -7,8 +7,9 @@ import { NBSP } from './format';
 const COUNTRY_OPTIONS = COUNTRIES.map((country) => ({ value: country.code, label: country.name }));
 
 /**
- * Étape 1 — coordonnées, adresse, mode de livraison, mot d'accompagnement.
+ * Étape 1 — coordonnées, adresse, mode de livraison, cadeau (mot d'accompagnement facultatif).
  * Formulaire contrôlé : l'état, la validation et l'enregistrement du brouillon vivent dans la page.
+ * L'ordre des champs est celui de CHECKOUT_FIELDS (lib/validation).
  * @param {{
  *   values: Record<string, string>, errors: Record<string, string>, gift: boolean,
  *   shipping: number, today: Date,
@@ -41,14 +42,22 @@ export default function DetailsStep({ values, errors, gift, shipping, today, onC
           <Field label="Nom" error={errors.lastName}>
             <Input {...bind('lastName')} autoComplete="family-name" autoCapitalize="words" required />
           </Field>
-          <Field label="Téléphone" optional hint="Pour le transporteur, en cas de besoin." error={errors.phone} className="sm:col-span-2">
-            <Input {...bind('phone')} type="tel" inputMode="tel" autoComplete="tel" />
-          </Field>
         </div>
       </FormGroup>
 
-      <FormGroup title="Adresse" note="France, Belgique, Suisse et Luxembourg.">
+      {/* Le pays ouvre le groupe : le code postal et le téléphone, validés d'après lui, viennent ensuite. */}
+      <FormGroup title="Adresse" note="France métropolitaine, Belgique, Suisse et Luxembourg.">
         <div className="grid gap-x-5 gap-y-6 sm:grid-cols-6">
+          <Field label="Pays" error={errors.country} className="sm:col-span-6">
+            <Select
+              name="country"
+              value={values.country}
+              onChange={(event) => onChange('country', event.target.value)}
+              options={COUNTRY_OPTIONS}
+              autoComplete="shipping country"
+              required
+            />
+          </Field>
           <Field label="Adresse" error={errors.address} className="sm:col-span-6">
             <Input {...bind('address')} autoComplete="shipping address-line1" required />
           </Field>
@@ -67,15 +76,8 @@ export default function DetailsStep({ values, errors, gift, shipping, today, onC
           <Field label="Ville" error={errors.city} className="sm:col-span-4">
             <Input {...bind('city')} autoComplete="shipping address-level2" autoCapitalize="words" required />
           </Field>
-          <Field label="Pays" error={errors.country} className="sm:col-span-6">
-            <Select
-              name="country"
-              value={values.country}
-              onChange={(event) => onChange('country', event.target.value)}
-              options={COUNTRY_OPTIONS}
-              autoComplete="shipping country"
-              required
-            />
+          <Field label="Téléphone" optional hint="Pour le transporteur, en cas de besoin." error={errors.phone} className="sm:col-span-6">
+            <Input {...bind('phone')} type="tel" inputMode="tel" autoComplete="tel" />
           </Field>
         </div>
       </FormGroup>
@@ -90,12 +92,13 @@ export default function DetailsStep({ values, errors, gift, shipping, today, onC
           checked={gift}
           onChange={(event) => onGift(event.target.checked)}
           label="C’est un cadeau"
-          description="Joignez quelques mots&nbsp;: ils accompagneront le colis."
+          description="Si vous le souhaitez, joignez quelques mots&nbsp;: ils accompagneront le colis."
           className="-mt-2.5"
         />
         {gift ? (
           <Field
             label="Votre mot"
+            optional
             hint={`${noteLength}${NBSP}/${NBSP}${GIFT_NOTE_MAX} caractères`}
             error={errors.giftNote}
             className="page-enter mt-4"

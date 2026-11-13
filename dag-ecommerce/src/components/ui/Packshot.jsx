@@ -14,18 +14,22 @@ const SURFACES = {
  * affiche un dessin de ceinture (BeltThumb) si l'image manque ou échoue.
  * @param {{
  *   src?: string|null, alt?: string, belt?: Partial<import('../../data/atelier').BeltConfig>,
- *   hoverSrc?: string, ratio?: string, surface?: 'papier'|'craie'|'none',
+ *   hoverSrc?: string, hoverFit?: 'cover'|'contain', ratio?: string, surface?: 'papier'|'craie'|'none',
  *   loading?: 'lazy'|'eager', className?: string, children?: import('react').ReactNode
  * }} props
  *   ratio : rapport largeur/hauteur CSS (défaut « 4 / 5 ») · hoverSrc : second visuel en fondu croisé
- *   au survol (de la tuile ou d'un ancêtre `.group`) · children : calques posés sur la tuile
- *   (étiquette, bouton favori) — ils héritent d'une palette sombre sur clair.
+ *   au survol (de la tuile ou d'un ancêtre `.group`) · hoverFit : « cover » (défaut) fait remplir la
+ *   tuile au second visuel — les gros plans sont cadrés bord à bord et seraient coupés net au milieu
+ *   d'une tuile non carrée ; « contain » le montre en entier, pour un visuel détouré avec ses marges
+ *   children : calques posés sur la tuile (étiquette, bouton favori) — ils héritent d'une palette
+ *   sombre sur clair.
  */
 export default function Packshot({
   src,
   alt = '',
   belt,
   hoverSrc,
+  hoverFit = 'cover',
   ratio = '4 / 5',
   surface = 'papier',
   loading = 'lazy',
@@ -79,7 +83,10 @@ export default function Packshot({
           draggable="false"
           onLoad={() => setHoverReady(hoverSrc)}
           onError={() => setHoverReady(null)}
-          className="packshot-img packshot-hover absolute inset-0 size-full object-contain opacity-0"
+          className={cn(
+            'packshot-img packshot-hover absolute inset-0 size-full opacity-0',
+            hoverFit === 'contain' ? 'object-contain' : 'object-cover',
+          )}
         />
       ) : null}
 

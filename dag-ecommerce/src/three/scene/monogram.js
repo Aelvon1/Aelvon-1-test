@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // Monogramme : le texte est dessiné sur un canvas, dont on tire un masque (alpha) et une
-// carte de normales (biseau de l'empreinte). Redessiné à chaque frappe, sans toucher à la géométrie.
+// carte de normales (épaulement de l'empreinte + grain du cuir, qui transparaît sous le marquage).
+// Redessiné à chaque frappe ou changement de fini, sans toucher à la géométrie.
 // ---------------------------------------------------------------------------
 
 export const MONO_W = 640;
@@ -50,8 +51,13 @@ export function createMonogramCanvases() {
   return { text: mk(), alpha: mk(), normal: mk() };
 }
 
-/** Dessine `text` (≤ 3 caractères) ; renvoie false si le texte est vide. */
-export function drawMonogram(canvases, text) {
+/**
+ * Dessine `text` (≤ 3 caractères) ; renvoie false si le texte est vide.
+ * @param {{ normalBytes: Uint8ClampedArray, ormBytes: Uint8ClampedArray, size: number, tile: number }} [grain]
+ *        cartes du fini de cuir : le grain reste lisible dans l'empreinte et use la dorure sur ses bords
+ * @param {number} [heightMm] hauteur réelle de la pastille, pour mettre le grain à l'échelle
+ */
+export function drawMonogram(canvases, text, grain = null, heightMm = 14) {
   const chars = Array.from(String(text ?? '').trim()).slice(0, 3);
   const w = MONO_W;
   const h = MONO_H;
@@ -72,7 +78,7 @@ export function drawMonogram(canvases, text) {
   let size = h * 0.86;
   const measure = () => {
     ctx.font = `${WEIGHT} ${size}px ${MONO_FONT}`;
-    const track = size * 0.09;
+    const track = size * 0.065;
     const widths = chars.map((ch) => ctx.measureText(ch).width);
     const total = widths.reduce((a, b) => a + b, 0) + track * (chars.length - 1);
     return { widths, total, track };
@@ -106,16 +112,31 @@ export function drawMonogram(canvases, text) {
 
   const aimg = actx.createImageData(w, h);
   const nimg = nctx.createImageData(w, h);
-  const K = 7.5; // pente du biseau
+  const K = 7.5; // pente de l'épaulement
+  const GRAIN = 0.7; // part du relief du cuir conservée sous le marquage
+  const gs = grain ? grain.size : 0;
+  const gk = grain ? (heightMm / h / grain.tile) * gs : 0; // pixels de cuir par pixel de pastille
   for (let y = 0; y < h; y++) {
     const ya = Math.max(0, y - 1) * w;
     const yb = Math.min(h - 1, y + 1) * w;
     for (let xx = 0; xx < w; xx++) {
       const i = y * w + xx;
       const o = i * 4;
-      // masque net, très légèrement élargi pour porter le biseau
+      let gx = 0;
+      let gy = 0;
+      let pit = 0;
+      if (grain) {
+        const q = ((Math.floor(y * gk) % gs) * gs + (Math.floor(xx * gk) % gs)) * 4;
+        gx = (grain.normalBytes[q] / 255 - 0.5) * 2 * GRAIN;
+        gy = (grain.normalBytes[q + 1] / 255 - 0.5) * 2 * GRAIN;
+        pit = 1 - grain.ormBytes[q] / 255; // creux du grain : pores, sillons
+      }
+      // masque net, très légèrement élargi pour porter l'épaulement
       const t = Math.min(1, Math.max(0, (bevel[i] - 0.1) / 0.3));
-      const a = Math.max(soft[i], t * t * (3 - 2 * t) * 0.999);
+      let a = Math.max(soft[i], t * t * (3 - 2 * t) * 0.999);
+      // le film ne descend pas au fond des creux et s'use sur les bords de la lettre
+      const rim = 1 - Math.min(1, Math.max(0, (bevel[i] - 0.45) / 0.4));
+      a *= 1 - Math.min(0.75, pit * (1.6 + 2.2 * rim));
       const g = Math.round(a * 255);
       aimg.data[o] = g;
       aimg.data[o + 1] = g;
@@ -125,9 +146,12 @@ export function drawMonogram(canvases, text) {
       const hx = -K * (bevel[i + (xx < w - 1 ? 1 : 0)] - bevel[i - (xx > 0 ? 1 : 0)]);
       const hy = -K * (bevel[yb + xx] - bevel[ya + xx]);
       const l = 1 / Math.sqrt(hx * hx + hy * hy + 1);
-      nimg.data[o] = Math.round(255 * (0.5 - 0.5 * hx * l));
-      nimg.data[o + 1] = Math.round(255 * (0.5 + 0.5 * hy * l));
-      nimg.data[o + 2] = Math.round(255 * (0.5 + 0.5 * l));
+      const nx = -hx * l + gx;
+      const ny = hy * l + gy;
+      const nz = Math.sqrt(Math.max(0.04, 1 - Math.min(0.96, nx * nx + ny * ny)));
+      nimg.data[o] = Math.round(255 * (0.5 + 0.5 * nx));
+      nimg.data[o + 1] = Math.round(255 * (0.5 + 0.5 * ny));
+      nimg.data[o + 2] = Math.round(255 * (0.5 + 0.5 * nz));
       nimg.data[o + 3] = 255;
     }
   }

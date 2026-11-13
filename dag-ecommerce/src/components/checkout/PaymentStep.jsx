@@ -1,4 +1,4 @@
-import { Button, TextLink } from '../ui';
+import { Button, Icon, TextLink } from '../ui';
 import DeliveryMethod from './DeliveryMethod';
 import DemoNotice from './DemoNotice';
 import FormGroup from './FormGroup';
@@ -24,23 +24,26 @@ function Row({ children, edit }) {
 
 /**
  * Étape 2 — rappel des coordonnées (modifiables) et confirmation. Aucune donnée bancaire n'est demandée.
+ * Les groupes reprennent ceux de l'étape 1 : le téléphone, demandé pour le transporteur, suit l'adresse.
  * @param {{
- *   customer: Record<string, string>, giftNote: string, shipping: number, today: Date, confirming: boolean,
+ *   customer: Record<string, string>, gift?: boolean, giftNote: string, shipping: number, today: Date,
+ *   confirming: boolean, notice?: string,
  *   onEdit: (field: string) => void, onConfirm: (event: import('react').FormEvent<HTMLFormElement>) => void
  * }} props
- *   customer : coordonnées normalisées (toCustomer) · onEdit(field) : retour à l'étape 1, focus sur ce champ
+ *   customer : coordonnées normalisées (toCustomer) · gift : la commande est un cadeau, avec ou sans mot ·
+ *   notice : message à lire avant de confirmer (panier modifié dans un autre onglet) ·
+ *   onEdit(field) : retour à l'étape 1, focus sur ce champ
  */
-export default function PaymentStep({ customer, giftNote, shipping, today, confirming, onEdit, onConfirm }) {
+export default function PaymentStep({ customer, gift = false, giftNote, shipping, today, confirming, notice = '', onEdit, onConfirm }) {
   const editContact = <EditLink label="Modifier le contact" onClick={() => onEdit('email')} />;
   const editAddress = <EditLink label="Modifier l’adresse de livraison" onClick={() => onEdit('address')} />;
-  const editNote = <EditLink label="Modifier le mot d’accompagnement" onClick={() => onEdit('giftNote')} />;
+  const editGift = <EditLink label="Modifier le cadeau et son mot d’accompagnement" onClick={() => onEdit('giftNote')} />;
 
   return (
     <form onSubmit={onConfirm} noValidate className="flex flex-col gap-10 md:gap-12">
       <FormGroup title="Contact" action={editContact}>
         <Row edit={editContact}>
           <p className="wrap-anywhere">{customer.email}</p>
-          {customer.phone ? <p className="text-muted">{customer.phone}</p> : null}
         </Row>
       </FormGroup>
 
@@ -53,6 +56,7 @@ export default function PaymentStep({ customer, giftNote, shipping, today, confi
                 {line}
               </span>
             ))}
+            {customer.phone ? <span className="mt-2 block text-muted">Tél. {customer.phone}</span> : null}
           </address>
         </Row>
       </FormGroup>
@@ -61,11 +65,19 @@ export default function PaymentStep({ customer, giftNote, shipping, today, confi
         <DeliveryMethod country={customer.country} shipping={shipping} from={today} framed={false} />
       </FormGroup>
 
-      {giftNote ? (
-        <FormGroup title="Cadeau" action={editNote}>
-          <Row edit={editNote}>
-            <p className="text-muted">Un mot accompagnera le colis&nbsp;:</p>
-            <p className="mt-2 max-w-[40ch] whitespace-pre-line wrap-anywhere font-display text-[1.375rem] italic leading-snug">{giftNote}</p>
+      {/* la case « C'est un cadeau » se retrouve ici même sans mot : ce que le client a coché est ce qu'il confirme */}
+      {gift || giftNote ? (
+        <FormGroup title="Cadeau" action={editGift}>
+          <Row edit={editGift}>
+            <p>Cette commande est un cadeau.</p>
+            {giftNote ? (
+              <>
+                <p className="mt-2 text-muted">Un mot accompagnera le colis&nbsp;:</p>
+                <p className="mt-2 max-w-[40ch] whitespace-pre-line wrap-anywhere font-display text-[1.375rem] italic leading-snug">{giftNote}</p>
+              </>
+            ) : (
+              <p className="text-muted">Aucun mot ne l’accompagne.</p>
+            )}
           </Row>
         </FormGroup>
       ) : null}
@@ -73,6 +85,13 @@ export default function PaymentStep({ customer, giftNote, shipping, today, confi
       <FormGroup title="Paiement">
         <DemoNotice />
       </FormGroup>
+
+      {notice ? (
+        <p role="alert" className="flex items-start gap-3 border border-fg/25 p-5 text-[0.9375rem] leading-relaxed">
+          <Icon name="alert" size={18} className="mt-1 text-accent" />
+          <span>{notice}</span>
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-x-8 gap-y-3 border-t border-line pt-8 sm:flex-row-reverse sm:items-center sm:justify-between md:pt-10">
         <Button type="submit" variant="primary" size="lg" icon="arrow-right" loading={confirming} className="max-sm:w-full">

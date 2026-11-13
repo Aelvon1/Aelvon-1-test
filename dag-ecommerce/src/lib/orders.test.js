@@ -124,7 +124,7 @@ describe('createOrder', () => {
       { items, totals, customer, giftNote: '  Joyeux anniversaire.  ' },
       { now: '2026-11-13T09:30:00.000Z', random: () => 0.5 },
     );
-    expect(Object.keys(created)).toEqual(['id', 'createdAt', 'items', 'totals', 'customer', 'giftNote', 'status']);
+    expect(Object.keys(created)).toEqual(['id', 'createdAt', 'items', 'totals', 'customer', 'gift', 'giftNote', 'status']);
     expect(created.id).toBe('DAG-JJJJJJ');
     expect(created.createdAt).toBe('2026-11-13T09:30:00.000Z');
     expect(created.items).toHaveLength(2);
@@ -132,8 +132,19 @@ describe('createOrder', () => {
     expect(created.items[1]).toMatchObject({ name: 'DAG Dress', quantity: 2 });
     expect(created.totals).toEqual({ subtotal: 89 + 99 * 2, shipping: 0, total: 89 + 99 * 2, count: 3 });
     expect(created.customer).toEqual(customer);
+    expect(created.gift).toBe(true);
     expect(created.giftNote).toBe('Joyeux anniversaire.');
     expect(created.status).toBe(ORDER_STATUS_DEMO);
+  });
+
+  it('retient qu’une commande est un cadeau, même sans mot d’accompagnement', () => {
+    expect(order({ gift: true, giftNote: '' })).toMatchObject({ gift: true, giftNote: '' });
+    expect(order({ gift: true, giftNote: '   ' })).toMatchObject({ gift: true, giftNote: '' });
+    expect(order({ gift: false, giftNote: '' }).gift).toBe(false);
+    expect(order().gift).toBe(false);
+    // un mot d'accompagnement suffit à en faire un cadeau ; seul le booléen true compte sinon
+    expect(order({ giftNote: 'Pour toi.' }).gift).toBe(true);
+    expect(order({ gift: 'oui' }).gift).toBe(false);
   });
 
   it('fige les lignes : modifier le panier ensuite ne change pas la commande', () => {
@@ -323,6 +334,26 @@ describe('sanitizeOrder', () => {
     const created = order({ giftNote: 'Pour toi.' });
     expect(sanitizeOrder(created)).toEqual(created);
     expect(sanitizeOrder(JSON.parse(JSON.stringify(created)))).toEqual(created);
+  });
+
+  it('conserve l’indication cadeau, et la déduit du mot pour une commande plus ancienne', () => {
+    const gifted = order({ gift: true });
+    expect(sanitizeOrder(JSON.parse(JSON.stringify(gifted))).gift).toBe(true);
+    const { gift, ...legacy } = order({ giftNote: 'Pour toi.' });
+    expect(gift).toBe(true);
+    expect(sanitizeOrder(legacy).gift).toBe(true);
+    const { gift: none, ...plain } = order();
+    expect(none).toBe(false);
+    expect(sanitizeOrder(plain).gift).toBe(false);
+  });
+
+  it('ne rechiffre pas une commande passée : elle garde le prix et le nom du jour de l’achat', () => {
+    const created = order();
+    const past = { ...created, items: created.items.map((item) => ({ ...item, price: 59, name: 'Ancien nom' })), totals: { subtotal: 177, shipping: 0, total: 177 } };
+    const read = sanitizeOrder(past);
+    expect(read.items.map((item) => item.price)).toEqual([59, 59]);
+    expect(read.items[0].name).toBe('Ancien nom');
+    expect(read.totals.total).toBe(177);
   });
 
   it('renvoie null pour ce qui n’est pas une commande', () => {

@@ -193,7 +193,7 @@ function DetailBlock({ title, className, children }) {
 }
 
 function Recap({ order }) {
-  const { customer, items, totals, giftNote } = order;
+  const { customer, items, totals, gift, giftNote } = order;
   return (
     <Section tone="noir" innerClassName="grid gap-y-12 lg:grid-cols-12 lg:gap-x-8">
       <div className="min-w-0 lg:col-span-7">
@@ -230,11 +230,19 @@ function Recap({ order }) {
               <span className="block wrap-anywhere">{customer.email}</span>
               {customer.phone ? <span className="block text-muted">{customer.phone}</span> : null}
             </DetailBlock>
-            {giftNote ? (
-              <DetailBlock title="Mot d’accompagnement" className="sm:col-span-2">
-                <span className="block max-w-[44ch] whitespace-pre-line wrap-anywhere font-display text-[1.375rem] italic leading-snug">
-                  {giftNote}
-                </span>
+            {gift ? (
+              <DetailBlock title="Cadeau" className="sm:col-span-2">
+                <span className="block">Cette commande est un cadeau.</span>
+                {giftNote ? (
+                  <>
+                    <span className="block text-muted">Ce mot accompagne le colis&nbsp;:</span>
+                    <span className="mt-3 block max-w-[44ch] whitespace-pre-line wrap-anywhere font-display text-[1.375rem] italic leading-snug">
+                      {giftNote}
+                    </span>
+                  </>
+                ) : (
+                  <span className="block text-muted">Aucun mot ne l’accompagne.</span>
+                )}
               </DetailBlock>
             ) : null}
           </dl>

@@ -17,9 +17,10 @@ const two = (n) => String(n).padStart(2, '0');
  *   visual : résultat de beltVisual() · alt : description du gros plan
  */
 export default function GestureSequence({ steps, className }) {
+  // une suite de lecture, sans liens d'ancre : seule compte la ligne, un peu sous le milieu de l'écran
   const active = useActiveSection(
     steps.map((step) => step.id),
-    { line: 0.55 },
+    { line: 0.55, anchored: false },
   );
   const activeIndex = Math.max(
     0,

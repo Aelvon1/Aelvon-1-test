@@ -27,6 +27,8 @@ import { composeOgImage, composeOnBackdrop } from './compose';
 //   og()                    → data URL JPEG 1200×630 de l'image de partage
 //   features()              → positions (mm) et normales des détails : boucle, passant, monogramme, crans, pointe…
 //                             utile avec capture({ camera: { position, target, fov } }) pour inspecter un détail
+//   flowFit(options)        → { ok, results } : écart maximal au cadre (|NDC|, 1 = bord) de la pose déroulée sur
+//                             180 s de respiration, par vue et par format ({ views, aspects, seconds, step })
 //   variants()              → allVariants() du catalogue
 //   state()                 → configuration et options courantes
 // ---------------------------------------------------------------------------
@@ -130,6 +132,14 @@ export default function Studio() {
         return composeOgImage(belt);
       },
       features: () => apiRef.current?.features() ?? null,
+      // Vérifie que la pose déroulée reste dans le cadre pendant toute sa respiration.
+      flowFit: ({ views = ['hero', 'full'], aspects = [16 / 9, 1, 9 / 16], seconds = 180, step = 0.5 } = {}) => {
+        const results = [];
+        for (const view of views) {
+          for (const aspect of aspects) results.push(apiRef.current?.flowExcursion({ view, aspect, seconds, step }) ?? null);
+        }
+        return { ok: results.every((r) => r && r.worst <= 1), results };
+      },
       variants: () => allVariants(),
       state: () => ({ config: stateRef.current.config, options: stateRef.current.options, description: describeBelt(stateRef.current.config) }),
       presets: { hero: HERO_BELT, default: DEFAULT_BELT },

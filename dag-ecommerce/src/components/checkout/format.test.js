@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NBSP, addressLines, countLabel, delayLabel, deliveryWindow, formatDateRange, fullName, tidySubtitle } from './format';
+import { NBSP, addressLines, countLabel, delayLabel, deliveryWindow, formatDateRange, fullName, lineLabel, tidySubtitle } from './format';
 
 /** Date locale à midi : indépendante du fuseau où tournent les tests. */
 const day = (year, month, date) => new Date(year, month - 1, date, 12);
@@ -58,6 +58,18 @@ describe('libellés', () => {
     expect(tidySubtitle('Cuir cognac lisse · 38 mm · 95 cm')).toBe(`Cuir cognac lisse · 38${NBSP}mm · 95${NBSP}cm`);
     expect(tidySubtitle('Noir · 95 cm · Monogramme AD')).toBe(`Noir · 95${NBSP}cm · Monogramme AD`);
     expect(tidySubtitle(undefined)).toBe('');
+  });
+
+  it('nomme une ligne par ce qui la distingue : produit, coloris, taille, options', () => {
+    const noir95 = { name: 'DAG Essential', subtitle: 'Noir · 95 cm' };
+    const noir100 = { name: 'DAG Essential', subtitle: 'Noir · 100 cm' };
+    expect(lineLabel(noir95)).toBe(`DAG Essential, Noir, 95${NBSP}cm`);
+    expect(lineLabel(noir100)).not.toBe(lineLabel(noir95));
+    expect(lineLabel({ name: 'DAG Sur-Mesure', subtitle: 'Cuir noir lisse · boucle acier poli · couture écru · 35 mm · 95 cm · Monogramme AB (dorure or)' })).toBe(
+      `DAG Sur-Mesure, Cuir noir lisse, boucle acier poli, couture écru, 35${NBSP}mm, 95${NBSP}cm, Monogramme AB (dorure or)`,
+    );
+    expect(lineLabel({ name: 'DAG Essential', subtitle: '' })).toBe('DAG Essential');
+    expect(lineLabel({ name: 'DAG Essential' })).toBe('DAG Essential');
   });
 
   it('compose le nom et l’adresse ligne à ligne', () => {

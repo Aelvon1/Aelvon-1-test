@@ -71,6 +71,49 @@ describe('validateEmail', () => {
     expect(validateEmail(`${'a'.repeat(250)}@exemple.fr`)).not.toBe('');
   });
 
+  it('refuse une ponctuation restée collée à l’adresse (fin de phrase, copier-coller)', () => {
+    for (const email of [
+      'jean@gmail.com.',
+      'jean@exemple.fr,',
+      'a@b.fr;',
+      'jean@exemple.fr)',
+      '<jean@exemple.fr>',
+      '<jean@exemple.fr',
+      'mailto:jean@exemple.fr',
+      '"jean@exemple.fr"',
+      'jean@exemple.fr.',
+      'jean@.exemple.fr',
+      'jean@-exemple.fr',
+      'jean@exemple-.fr',
+      'jean@exem_ple.fr',
+      '.jean@exemple.fr',
+      'jean.@exemple.fr',
+    ]) {
+      expect(validateEmail(email), email).toMatch(/semble incomplète/);
+    }
+  });
+
+  it('refuse une extension de domaine qui n’est pas faite de lettres', () => {
+    for (const email of ['jean@gmail.c0m', 'jean@exemple.123', 'jean@exemple.f-r', 'jean@192.168.0.1']) {
+      expect(validateEmail(email), email).toMatch(/semble incomplète/);
+    }
+  });
+
+  it('accepte sous-domaines, tirets, chiffres et extensions longues ou internationales', () => {
+    for (const email of [
+      'jean@mail.exemple.co.uk',
+      'jean@mon-domaine.fr',
+      'jean@123.fr',
+      'j_d-x+tag@exemple.photography',
+      "o'brien@exemple.ie",
+      'jean@münchen.de',
+      'jean@exemple.xn--p1ai',
+      'JEAN@EXEMPLE.FR',
+    ]) {
+      expect(validateEmail(email), email).toBe('');
+    }
+  });
+
   it('respecte la typographie française (espace insécable avant les deux-points)', () => {
     expect(validateEmail('x')).toContain('Exemple\u00a0: prenom@exemple.fr');
   });
@@ -156,12 +199,21 @@ describe('validatePostalCode', () => {
   });
 
   it('France : cinq chiffres', () => {
-    for (const code of ['75003', '01000', '97400', '98000', '20000', '75 003']) {
+    for (const code of ['75003', '01000', '20000', '20200', '95880', '75 003', 'F-75003']) {
       expect(validatePostalCode(code, 'FR')).toBe('');
     }
-    for (const code of ['7500', '750030', '00100', '75O03', 'ABCDE']) {
+    for (const code of ['7500', '750030', '00100', '75O03', 'ABCDE', '96000', '99123']) {
       expect(validatePostalCode(code, 'FR')).toBe('En France, le code postal compte 5\u00a0chiffres. Exemple\u00a0: 75003');
     }
+  });
+
+  it('France : métropole uniquement — outre-mer et Monaco sont refusés, avec la raison', () => {
+    // La Réunion, Guadeloupe, Martinique, Guyane, Mayotte, Nouvelle-Calédonie, Polynésie, Monaco
+    for (const code of ['97400', '97110', '97200', '97300', '97600', '98800', '98714', '98000', '97 400']) {
+      expect(validatePostalCode(code, 'FR'), code).toBe('Ce code postal est hors de France métropolitaine\u00a0: nous ne livrons pas encore l’outre-mer ni Monaco.');
+    }
+    // la règle ne vaut que pour la France : ailleurs, le message habituel du pays
+    expect(validatePostalCode('97400', 'BE')).toMatch(/^En Belgique/);
   });
 
   it('Belgique, Suisse, Luxembourg : quatre chiffres', () => {
@@ -259,8 +311,21 @@ describe('validateCheckout', () => {
 
   it('désigne le premier champ en erreur dans l’ordre d’affichage', () => {
     const result = validateCheckout({ ...valid, city: '', postalCode: '123', phone: 'abc' });
-    expect(Object.keys(result.errors)).toEqual(['phone', 'postalCode', 'city']);
-    expect(result.firstInvalid).toBe('phone');
+    expect(Object.keys(result.errors)).toEqual(['postalCode', 'city', 'phone']);
+    expect(result.firstInvalid).toBe('postalCode');
+  });
+
+  it('place le pays avant les champs qui en dépendent (code postal, téléphone)', () => {
+    const at = (field) => CHECKOUT_FIELDS.indexOf(field);
+    expect(at('country')).toBeGreaterThan(-1);
+    expect(at('country')).toBeLessThan(at('postalCode'));
+    expect(at('country')).toBeLessThan(at('phone'));
+  });
+
+  it('refuse une commande vers l’outre-mer ou Monaco', () => {
+    const result = validateCheckout({ ...valid, postalCode: '97400', city: 'Saint-Denis' });
+    expect(result.valid).toBe(false);
+    expect(result.firstInvalid).toBe('postalCode');
   });
 
   it('tolère une entrée absente', () => {

@@ -46,14 +46,16 @@ const smooth = (a, b, x) => {
 };
 
 /** Bruit cellulaire périodique : distances aux deux germes les plus proches (en unités de cellule). */
-async function worley(size, cellsX, cellsY, seed, f1, f2, budget) {
+async function worley(size, cellsX, cellsY, seed, f1, f2, budget, id = null) {
   const rnd = mulberry32(seed);
   const n = cellsX * cellsY;
   const fx = new Float32Array(n);
   const fy = new Float32Array(n);
+  const tag = id ? new Float32Array(n) : null;
   for (let i = 0; i < n; i++) {
     fx[i] = (i % cellsX) + rnd();
     fy[i] = Math.floor(i / cellsX) + rnd();
+    if (tag) tag[i] = rnd();
   }
   const sx = cellsX / size;
   const sy = cellsY / size;
@@ -65,6 +67,7 @@ async function worley(size, cellsX, cellsY, seed, f1, f2, budget) {
       const cx = Math.floor(px);
       let d1 = 1e9;
       let d2 = 1e9;
+      let near = 0;
       for (let j = -1; j <= 1; j++) {
         const iy = cy + j;
         const wy = iy < 0 ? iy + cellsY : iy >= cellsY ? iy - cellsY : iy;
@@ -79,6 +82,7 @@ async function worley(size, cellsX, cellsY, seed, f1, f2, budget) {
           if (d < d1) {
             d2 = d1;
             d1 = d;
+            near = k;
           } else if (d < d2) {
             d2 = d;
           }
@@ -87,36 +91,42 @@ async function worley(size, cellsX, cellsY, seed, f1, f2, budget) {
       const o = y * size + x;
       f1[o] = Math.sqrt(d1);
       f2[o] = Math.sqrt(d2);
+      if (tag) id[o] = tag[near];
     }
     if ((y & 31) === 31) await budget();
   }
 }
 
-/** Bruit de valeur fractal périodique, normalisé dans [0, 1]. */
-async function fbm(size, cells, octaves, seed, out, budget) {
+/**
+ * Bruit de valeur fractal périodique, normalisé dans [0, 1]. `cellsX` et `cellsY` peuvent différer :
+ * le motif s'étire alors le long de l'axe qui compte le moins de cellules.
+ */
+async function fbm(size, cellsX, cellsY, octaves, seed, out, budget) {
   const rnd = mulberry32(seed);
   out.fill(0);
   let amp = 1;
   let total = 0;
   for (let o = 0; o < octaves; o++) {
-    const c = cells << o;
-    const lat = new Float32Array(c * c);
+    const cx = cellsX << o;
+    const cy = cellsY << o;
+    const lat = new Float32Array(cx * cy);
     for (let i = 0; i < lat.length; i++) lat[i] = rnd();
-    const s = c / size;
+    const sx = cx / size;
+    const sy = cy / size;
     for (let y = 0; y < size; y++) {
-      const py = y * s;
+      const py = y * sy;
       const y0 = Math.floor(py);
       const ty = py - y0;
       const wy = ty * ty * (3 - 2 * ty);
-      const r0 = (y0 % c) * c;
-      const r1 = ((y0 + 1) % c) * c;
+      const r0 = (y0 % cy) * cx;
+      const r1 = ((y0 + 1) % cy) * cx;
       for (let x = 0; x < size; x++) {
-        const px = x * s;
+        const px = x * sx;
         const x0 = Math.floor(px);
         const tx = px - x0;
         const wx = tx * tx * (3 - 2 * tx);
-        const xa = x0 % c;
-        const xb = (x0 + 1) % c;
+        const xa = x0 % cx;
+        const xb = (x0 + 1) % cx;
         const a = lat[r0 + xa] + (lat[r0 + xb] - lat[r0 + xa]) * wx;
         const b = lat[r1 + xa] + (lat[r1 + xb] - lat[r1 + xa]) * wx;
         out[y * size + x] += amp * (a + (b - a) * wy);
@@ -127,6 +137,52 @@ async function fbm(size, cells, octaves, seed, out, budget) {
     amp *= 0.5;
   }
   for (let i = 0; i < out.length; i++) out[i] /= total;
+}
+
+/** Flou en boîte périodique (rayon en pixels), sur place. */
+function blur(field, size, radius) {
+  if (radius < 1) return;
+  const tmp = new Float32Array(size);
+  const norm = 1 / (2 * radius + 1);
+  for (let pass = 0; pass < 2; pass++) {
+    const step = pass ? size : 1;
+    const span = pass ? 1 : size;
+    for (let line = 0; line < size; line++) {
+      const base = line * span;
+      let acc = 0;
+      for (let i = -radius; i <= radius; i++) acc += field[base + ((i + size) % size) * step];
+      for (let i = 0; i < size; i++) {
+        tmp[i] = acc * norm;
+        acc += field[base + ((i + radius + 1) % size) * step] - field[base + ((i - radius + size) % size) * step];
+      }
+      for (let i = 0; i < size; i++) field[base + i * step] = tmp[i];
+    }
+  }
+}
+
+/** Déforme un champ périodique par deux bruits (amplitude en pixels) : les contours deviennent sinueux. */
+function warp(field, size, wx, wy, amount) {
+  const out = new Float32Array(field.length);
+  const mask = size - 1; // size est une puissance de deux
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = y * size + x;
+      const sx = x + (wx[i] - 0.5) * 2 * amount;
+      const sy = y + (wy[i] - 0.5) * 2 * amount;
+      const x0 = Math.floor(sx);
+      const y0 = Math.floor(sy);
+      const tx = sx - x0;
+      const ty = sy - y0;
+      const xa = x0 & mask;
+      const xb = (x0 + 1) & mask;
+      const ya = (y0 & mask) * size;
+      const yb = ((y0 + 1) & mask) * size;
+      const top = field[ya + xa] + (field[ya + xb] - field[ya + xa]) * tx;
+      const bottom = field[yb + xa] + (field[yb + xb] - field[yb + xa]) * tx;
+      out[i] = top + (bottom - top) * ty;
+    }
+  }
+  field.set(out);
 }
 
 const toSrgb = (v) => {
@@ -171,13 +227,15 @@ function normalBytes(size, height, pxMm, bytes) {
 // --- Cuirs -------------------------------------------------------------------
 
 const LEATHER = {
-  // Pleine fleur lisse : grain très fin, pores, légère ondulation.
+  // Pleine fleur lisse : pores fins et irréguliers, longues rides peu profondes, peau d'orange très fine.
   lisse: { size: 1024, tile: 26 },
-  // Grainé : galets irréguliers séparés par des sillons.
+  // Grainé : petits galets bombés de tailles mêlées, séparés par des sillons doux.
   graine: { size: 1024, tile: 28 },
-  // Nubuck : pas de relief, seulement le velours des fibres.
-  mat: { size: 512, tile: 20 },
+  // Nubuck : fibres très fines et plages de poil couché ; aucun relief marqué.
+  mat: { size: 1024, tile: 22 },
 };
+
+const ridge = (v) => 1 - Math.abs(2 * v - 1); // 1 sur la ligne de niveau 0,5 : rides longues et sinueuses
 
 async function generateLeather(finish) {
   const { size, tile } = LEATHER[finish];
@@ -195,51 +253,82 @@ async function generateLeather(finish) {
   if (finish === 'graine') {
     const g1 = new Float32Array(n);
     const g2 = new Float32Array(n);
-    await worley(size, 34, 34, 1207, f1, f2, budget); // galets ≈ 0,8 mm
-    await worley(size, 92, 92, 77, g1, g2, budget); // rides fines
-    await fbm(size, 8, 4, 31, low, budget);
+    const peb = new Float32Array(n);
+    await worley(size, 24, 24, 1207, f1, f2, budget); // grands galets ≈ 1,2 mm
+    await worley(size, 44, 44, 77, g1, g2, budget); // petits galets ≈ 0,6 mm
+    await fbm(size, 7, 7, 2, 31, low, budget); // plages où le grain se resserre
     for (let i = 0; i < n; i++) {
-      const valley = 1 - smooth(0.0, 0.5, f2[i] - f1[i]); // 1 au fond du sillon
-      const v2 = valley * valley; // épaulements arrondis
-      const dome = 1 - 0.9 * f1[i] * f1[i];
-      const c2 = (1 - smooth(0.0, 0.3, g2[i] - g1[i])) * (1 - valley);
-      const f = low[i] - 0.5;
-      height[i] = -0.075 * v2 + 0.03 * (dome - 0.5) - 0.006 * c2 + 0.012 * f;
-      rough[i] = 0.5 + 0.12 * v2 + 0.03 * c2 - 0.06 * (dome - 0.6) + 0.03 * f;
-      cavity[i] = 1 - 0.35 * v2 - 0.06 * c2;
-      tint[i] = 1 - 0.1 * v2 - 0.02 * c2 + 0.03 * f;
+      // profil bombé : la pente est nulle au sommet, franche au bord du galet
+      const xa = Math.min(1, (f2[i] - f1[i]) / 0.7);
+      const pa = 1 - Math.pow(1 - xa, 2.3);
+      const xb = Math.min(1, (g2[i] - g1[i]) / 0.66);
+      const pb = 1 - Math.pow(1 - xb, 2.3);
+      const fine = smooth(0.25, 0.75, low[i]);
+      // les petits galets redécoupent les grands, davantage par endroits
+      peb[i] = pa * (1 - (0.45 + 0.3 * fine) * (1 - pb)) + 0.1 * (1 - f1[i] * f1[i]) * pa;
+    }
+    // Contours sinueux puis adoucis : des galets, plus une mosaïque de polygones à arêtes vives.
+    await fbm(size, 36, 36, 2, 5, g1, budget);
+    await fbm(size, 36, 36, 2, 9, g2, budget);
+    warp(peb, size, g1, g2, 5);
+    await budget();
+    blur(peb, size, 3);
+    blur(peb, size, 2);
+    await budget();
+    blur(peb, size, 1);
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 0; i < n; i++) {
+      lo = Math.min(lo, peb[i]);
+      hi = Math.max(hi, peb[i]);
+    }
+    for (let i = 0; i < n; i++) {
+      const p = (peb[i] - lo) / (hi - lo);
+      const valley = 1 - smooth(0.15, 0.7, p);
+      height[i] = 0.05 * p;
+      rough[i] = 0.5 + 0.08 * valley - 0.03 * smooth(0.75, 1, p);
+      cavity[i] = 1 - 0.16 * valley;
+      tint[i] = 1 - 0.06 * valley;
     }
   } else if (finish === 'lisse') {
-    const g1 = new Float32Array(n);
-    const g2 = new Float32Array(n);
+    const id = new Float32Array(n);
+    const w1 = new Float32Array(n);
+    const w2 = new Float32Array(n);
     const hi = new Float32Array(n);
-    const mid = new Float32Array(n);
-    await worley(size, 74, 60, 9001, f1, f2, budget);
-    await worley(size, 128, 128, 4242, g1, g2, budget);
-    await fbm(size, 7, 4, 5, low, budget);
-    await fbm(size, 22, 3, 17, mid, budget);
-    await fbm(size, 96, 2, 11, hi, budget);
+    await worley(size, 104, 104, 4242, f1, f2, budget, id); // semis de pores (≈ 0,25 mm)
+    await fbm(size, 5, 5, 3, 5, low, budget);
+    await fbm(size, 12, 6, 3, 17, w1, budget); // rides, plutôt en travers de la lanière
+    await fbm(size, 26, 14, 2, 23, w2, budget); // réseau de plis plus fin
+    await fbm(size, 150, 150, 2, 11, hi, budget); // peau d'orange
     for (let i = 0; i < n; i++) {
-      // rides fines, estompées par plages : le réseau ne se referme pas partout
-      const c1 = (1 - smooth(0.0, 0.26, f2[i] - f1[i])) * (0.25 + 0.75 * smooth(0.34, 0.62, mid[i]));
       const f = low[i] - 0.5;
-      const pore = (1 - smooth(0.1, 0.26, g1[i])) * smooth(-0.3, 0.05, f);
-      height[i] = -0.012 * c1 - 0.02 * pore + 0.012 * f + 0.004 * (hi[i] - 0.5);
-      rough[i] = 0.4 + 0.07 * c1 + 0.09 * pore + 0.012 * f + 0.025 * (hi[i] - 0.5);
-      cavity[i] = 1 - 0.12 * c1 - 0.25 * pore;
-      tint[i] = 1 - 0.045 * c1 - 0.1 * pore + 0.035 * f;
+      // un pore par cellule au plus, de taille variable, et seulement par plages : aucun motif répété
+      const present = id[i] < 0.2 + 0.5 * smooth(0.4, 0.66, low[i]) ? 1 : 0;
+      const radius = 0.11 + 0.16 * ((id[i] * 7.31) % 1);
+      const pore = present * (1 - smooth(radius * 0.45, radius, f1[i]));
+      const r1 = smooth(0.94, 0.995, ridge(w1[i])) * smooth(0.42, 0.66, w2[i]);
+      const r2 = smooth(0.9, 0.99, ridge(w2[i])) * (0.2 + 0.8 * smooth(0.5, 0.72, w1[i]));
+      const fold = Math.max(r1, 0.7 * r2);
+      const micro = hi[i] - 0.5;
+      height[i] = -0.014 * pore - 0.004 * fold + 0.006 * micro + 0.012 * f;
+      rough[i] = 0.41 + 0.09 * pore + 0.03 * fold + 0.05 * micro + 0.02 * f;
+      cavity[i] = 1 - 0.22 * pore - 0.05 * fold;
+      tint[i] = 1 - 0.07 * pore - 0.012 * fold + 0.03 * f;
     }
   } else {
     const hi = new Float32Array(n);
-    await fbm(size, 20, 4, 99, low, budget);
-    await fbm(size, 128, 2, 7, hi, budget);
+    const nap = new Float32Array(n);
+    await fbm(size, 9, 4, 3, 99, nap, budget); // plages de poil couché, étirées dans le sens du brossage
+    await fbm(size, 56, 40, 2, 3, low, budget); // moutonnement du velours
+    await fbm(size, 190, 190, 2, 7, hi, budget); // fibres
     for (let i = 0; i < n; i++) {
-      const f = low[i] - 0.5;
+      const f = nap[i] - 0.5;
+      const m = low[i] - 0.5;
       const h = hi[i] - 0.5;
-      height[i] = 0.009 * h + 0.004 * f;
-      rough[i] = 0.93 + 0.06 * f;
-      cavity[i] = 1;
-      tint[i] = 1 + 0.13 * f + 0.1 * h;
+      height[i] = 0.016 * h + 0.012 * m;
+      rough[i] = 0.9 + 0.08 * f + 0.06 * h;
+      cavity[i] = 1 - 0.2 * Math.max(0, -h) - 0.1 * Math.max(0, -m);
+      tint[i] = 1 + 0.16 * f + 0.14 * m + 0.2 * h;
     }
   }
   await budget();
@@ -264,7 +353,11 @@ async function generateLeather(finish) {
   return {
     finish,
     tile,
+    size,
     tintGain: 1 / 0.86,
+    // octets bruts : le monogramme y lit le grain (relief et creux) pour le laisser transparaître
+    normalBytes: nb,
+    ormBytes: ob,
     normal: canvasOf(size, nb),
     orm: canvasOf(size, ob),
     albedo: canvasOf(size, ab),
@@ -342,11 +435,11 @@ export function threadMaps() {
   const bytes = new Uint8ClampedArray(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const ph = ((x / size) * 3 + (y / size) * 1) * Math.PI * 2;
-      const d = Math.cos(ph) * 0.75;
-      // gradient de sin(ph) le long de (3, 1)
-      const gx = d * 0.95;
-      const gy = d * 0.32;
+      // deux brins retordus : 5 spires sur la longueur du point, inclinées d'environ 55°
+      const ph = ((x / size) * 5 + (y / size) * 2) * Math.PI * 2;
+      const d = Math.cos(ph) * 0.6;
+      const gx = d * 0.93;
+      const gy = d * 0.37;
       const l = 1 / Math.sqrt(gx * gx + gy * gy + 1);
       const o = (y * size + x) * 4;
       bytes[o] = toByte(0.5 - 0.5 * gx * l);

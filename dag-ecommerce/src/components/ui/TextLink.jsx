@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
-import { cn } from './cn';
+import { cn, yieldDisplay } from './cn';
 
 const ARROWS = { right: 'arrow-right', left: 'arrow-left', 'up-right': 'arrow-up-right', down: 'arrow-down' };
 
@@ -38,7 +38,8 @@ export default function TextLink({
   const leading = arrowName === 'arrow-left';
 
   const classes = cn(
-    'group/link inline-flex items-center transition-colors duration-500 ease-luxe',
+    // une classe d'affichage de l'appelant (« hidden sm:inline-flex ») remplace « inline-flex »
+    yieldDisplay('group/link inline-flex items-center transition-colors duration-500 ease-luxe', className),
     variant === 'label'
       ? 'min-h-11 gap-3 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.22em]'
       : 'gap-2 align-baseline',

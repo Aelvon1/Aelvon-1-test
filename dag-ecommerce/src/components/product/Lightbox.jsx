@@ -6,13 +6,18 @@ import { EASE_LUXE, Icon, Packshot, cn } from '../ui';
 
 const pad = (n) => String(n).padStart(2, '0');
 
+// aria-disabled, jamais disabled : une commande désactivée alors qu'elle porte le focus le laisserait
+// retomber hors de la fenêtre, où les flèches du clavier ne sont plus entendues.
 const CONTROL =
-  'grid size-12 place-items-center text-fg transition-colors duration-300 hover:text-accent disabled:cursor-not-allowed disabled:text-fg/25';
+  'grid size-12 place-items-center text-fg transition-colors duration-300 hover:text-accent aria-disabled:cursor-not-allowed aria-disabled:text-fg/25';
 
 /** Fenêtre de la visionneuse : montée à chaque ouverture, elle repart du visuel demandé. */
 function Viewer({ layerRef, title, shots, belt, startIndex, reduced, onClose }) {
   const trackRef = useRef(null);
   const [current, setCurrent] = useState(startIndex);
+  // Visuel visé par la dernière commande (flèche, repère). Le défilement adouci n'y est pas encore :
+  // `current`, lu dans la position de la bande, le rejoint avec retard. null : le visiteur fait défiler lui-même.
+  const aim = useRef(null);
   const last = shots.length - 1;
 
   // se place sur le visuel demandé avant la première image
@@ -25,8 +30,16 @@ function Viewer({ layerRef, title, shots, belt, startIndex, reduced, onClose }) 
     const track = trackRef.current;
     if (!track) return;
     const next = Math.min(last, Math.max(0, index));
+    aim.current = next;
     track.scrollTo({ left: next * track.clientWidth, behavior: reduced ? 'auto' : 'smooth' });
     if (reduced) setCurrent(next);
+  };
+
+  /** Avance ou recule depuis le visuel visé : deux commandes rapprochées comptent pour deux. */
+  const step = (delta) => goTo((aim.current ?? current) + delta);
+
+  const release = () => {
+    aim.current = null;
   };
 
   const onScroll = (event) => {
@@ -37,10 +50,10 @@ function Viewer({ layerRef, title, shots, belt, startIndex, reduced, onClose }) 
   };
 
   const onKeyDown = (event) => {
-    const moves = { ArrowRight: current + 1, ArrowLeft: current - 1, Home: 0, End: last };
+    const moves = { ArrowRight: () => step(1), ArrowLeft: () => step(-1), Home: () => goTo(0), End: () => goTo(last) };
     if (!(event.key in moves)) return;
     event.preventDefault();
-    goTo(moves[event.key]);
+    moves[event.key]();
   };
 
   return (
@@ -76,6 +89,8 @@ function Viewer({ layerRef, title, shots, belt, startIndex, reduced, onClose }) 
         ref={trackRef}
         data-lenis-prevent
         onScroll={onScroll}
+        onPointerDown={release}
+        onWheel={release}
         className="relative flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {shots.map((shot, index) => (
@@ -98,7 +113,7 @@ function Viewer({ layerRef, title, shots, belt, startIndex, reduced, onClose }) 
       </ul>
 
       <footer className="relative flex h-[5.5rem] shrink-0 items-center justify-center gap-2 pb-[env(safe-area-inset-bottom)]">
-        <button type="button" onClick={() => goTo(current - 1)} disabled={current === 0} aria-label="Visuel précédent" className={CONTROL}>
+        <button type="button" onClick={() => step(-1)} aria-disabled={current === 0} aria-label="Visuel précédent" className={CONTROL}>
           <Icon name="arrow-left" size={22} />
         </button>
         <div className="flex items-center" role="group" aria-label="Choisir un visuel">
@@ -120,7 +135,7 @@ function Viewer({ layerRef, title, shots, belt, startIndex, reduced, onClose }) 
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => goTo(current + 1)} disabled={current === last} aria-label="Visuel suivant" className={CONTROL}>
+        <button type="button" onClick={() => step(1)} aria-disabled={current === last} aria-label="Visuel suivant" className={CONTROL}>
           <Icon name="arrow-right" size={22} />
         </button>
       </footer>

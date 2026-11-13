@@ -1,19 +1,24 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import PageHero from '../components/editorial/PageHero';
 import RichText from '../components/editorial/RichText';
 import SectionNav from '../components/editorial/SectionNav';
 import { FAQ_CATEGORIES, FAQ_COUNT, faqJsonLd, filterFaq, fold, highlightParts, searchTerms } from '../components/editorial/faq-content';
 import { useActiveSection } from '../components/editorial/useActiveSection';
 import { useHashAnchor } from '../components/editorial/useHashAnchor';
+import { useSearchQuery } from '../components/editorial/useSearchQuery';
 import { CONTACT_EMAIL } from '../components/layout/navigation';
 import { useJsonLd } from '../components/product/useJsonLd';
 import { Accordion, Button, Icon, Reveal, Section, SectionHeading, TextLink, cn } from '../components/ui';
-import { usePageMeta } from '../hooks';
+import { scrollToTarget, usePageMeta } from '../hooks';
 
 const JSON_LD = faqJsonLd();
 const SUGGESTIONS = ['livraison', 'taille', 'retour', 'paiement', 'garantie', 'entretien'];
 const two = (n) => String(n).padStart(2, '0');
 const plural = (n, singular, pluralForm = `${singular}s`) => `${n}\xa0${n > 1 ? pluralForm : singular}`;
+
+// Les réponses commencent sous le premier écran : on y conduit le visiteur. La rubrique rejointe reçoit
+// le focus — le champ de recherche est quitté, le clavier virtuel se replie.
+const showResults = (id) => scrollToTarget(`#${id}`, { focus: true });
 
 /** Intitulé d'une question, les mots cherchés surlignés. */
 function Highlighted({ text, query }) {
@@ -39,7 +44,7 @@ export default function FAQ() {
 
   const searchId = useId();
   const inputRef = useRef(null);
-  const [query, setQuery] = useState('');
+  const { query, type, search } = useSearchQuery();
 
   const searching = searchTerms(query).length > 0;
   const trimmed = query.trim();
@@ -47,9 +52,24 @@ export default function FAQ() {
   const visible = filtered.filter((category) => category.questions.length > 0);
   const total = visible.reduce((sum, category) => sum + category.questions.length, 0);
   const active = useActiveSection(visible.map((category) => category.id));
+  const firstId = visible[0]?.id;
+
+  // Valider la recherche (Entrée, touche « Rechercher » du clavier virtuel) conduit aux réponses.
+  const onSubmit = (event) => {
+    event.preventDefault();
+    if (searching && firstId) showResults(firstId);
+  };
+
+  // Une suggestion lance sa recherche : ses réponses sont montrées une fois affichées.
+  const reveal = useRef(false);
+  useEffect(() => {
+    if (!reveal.current) return;
+    reveal.current = false;
+    if (firstId) showResults(firstId);
+  }, [query, firstId]);
 
   const clear = () => {
-    setQuery('');
+    search('');
     inputRef.current?.focus();
   };
 
@@ -75,7 +95,7 @@ export default function FAQ() {
         lead="Livraison, tailles, retours, paiement, garantie&nbsp;: l’essentiel est ici. Et si la réponse manque, écrivez-nous."
       >
         <Reveal delay={0.35} className="mt-12 max-w-3xl lg:mt-16">
-          <form role="search" onSubmit={(event) => event.preventDefault()}>
+          <form role="search" onSubmit={onSubmit}>
             <label htmlFor={searchId} className="sr-only">
               Rechercher dans l’aide
             </label>
@@ -90,11 +110,12 @@ export default function FAQ() {
                 enterKeyHint="search"
                 placeholder="Rechercher une question"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => type(event.target.value)}
+                onBlur={() => search(query)}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape' && query) {
                     event.preventDefault();
-                    setQuery('');
+                    search('');
                   }
                 }}
                 className="control min-h-16 min-w-0 flex-1 bg-transparent font-display text-[clamp(1.375rem,2vw,1.75rem)] text-fg outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
@@ -123,7 +144,10 @@ export default function FAQ() {
                   key={word}
                   type="button"
                   aria-pressed={pressed}
-                  onClick={() => setQuery(pressed ? '' : word)}
+                  onClick={() => {
+                    reveal.current = !pressed;
+                    search(pressed ? '' : word);
+                  }}
                   className={cn(
                     'min-h-11 rounded-full border px-4 text-[0.8125rem] transition-colors duration-300',
                     pressed ? 'border-fg bg-fg text-bg' : 'border-fg/25 text-fg/85 hover:border-fg/70 hover:text-fg',

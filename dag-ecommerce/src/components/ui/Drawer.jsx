@@ -7,10 +7,24 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { cn } from './cn';
 
+// Zones sûres (encoche, barre d'état, indicateur d'accueil) : le panneau s'en écarte du côté
+// où il touche le bord de l'écran. Sans zone sûre, env(…, 0px) vaut 0 : rien ne bouge.
 const SIDES = {
-  right: { panel: 'inset-y-0 right-0 h-full w-full border-l', hidden: { x: '100%' }, shown: { x: 0 } },
-  left: { panel: 'inset-y-0 left-0 h-full w-full border-r', hidden: { x: '-100%' }, shown: { x: 0 } },
-  bottom: { panel: 'inset-x-0 bottom-0 max-h-[88dvh] w-full border-t', hidden: { y: '100%' }, shown: { y: 0 } },
+  right: {
+    panel: 'inset-y-0 right-0 h-full w-full border-l pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)]',
+    hidden: { x: '100%' },
+    shown: { x: 0 },
+  },
+  left: {
+    panel: 'inset-y-0 left-0 h-full w-full border-r pt-[env(safe-area-inset-top,0px)] pl-[env(safe-area-inset-left,0px)]',
+    hidden: { x: '-100%' },
+    shown: { x: 0 },
+  },
+  bottom: {
+    panel: 'inset-x-0 bottom-0 max-h-[88dvh] w-full border-t pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]',
+    hidden: { y: '100%' },
+    shown: { y: 0 },
+  },
 };
 
 const WIDTHS = { sm: 'sm:max-w-[24rem]', md: 'sm:max-w-[30rem]', lg: 'sm:max-w-[38rem]' };
@@ -100,10 +114,18 @@ export default function Drawer({
                 <Icon name="close" size={22} />
               </button>
             </header>
-            <div data-lenis-prevent className={cn('scroll-area min-h-0 flex-1', padded && 'px-6 py-6 sm:px-8')}>
+            {/* le bas du panneau s'écarte de la zone sûre : par le pied s'il existe, sinon par la zone défilante */}
+            <div
+              data-lenis-prevent
+              className={cn(
+                'scroll-area min-h-0 flex-1',
+                padded && 'px-6 py-6 sm:px-8',
+                !footer && (padded ? 'pb-[max(1.5rem,env(safe-area-inset-bottom,0px))]' : 'pb-[env(safe-area-inset-bottom,0px)]'),
+              )}
+            >
               {children}
             </div>
-            {footer ? <footer className="shrink-0 border-t border-line px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-8">{footer}</footer> : null}
+            {footer ? <footer className="shrink-0 border-t border-line px-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pt-6 sm:px-8">{footer}</footer> : null}
           </Motion.div>
         </div>
       ) : null}

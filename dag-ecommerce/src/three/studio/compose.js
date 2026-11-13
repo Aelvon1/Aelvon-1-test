@@ -76,11 +76,11 @@ export async function composeOgImage(beltUrl) {
   ctx.fillRect(-3, -3, 6, 6);
   ctx.restore();
 
-  // Ceinture, à droite
-  const bh = H * 1.08;
+  // Ceinture, à droite : la boucle garde une vraie marge avec le bord (≈ 5 % de la largeur)
+  const bh = H * 1.04;
   const bw = (belt.naturalWidth / belt.naturalHeight) * bh;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(belt, W - bw * 0.955, (H - bh) / 2 + 6, bw, bh);
+  ctx.drawImage(belt, W - bw * 0.955 - 28, (H - bh) / 2 + 6, bw, bh);
 
   // Textes
   const x = 84;

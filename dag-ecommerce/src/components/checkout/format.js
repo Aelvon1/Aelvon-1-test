@@ -15,10 +15,10 @@ export function delayLabel(country) {
   return `${minDays} à ${maxDays}${NBSP}jours ouvrés`;
 }
 
-/** « 18 novembre 2026 » découpé ; le premier du mois s'écrit « 1er ». */
+/** « 18 novembre 2026 » découpé (formatDate écrit déjà « 1er » pour le premier du mois). */
 function dateParts(date) {
   const [day, month, year] = formatDate(date).split(/\s+/);
-  return { day: day === '1' ? '1er' : day, month, year };
+  return { day, month, year };
 }
 
 /**
@@ -43,6 +43,15 @@ export const deliveryWindow = (date, country) => estimateDelivery(date, delivery
 
 /** Description d'un article sans coupure entre un nombre et son unité : « 38 mm », « 95 cm ». */
 export const tidySubtitle = (subtitle) => String(subtitle ?? '').replace(/(\d) (?=(?:mm|cm)\b)/g, `$1${NBSP}`);
+
+/**
+ * Nom d'une ligne pour les technologies d'assistance : « DAG Essential, Noir, 95 cm ».
+ * Le nom seul ne suffit pas — deux tailles d'une même ceinture, deux créations de l'Atelier le partagent.
+ */
+export function lineLabel(item) {
+  const details = tidySubtitle(item?.subtitle).split(' · ').filter(Boolean);
+  return [item?.name, ...details].filter(Boolean).join(', ');
+}
 
 export const fullName = (customer) => [customer?.firstName, customer?.lastName].filter(Boolean).join(' ');
 

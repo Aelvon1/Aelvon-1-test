@@ -11,7 +11,13 @@ import { roundedRectPath, superellipse, sweepGeometry } from './sweep';
 
 const SECTION_M = 40;
 
-/** Cadre : rectangle aux coins arrondis, section biseautée ; le côté talon est la barrette ronde. */
+const NOTCH_HALF = 2.5; // demi-largeur du repos d'ardillon sur la traverse avant
+const NOTCH_DEPTH = 0.42;
+
+/**
+ * Cadre : rectangle aux coins arrondis, section légèrement bombée ; le côté talon est la barrette
+ * ronde. La traverse avant porte un repos creusé où vient se poser la pointe de l'ardillon.
+ */
 function buildFrame(spec) {
   const hy = spec.frameHalf;
   const Lf = spec.frameLength;
@@ -21,10 +27,11 @@ function buildFrame(spec) {
     y0: -hy,
     y1: hy,
     radii: [3.6, 5.6, 5.6, 3.6],
-    cornerSeg: 12,
-    sideStep: 3,
+    cornerSeg: 24,
+    sideStep: 1.6,
   });
-  const rect = superellipse(SECTION_M, spec.sectionW / 2, spec.sectionT / 2, 4.2);
+  // section : flancs presque droits, dessus et dessous bombés (les reflets roulent au lieu de plaquer)
+  const rect = superellipse(SECTION_M, spec.sectionW / 2, spec.sectionT / 2, 3.4);
   const round = superellipse(SECTION_M, spec.barRadius, spec.barRadius, 2);
   const rings = pts.map((p) => {
     let m = 0;
@@ -32,6 +39,14 @@ function buildFrame(spec) {
     else if (p.corner <= 1) m = 1 - smoothstep(0.1, 0.9, p.corner);
     else if (p.corner >= 3) m = smoothstep(0.1, 0.9, p.corner - 3);
     const section = rect.map((v, i) => lerp(v, round[i], m));
+    if (p.corner < 0 && p.x > Lf - 0.01 && Math.abs(p.y) < NOTCH_HALF) {
+      // repos de l'ardillon : le dessus de la traverse se creuse en douceur
+      const dip = NOTCH_DEPTH * (0.5 + 0.5 * Math.cos((Math.PI * p.y) / NOTCH_HALF));
+      for (let i = 1; i < section.length; i += 2) {
+        const h = section[i] / (spec.sectionT / 2);
+        if (h > 0) section[i] -= dip * h * h;
+      }
+    }
     // axe « largeur » de la section = normale sortante du contour, dans le plan du cadre
     return { c: [p.x, p.y, 0], b: [-p.ty, p.tx, 0], n: [0, 0, 1], pts: section, u: p.len };
   });
@@ -65,7 +80,9 @@ function buildProng(spec) {
   // Tige
   const shank = [];
   const xEnd = Lf + 1.5;
-  const zRest = spec.sectionT / 2 + 0.92;
+  // la pointe repose dans le creux de la traverse, à 0,2 mm du métal
+  const tipHalf = 1.05 * 0.72;
+  const zRest = spec.sectionT / 2 - NOTCH_DEPTH + 0.2 + tipHalf;
   const N = 34;
   const z = (x) => {
     const t = x / Lf;
@@ -115,9 +132,9 @@ export function buildKeeper(spec) {
   const yh = spec.hw + 0.45 + kt / 2;
   const { pts, total } = roundedRectPath({ x0: -yh, x1: yh, y0: zBot, y1: zTop, radii: [2.1, 2.1, 2.1, 2.1], cornerSeg: 8, sideStep: 2.5 });
 
-  // Section de la bande : fleur bombée, tranches rondes.
+  // Section de la bande : fleur bombée, tranches à chant plat et arêtes adoucies (comme la lanière).
   const half = kw / 2;
-  const e = 0.75;
+  const e = 0.34;
   const a = half - e;
   const hh = kt / 2;
   const section = [];
@@ -127,16 +144,18 @@ export function buildKeeper(spec) {
     section.push(x * a, hh + 0.22 * (1 - x * x));
   }
   const EDGE = 5;
-  for (let i = 1; i <= EDGE; i++) {
-    const ang = Math.PI / 2 - (i * Math.PI) / (EDGE + 1);
-    section.push(a + e * Math.cos(ang), hh * Math.sin(ang));
-  }
+  const C = Math.SQRT1_2;
+  const edge = [
+    [e * C, hh - e + e * C],
+    [e, hh - e],
+    [e, 0],
+    [e, -hh + e],
+    [e * C, -hh + e - e * C],
+  ];
+  for (const [dv, h] of edge) section.push(a + dv, h);
   const IN = 5;
   for (let i = 0; i < IN; i++) section.push(a - (2 * a * i) / (IN - 1), -hh);
-  for (let i = 1; i <= EDGE; i++) {
-    const ang = -Math.PI / 2 + (i * Math.PI) / (EDGE + 1);
-    section.push(-a - e * Math.cos(ang), hh * Math.sin(ang));
-  }
+  for (let i = EDGE - 1; i >= 0; i--) section.push(-a - edge[i][0], edge[i][1]);
   const materialOf = (j) => (j < OUT - 1 ? 0 : j < OUT - 1 + EDGE + 1 ? 2 : j < OUT - 1 + EDGE + 1 + IN - 1 ? 1 : 2);
 
   const rings = pts.map((p) => ({

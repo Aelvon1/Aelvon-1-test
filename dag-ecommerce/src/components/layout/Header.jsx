@@ -62,7 +62,8 @@ export default function Header() {
         )}
       />
 
-      <div className="container-luxe relative grid h-[var(--header-h)] grid-cols-[1fr_auto_1fr] items-center gap-6">
+      {/* --header-h comprend la zone sûre du haut : la barre garde sa hauteur utile en dessous */}
+      <div className="container-luxe relative grid h-[var(--header-h)] grid-cols-[1fr_auto_1fr] items-center gap-6 pt-[env(safe-area-inset-top,0px)]">
         <div data-tone-zone data-tone="noir" className="justify-self-start">
           <Link
             to="/"

@@ -33,11 +33,10 @@ export { useToast } from './toast-context';
 export { default as Packshot } from './Packshot';
 export { default as BeltThumb } from './BeltThumb';
 export { default as FreeShippingBar } from './FreeShippingBar';
-export { default as ProductCard } from './ProductCard';
 export { default as FavoriteButton } from './FavoriteButton';
 
 export { default as Section } from './Section';
 export { default as SectionHeading } from './SectionHeading';
 
 export { EASE_LUXE, EASE_SOIE } from './motion-presets';
-export { cn } from './cn';
+export { cn, yieldDisplay } from './cn';
