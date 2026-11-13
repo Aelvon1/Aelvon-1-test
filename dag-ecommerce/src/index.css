@@ -1,33 +1,219 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* ==========================================================================
+   DAG — Design system « Noir Atelier »
+   --------------------------------------------------------------------------
+   Deux surfaces : .theme-noir (défaut) et .theme-ivoire.
+   Les composants n'utilisent que les couleurs sémantiques (bg, surface, fg,
+   muted, line, accent) : ils s'adaptent donc à la surface qui les contient.
+   ========================================================================== */
+
+@theme {
+  --font-display: "Cormorant Garamond Variable", "Cormorant Garamond", "Iowan Old Style",
+    "Palatino Linotype", Georgia, serif;
+  --font-sans: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+
+  /* Palette brute */
+  --color-noir: #0b0a09;
+  --color-encre: #131110;
+  --color-fusain: #1c1917;
+  --color-ardoise: #2b2723;
+  --color-ivoire: #f1ebe1;
+  --color-papier: #e7dfd1;
+  --color-craie: #faf7f2;
+  --color-laiton: #c9a96e;
+  --color-laiton-clair: #e4cc98;
+  --color-laiton-fonce: #7a5f30;
+  --color-cognac: #9a5b32;
+  --color-succes: #7fa07a;
+  --color-alerte: #c8665a;
+
+  --ease-luxe: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soie: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --breakpoint-3xl: 112rem;
+}
+
+/* Couleurs sémantiques : résolues selon la surface (.theme-*) la plus proche */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+}
+
+:root,
+.theme-noir {
+  --bg: #0b0a09;
+  --surface: #151311;
+  --fg: #f1ebe1;
+  --muted: #a39a8c;
+  --line: rgb(241 235 225 / 0.14);
+  --accent: #c9a96e;
+  --on-accent: #0b0a09;
+  color-scheme: dark;
+}
+
+.theme-ivoire {
+  --bg: #f1ebe1;
+  --surface: #faf7f2;
+  --fg: #171412;
+  --muted: #6e665b;
+  --line: rgb(23 20 18 / 0.16);
+  --accent: #7a5f30;
+  --on-accent: #faf7f2;
+  color-scheme: light;
+}
+
+.theme-noir,
+.theme-ivoire {
+  background-color: var(--bg);
+  color: var(--fg);
+}
 
 @layer base {
-  * {
-    @apply antialiased;
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scrollbar-color: #3a342e #0b0a09;
   }
 
   body {
-    @apply font-sans text-dag-black bg-white;
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+    overflow-x: clip;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-display;
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background-color: #c9a96e;
+    color: #0b0a09;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  button,
+  [role="button"],
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  img,
+  svg,
+  canvas {
+    display: block;
+    max-width: 100%;
   }
 }
 
-@layer components {
-  .btn-primary {
-    @apply bg-dag-black text-white px-8 py-3 font-medium tracking-wide transition-all duration-300 hover:bg-dag-gray;
-  }
+/* --- Typographie -------------------------------------------------------- */
 
-  .btn-secondary {
-    @apply border-2 border-dag-black text-dag-black px-8 py-3 font-medium tracking-wide transition-all duration-300 hover:bg-dag-black hover:text-white;
-  }
+@utility text-hero {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3.75rem, 13vw, 13rem);
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+}
 
-  .container-custom {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+@utility text-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.6rem, 6.4vw, 6rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+
+@utility text-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2rem, 3.6vw, 3.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+
+@utility text-subtitle {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.4rem, 2vw, 1.875rem);
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+}
+
+@utility text-lead {
+  font-size: clamp(1.05rem, 1.25vw, 1.25rem);
+  line-height: 1.65;
+}
+
+@utility eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+/* --- Mise en page ------------------------------------------------------- */
+
+@utility container-luxe {
+  width: 100%;
+  max-width: 96rem;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 4rem);
+}
+
+@utility section-pad {
+  padding-block: clamp(5rem, 11vw, 11rem);
+}
+
+/* Grain photographique, à poser sur un élément position:relative/fixed */
+@utility grain {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.07;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }
