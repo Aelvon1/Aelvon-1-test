@@ -217,6 +217,7 @@ def build_assets():
     A['spark4'] = make_sparkles(26, 3, 482, 1020, 480, 300)
     A['spark5'] = make_sparkles(22, 5, 505, 1000, 380, 380)
     A['clicks'] = TL.wheel_click_times()
+    persist(A)
     A['pc_cache'] = {}
     return A
 

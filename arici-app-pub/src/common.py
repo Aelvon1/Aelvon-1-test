@@ -263,33 +263,48 @@ class Cam:
 
 
 _RES_CACHE = {}
+_PREMUL = {}
+_PERSIST = {}          # id -> image: long-lived assets that may be cached safely (ids never reused)
 
 
-def _resized(spr, tw, th):
-    key = (id(spr), tw, th)
+def persist(obj):
+    """Register every PIL image found in obj (dict/list/tuple) as a long-lived asset."""
+    if isinstance(obj, Image.Image):
+        _PERSIST[id(obj)] = obj
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            persist(v)
+    elif isinstance(obj, (list, tuple)):
+        for v in obj:
+            persist(v)
+    return obj
+
+
+def _resized(src, tw, th, key_id=None):
+    if key_id is None:
+        method = Image.LANCZOS if tw < src.width else Image.BICUBIC
+        return src.resize((tw, th), method)
+    key = (key_id, tw, th)
     r = _RES_CACHE.get(key)
     if r is None:
-        if len(_RES_CACHE) > 160:
+        if len(_RES_CACHE) > 48:
             _RES_CACHE.clear()
-        method = Image.LANCZOS if tw < spr.width else Image.BICUBIC
-        r = spr.resize((tw, th), method)
+        method = Image.LANCZOS if tw < src.width else Image.BICUBIC
+        r = src.resize((tw, th), method)
         _RES_CACHE[key] = r
     return r
 
 
-_PREMUL = {}
-
-
 def premul(spr):
-    """Cache premultiplied version of an RGBA sprite (keyed by id)."""
+    """Premultiplied copy; cached only for registered long-lived sprites."""
     k = id(spr)
+    if k not in _PERSIST:
+        return spr.convert('RGBa')
     p = _PREMUL.get(k)
-    if p is None or p[0] is not spr:
-        if len(_PREMUL) > 400:
-            _PREMUL.clear()
-        p = (spr, spr.convert('RGBa'))
+    if p is None:
+        p = spr.convert('RGBa')
         _PREMUL[k] = p
-    return p[1]
+    return p
 
 
 def place(canvas, spr, x, y, scale=1.0, rot=0.0, alpha=1.0, anchor=(0.5, 0.5), cam=None, sx=None, sy=None,
@@ -309,7 +324,7 @@ def place(canvas, spr, x, y, scale=1.0, rot=0.0, alpha=1.0, anchor=(0.5, 0.5), c
     src = premul(spr)
     w, h = src.size
     tw, th = max(1, int(round(w * sxv))), max(1, int(round(h * syv)))
-    pre = src if (tw, th) == (w, h) else _resized(src, tw, th) if static or (tw * th < 4_000_000) else src.resize((tw, th), Image.BICUBIC)
+    pre = src if (tw, th) == (w, h) else _resized(src, tw, th, id(spr) if id(spr) in _PERSIST else None)
     fx, fy = tw / w, th / h  # actual scale achieved by the resize
     ax, ay = anchor[0] * tw, anchor[1] * th
     # residual scale correction is ignored (<0.5px); rotation + subpixel translation via affine
@@ -357,7 +372,7 @@ def place_quad(canvas, spr, quad, alpha=1.0):
     th = max(abs(quad[3][1] - quad[0][1]), abs(quad[2][1] - quad[1][1]))
     k = min(1.0, max(tw / src.width, th / src.height) * 1.05)
     if k < 0.98:
-        src = _resized(src, max(1, int(src.width * k)), max(1, int(src.height * k)))
+        src = _resized(src, max(1, int(src.width * k)), max(1, int(src.height * k)), id(spr) if id(spr) in _PERSIST else None)
     w, h = src.size
     dst = [(px - bx0, py - by0) for px, py in quad]
     coeffs = _homography([(0, 0), (w, 0), (w, h), (0, h)], dst)
