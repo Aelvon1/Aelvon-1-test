@@ -1,0 +1,8 @@
+build/
+voices_fallback/
+ref/tmp/
+ref/pdfimg/
+ref/flyer200-1.png
+tmp_models.json
+__pycache__/
+*.pyc
