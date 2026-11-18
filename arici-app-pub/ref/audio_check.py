@@ -4,9 +4,10 @@ from PIL import Image, ImageDraw
 sys.path.insert(0,'/home/user/Aelvon-1-test/arici-app-pub/src')
 from scipy import signal
 from common import font
+import subprocess
 def rd(p):
-    w=wave.open(p); x=np.frombuffer(w.readframes(w.getnframes()),np.int16).astype(np.float32)/32768
-    return x.reshape(-1,w.getnchannels()).mean(1), w.getframerate()
+    out=subprocess.run(['ffmpeg','-v','error','-i',p,'-f','f32le','-ac','1','-ar','48000','-'],capture_output=True,check=True).stdout
+    return np.frombuffer(out,np.float32).copy(), 48000
 mix,sr=rd('build/mix.wav'); v,_=rd('build/stem_voice.wav'); bed,_=rd('build/stem_bed.wav')
 info=json.load(open('build/mix_info.json'))
 print('dur', len(mix)/sr)

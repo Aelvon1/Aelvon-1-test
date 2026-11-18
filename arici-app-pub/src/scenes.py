@@ -173,6 +173,9 @@ def build_assets():
     A['phone_qr'] = ph.compose(ui.screen_qr(K, TL.P_TO))
     A['logo'] = ui.logo_round()
     A['decor'] = deco.build(1080)
+    _bt = A['decor']['bottom'][0]
+    A['deco_bl'] = _bt.crop((0, 0, 270, _bt.height))
+    A['deco_br'] = _bt.crop((690, 0, _bt.width, _bt.height))
     # flying product cards (k=3.2)
     A['fly'] = {i: ui.product_card(3.2, i) for i in (0, 1, 2)}
     # wheel
@@ -199,7 +202,7 @@ def build_assets():
     A['plus50'] = _plus50()
     A['jouer'] = _jouer_btn()
     # captions
-    A['cap1'] = Caption([("Tout l'univers ARICI…", 84, 800, INK, 'mont'),
+    A['cap1'] = Caption([("Tout l’univers ARICI…", 84, 800, INK, 'mont'),
                          ('dans votre poche.', 110, 800, TITLE_BROWN, 'mont')], top=1110, center=500, maxw=860)
     A['cap2'] = Caption([('Retrouvez', 84, 800, INK, 'mont'),
                          ('tous nos produits', 96, 800, TITLE_BROWN, 'mont')], top=286)
@@ -301,11 +304,11 @@ def _jouer_btn():
 def _build_final():
     F = {}
     # texts from the flyer, re-typeset in Montserrat at full resolution
-    F['decouvrez'] = _text_box("Découvrez notre", 'mont', 800, TITLE_BROWN, fmap(23, 356), FS * 441)
-    F['application'] = _text_box('Application', 'mont', 700, INK, fmap(21, 419), FS * 459)
-    F['tag1'] = _text_box("Tout l'univers ARICI", 'monti', 300, (16, 16, 16), fmap(46, 556), FS * 304)
+    F['decouvrez'] = _text_box("Découvrez notre", 'mont', 800, TITLE_BROWN, fmap(23, 356), FS * 441, tracking_em=-0.03)
+    F['application'] = _text_box('Application', 'mont', 700, INK, fmap(21, 419), FS * 459, tracking_em=-0.03)
+    F['tag1'] = _text_box("Tout l’univers ARICI", 'monti', 300, (16, 16, 16), fmap(46, 556), FS * 304)
     F['tag2'] = _text_box('dans votre poche.', 'monti', 300, (16, 16, 16), fmap(46, 596), FS * 280, size_from=F['tag1'][3])
-    F['scannez'] = _text_box('Scannez pour télécharger', 'mont', 600, COPPER, fmap(134, 654), FS * 256, tracking=1.0)
+    F['scannez'] = _text_box('Scannez pour télécharger', 'mont', 600, COPPER, fmap(134, 654), FS * 256)
     ul = ui.layer(3)
     F['underline'] = (ul.resize((int(FS * 158), int(FS * 20)), Image.LANCZOS), fmap(35, 522))
     grid = ui.qr_modules_from_svg(os.path.join(ROOT, 'ref', 'QR-ARICI-application.svg'))
@@ -334,20 +337,62 @@ def _build_final():
     A['final'] = F
 
 
-def _text_box(txt, fam, weight, color, topleft, max_w, size_from=None, tracking=0.0):
+def _text_box(txt, fam, weight, color, topleft, max_w, size_from=None, tracking=0.0, tracking_em=0.0):
     """Text sized to width max_w with glyph top at topleft. Returns (sprite, x, y, size)."""
     if size_from:
         f = font(fam, size_from, weight)
     else:
         s = 200
-        while (font(fam, s, weight).getlength(txt) + tracking * len(txt)) > max_w:
+        while (font(fam, s, weight).getlength(txt) + (tracking + tracking_em * s) * (len(txt) - 1)) > max_w:
             s -= 1
         f = font(fam, s, weight)
+    tracking = tracking + tracking_em * f.size
     spr, base = text_sprite(txt, f, color, tracking=tracking, pad=8)
     bb = f.getbbox(txt, anchor='ls')
     x = topleft[0] - 8 - bb[0]
     y = topleft[1] - (base + bb[1])
     return (spr, x, y, f.size)
+
+
+# ---------------------------------------------------------------- exact rotational motion blur
+_POLAR = {}
+
+
+def _polar(spr):
+    from scipy import ndimage
+    key = id(spr)
+    if key in _POLAR:
+        return _POLAR[key]
+    D = max(spr.size)
+    c = (spr.width - 1) / 2, (spr.height - 1) / 2
+    arr = np.asarray(spr.convert('RGBa')).astype(np.float32)
+    NT = 3600
+    NR = int(math.ceil(math.hypot(spr.width, spr.height) / 2)) + 3
+    th = np.arange(NT, dtype=np.float32) / NT * 2 * np.pi
+    r = np.arange(NR, dtype=np.float32)
+    rr, tt = np.meshgrid(r, th, indexing='ij')
+    xs = c[0] + rr * np.sin(tt)
+    ys = c[1] - rr * np.cos(tt)
+    P = np.stack([ndimage.map_coordinates(arr[..., ch], [ys, xs], order=1, mode='constant', cval=0.0)
+                  for ch in range(4)], -1)
+    yy, xx = np.mgrid[0:spr.height, 0:spr.width].astype(np.float32)
+    dx, dy = xx - c[0], yy - c[1]
+    Rg = np.sqrt(dx * dx + dy * dy)
+    Tg = (np.degrees(np.arctan2(dx, -dy)) % 360.0) / 360.0 * NT
+    _POLAR[key] = (P, Rg, Tg, NT)
+    return _POLAR[key]
+
+
+def rot_blurred(spr, angle, blur_deg):
+    """Sprite rotated clockwise by `angle` with an exact rotational motion blur of `blur_deg` (centred)."""
+    from scipy import ndimage
+    P, Rg, Tg, NT = _polar(spr)
+    w = max(1, int(round(blur_deg / 360.0 * NT)))
+    B = ndimage.uniform_filter1d(P, size=w, axis=1, mode='wrap') if w > 1 else P
+    src_t = (Tg - angle / 360.0 * NT) % NT
+    out = np.stack([ndimage.map_coordinates(B[..., ch], [Rg, src_t], order=1, mode='grid-wrap')
+                    for ch in range(4)], -1)
+    return Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), 'RGBa').convert('RGBA')
 
 
 # ---------------------------------------------------------------- helpers
@@ -368,8 +413,10 @@ def draw_decor(c, t, cam):
     place(c, spr, -(1 - e_in) * 320, -(1 - e_in) * 320, scale=s, rot=sway - (1 - e_in) * 25, anchor=(0, 0), cam=cam)
     spr, (x, y) = d['tr']
     place(c, spr, W + (1 - e_in) * 320, -(1 - e_in) * 320, scale=s, rot=-sway + (1 - e_in) * 25, anchor=(1, 0), cam=cam)
-    spr, (x, y) = d['bottom']
-    place(c, spr, W / 2, H + (1 - e_in) * 260, scale=s * 1.0, anchor=(0.5, 1.0), cam=cam)
+    place(c, A['deco_bl'], -(1 - e_in) * 300, H + (1 - e_in) * 300, scale=1.65 * (1 + bump), rot=-sway * 0.6,
+          anchor=(0, 1), cam=cam)
+    place(c, A['deco_br'], W + (1 - e_in) * 300, H + (1 - e_in) * 300, scale=2.0 * (1 + bump), rot=sway * 0.6,
+          anchor=(1, 1), cam=cam)
 
 
 def products_screen(t):
@@ -389,7 +436,7 @@ def products_screen(t):
         if t >= TL.FLY_OUT[i]:
             hx = 22 + col * 180
             hy = 214 + 8 + row * pitch - scroll
-            hole = rrect(ui.CARD_W * K, ui.CARD_H * K, 18 * K, (236, 226, 212, 255))
+            hole = rrect(ui.CARD_W * K, ui.CARD_H * K, 18 * K, (243, 236, 226, 255), outline=(230, 220, 206), width=1.5 * K)
             scr.alpha_composite(hole, (int(hx * K), int(hy * K)))
     return scr, scroll
 
@@ -411,8 +458,8 @@ def points_card_sprite(pts, progv, label, shine=0.0):
     if len(cache) > 60:
         cache.clear()
     kc = 880 / 365
-    p = ui.Painter(kc, 365 + 40, 164 + 44, bg=(0, 0, 0, 0))
-    ui.draw_points_card(p, 20, 18, 365, 164, pts, progv, label, shine)
+    p = ui.Painter(kc, 365 + 90, 164 + 100, bg=(0, 0, 0, 0))
+    ui.draw_points_card(p, 45, 43, 365, 164, pts, progv, label, shine)
     cache[key] = p.img
     return p.img
 
@@ -428,12 +475,17 @@ def scene1(c, t, cam):
     if p > 0:
         s = 1.08 * max(0.04, e_out_back(p, 1.6))
         rot = -540 * (1 - e_out_cubic(p))
+        dps = 540 * 3 * (1 - p) ** 2 / 0.68
         s *= 1 + 0.015 * math.sin(2 * math.pi * max(0, t - 0.9) * 0.9)
         # glow ring when it lands
         q = prog(t, 0.72, 1.25)
         if 0 < q < 1:
             place(c, A['ring'], 500, 690 + oy, scale=0.9 + 0.7 * e_out_cubic(q), alpha=(1 - q) * 0.8, cam=cam)
-        place(c, A['logo'], 500, 690 + oy, scale=s * 1.22, rot=rot, alpha=clamp(p * 4), cam=cam)
+        blur = dps * 0.5 / FPS
+        if blur > 0.6 and t < 0.72:
+            place(c, rot_blurred(A['logo'], rot, blur), 500, 690 + oy, scale=s * 1.22, alpha=clamp(p * 4), cam=cam)
+        else:
+            place(c, A['logo'], 500, 690 + oy, scale=s * 1.22, rot=rot, alpha=clamp(p * 4), cam=cam)
     A['cap1'].draw(c, t, 0.76, None, cam=cam, oy=oy, stagger=0.08, line_delay=0.42)
 
 
@@ -458,7 +510,7 @@ def scene2(c, t, cam):
     if t < 5.6:
         A['cap2'].draw(c, t, 2.58, 5.46, cam=cam)
     # cards jumping out
-    targets = [((690, 800), 6), ((650, 1300), 4), ((300, 1010), -7)]
+    targets = [((705, 770), 5), ((640, 1290), 3), ((290, 1020), -6)]
     s_slot = 1.432 / 3.2
     for i in (0, 1, 2):
         t0 = TL.FLY_OUT[i]
@@ -471,7 +523,7 @@ def scene2(c, t, cam):
         e = e_out_back(q, 1.5)
         x = lerp(sx, tx, e_out_cubic(q))
         y = lerp(sy, ty, e_out_cubic(q)) - 170 * math.sin(math.pi * clamp(q))
-        s = lerp(s_slot, 0.8, e)
+        s = lerp(s_slot, 0.7, e)
         r = trot * e
         if q >= 1:
             y += 9 * math.sin(2 * math.pi * 0.9 * (t - t0 - 0.42) + i)
@@ -514,7 +566,11 @@ def roulette_layer(c, t, alpha=1.0, cam=None, wheel_c=(510, 1010), wheel_s=1.0, 
             if t >= TL.SPIN1 and on:
                 place(c, A['dot_g'], px, py, scale=wheel_s, alpha=alpha * 0.9, cam=cam)
             place(c, spr, px, py, scale=wheel_s, alpha=alpha, cam=cam)
-    place(c, A['wheel'], cx, cy, scale=wheel_s, rot=ang, alpha=alpha, cam=cam)
+    beta = TL.wheel_speed(t) * 0.75 / FPS if TL.SPIN0 <= t < TL.SPIN_SETTLE else 0.0
+    if beta > 0.6:
+        place(c, rot_blurred(A['wheel'], ang, beta), cx, cy, scale=wheel_s, alpha=alpha, cam=cam)
+    else:
+        place(c, A['wheel'], cx, cy, scale=wheel_s, rot=ang, alpha=alpha, cam=cam)
     if t >= TL.SPIN1:
         pulse = 0.55 + 0.45 * math.sin(2 * math.pi * 3 * (t - TL.SPIN1))
         place(c, A['win_wedge'], cx, cy, scale=wheel_s, rot=ang + 90, alpha=alpha * pulse * prog(t, TL.SPIN1, TL.SPIN1 + 0.12), cam=cam)
@@ -530,7 +586,7 @@ def roulette_layer(c, t, alpha=1.0, cam=None, wheel_c=(510, 1010), wheel_s=1.0, 
         place(c, pp, cx, cy - WD / 2 * wheel_s - 6, scale=wheel_s, rot=-kick, anchor=(0.5, 0.22), alpha=alpha, cam=cam)
 
 
-def scene3(c, t, cam):
+def scene3(c, t, cam, handoff=False):
     cx, cy = PH_C2
     # 1) expand the "LA ROUE DU JOUR" card to full screen
     if t < TL.T_EXPAND[1] + 0.02:
@@ -589,10 +645,11 @@ def scene3(c, t, cam):
         hs = A['hand']
         place(c, hs, px, py, anchor=(tx / hs.width, ty / hs.height), cam=cam)
     # win: +50 pts pops on the wheel and confetti
-    if t >= TL.SPIN1 + 0.05:
+    if TL.SPIN1 + 0.05 <= t < TL.T_SHRINK[0]:
         q = prog(t, TL.SPIN1 + 0.05, TL.SPIN1 + 0.4)
         place(c, A['plus50'], 510, 1010, scale=0.2 + 0.95 * e_out_back(q, 2.2), alpha=clamp(q * 3), cam=cam)
-    draw_confetti(c, A['confetti'], t, TL.SPIN1, cam=cam)
+    if not handoff:
+        draw_confetti(c, A['confetti'], t, TL.SPIN1, cam=cam)
 
 
 def scene4(c, t, cam):
@@ -611,9 +668,13 @@ def scene4(c, t, cam):
         # dark that warms into the card gradient
         dark = A['dark']
         layer_ = dark.copy()
-        ra = 1 - prog(t, TL.T_SHRINK[0], TL.T_SHRINK[0] + 0.12)
+        ra = 1 - prog(t, TL.T_SHRINK[0], TL.T_SHRINK[0] + 0.14)
         if ra > 0:
-            roulette_layer(layer_, t, ra, None, show_ui=True)
+            rl = new(W, H)
+            scene3(rl, t, None, handoff=True)
+            if ra < 1:
+                rl = Image.fromarray((np.asarray(rl).astype(np.float32) * np.array([1, 1, 1, ra], np.float32)).astype(np.uint8), 'RGBA')
+            layer_.alpha_composite(rl)
         warm = prog(t, TL.T_SHRINK[0] + 0.1, TL.T_SHRINK[1])
         if warm > 0:
             gx0, gy0 = int(max(0, X0)), int(max(0, Y0))
@@ -645,13 +706,14 @@ def scene4(c, t, cam):
         if sx > 0.02:
             place(c, card, CX, CY + 8 - 60 * e_in_cubic(flip), scale=bump, sx=sx, alpha=a, cam=cam)
     # +50 flies into the card
-    q = prog(t, 10.04, 10.5)
+    q = prog(t, TL.T_SHRINK[0], TL.COUNT0)
+    if 0 <= q < 1 and t >= TL.T_SHRINK[0]:
+        e = e_inout_cubic(q)
+        place(c, A['plus50'], lerp(510, 300, e), lerp(1010, 790, e) - 60 * math.sin(math.pi * e),
+              scale=lerp(1.15, 0.4, e), alpha=1 - prog(q, 0.6, 1.0), cam=cam)
+    q = prog(t, TL.COUNT0 - 0.06, TL.COUNT0 + 0.3)
     if 0 < q < 1:
-        e = e_in_cubic(q)
-        place(c, A['plus50'], lerp(510, 300, e), lerp(1010, 975, e), scale=lerp(1.0, 0.35, e), alpha=1 - prog(q, 0.8, 1.0), cam=cam)
-    q = prog(t, 10.5, 10.8)
-    if 0 < q < 1:
-        place(c, A['glow'], 300, 975, scale=0.6, alpha=(1 - q) * 0.8, cam=cam)
+        place(c, A['glow'], 230, 950, scale=0.7, alpha=(1 - q) * 0.85, cam=cam)
     draw_confetti(c, A['confetti'], t, TL.SPIN1, cam=cam)
     draw_sparkles(c, A['spark4'], t, TL.COUNT1, dur=0.75, cam=cam)
     if t >= TL.T_SHRINK[1] - 0.15:
@@ -661,7 +723,7 @@ def scene4(c, t, cam):
 def scene5(c, t, cam):
     BX, BY = 495, 1420          # box bottom centre
     body, lid = A['gift_body'], A['gift_lid']
-    if t < 14.05:
+    if t < 14.26:
         fall = prog(t, 12.9, TL.GIFT_LAND)
         yb = lerp(-60, BY, fall ** 1.7)
         sq = 0.0
@@ -814,36 +876,35 @@ def render(t):
 
 
 def motion_samples(t):
-    """How many sub-frame samples for motion blur at time t."""
+    """Sub-frame samples for motion blur (rotations of the wheel and logo are blurred exactly in polar space)."""
     n = 1
     if 0.04 <= t < 0.72:
-        n = 10
+        n = 4
     if TL.T_WHIP1[0] - 0.02 <= t < TL.T_WHIP1[1] + 0.3:
-        n = 20
+        n = 32
     if any(t0 <= t < t0 + 0.42 for t0 in TL.FLY_OUT):
-        n = max(n, 8)
+        n = max(n, 12)
     if TL.T_FLYCAM[0] <= t < TL.T_FLYCAM[1]:
-        n = max(n, 16)
+        n = max(n, 28)
     if TL.T_EXPAND[0] <= t < TL.T_EXPAND[1]:
-        n = max(n, 8)
-    if TL.SPIN0 <= t < TL.SPIN_SETTLE:
-        deg_per_frame = TL.wheel_speed(t) / FPS
-        n = max(n, min(24, int(math.ceil(deg_per_frame * 0.75 / 2.0))))
+        n = max(n, 12)
+    if 6.45 <= t < 7.35:
+        n = max(n, 6)       # finger in/out
     if TL.T_SHRINK[0] <= t < TL.T_SHRINK[1]:
-        n = max(n, 8)
+        n = max(n, 12)
     if 12.84 <= t < TL.GIFT_LAND:
-        n = max(n, 8)
+        n = max(n, 16)
     if TL.LID_POP <= t < TL.LID_POP + 0.4:
-        n = max(n, 8)
+        n = max(n, 12)
     if 13.98 <= t < TL.T_QR_IN[1]:
-        n = max(n, 12)
+        n = max(n, 24)
     if 15.26 <= t < TL.T_FINAL[1]:
-        n = max(n, 12)
+        n = max(n, 24)
     return n
 
 
 def shutter(t):
-    return 0.75 if TL.SPIN0 <= t < TL.SPIN1 else 0.5
+    return 0.5
 
 
 def render_frame(fi):

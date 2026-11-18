@@ -461,8 +461,8 @@ def sfx(dur):
     # roulette shrinks into the points card, +50 flies in
     S.add(9.95, whoosh(0.42, 0.8, 300, 3000, 0.6, (0.4, -0.4)), 0.75)
     S.add(10.04, whoosh(0.46, 0.5, 900, 6000, 0.85, (0.0, -0.4)), 0.5)
-    S.add(10.5, bell(mtof(98), 0.6, 0.6), 0.45)
-    S.add(10.5, thud(0.5, 120), 0.35)
+    S.add(TL.COUNT0 - 0.04, bell(mtof(98), 0.6, 0.6), 0.45)
+    S.add(TL.COUNT0 - 0.04, thud(0.5, 120), 0.35)
     # counter
     for (tc, v) in TL.counter_tick_times():
         fr = 1700 + (v - TL.P_FROM) * 22
