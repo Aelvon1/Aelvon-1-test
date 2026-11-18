@@ -603,7 +603,7 @@ def build_mix():
     raw = os.path.join(ROOT, 'build', 'mix_raw.wav')
     _write_stereo(raw, mix)
     final = os.path.join(ROOT, 'build', 'mix.wav')
-    loudnorm(raw, final, -14.0, -1.0)
+    loudnorm(raw, final, -14.0, -1.5)
     # stems for checking
     k = 1 / (np.abs(M * 0.30 * duck + S * 0.42 * duck_s + np.vstack([V, V])).max() / 0.9)
     _write_stereo(os.path.join(ROOT, 'build', 'stem_voice.wav'), np.vstack([V, V]) * k)

@@ -1,0 +1,32 @@
+{
+ "total": 18.0,
+ "voice_slots": {
+  "v1": 0.22,
+  "v2": 2.62,
+  "v3": 6.12,
+  "v4": 10.12,
+  "v5": 13.08,
+  "v6": 14.95
+ },
+ "voice_durations": {
+  "v1": 1.823,
+  "v2": 1.297,
+  "v3": 2.078,
+  "v4": 1.148,
+  "v5": 0.859,
+  "v6": 2.8
+ },
+ "voice": {
+  "provider": "piper (provisional)",
+  "model": "fr_FR-tom-medium",
+  "voice": "Piper tom (fallback)",
+  "durations": {
+   "v1": 1.823,
+   "v2": 1.297,
+   "v3": 2.078,
+   "v4": 1.148,
+   "v5": 0.859,
+   "v6": 3.035
+  }
+ }
+}

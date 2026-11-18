@@ -1,0 +1,96 @@
+{
+ "probe": {
+  "programs": [],
+  "streams": [
+   {
+    "codec_name": "h264",
+    "profile": "High",
+    "codec_type": "video",
+    "width": 1080,
+    "height": 1920,
+    "pix_fmt": "yuv420p",
+    "r_frame_rate": "30/1",
+    "bit_rate": "6852916",
+    "nb_frames": "540"
+   },
+   {
+    "codec_name": "aac",
+    "profile": "LC",
+    "codec_type": "audio",
+    "sample_rate": "48000",
+    "channels": 2,
+    "r_frame_rate": "0/0",
+    "bit_rate": "264237",
+    "nb_frames": "845"
+   }
+  ],
+  "format": {
+   "duration": "18.000000",
+   "size": "16035046",
+   "bit_rate": "7126687"
+  }
+ },
+ "loudness": {
+  "I": -14.1,
+  "LRA": 1.7,
+  "true_peak": -1.5
+ },
+ "duration_s": 18.0,
+ "wheel": {
+  "turns": 5,
+  "peak_deg_per_s": 2579,
+  "stop_s": 9.3,
+  "clicks": 46,
+  "result": "50 points"
+ },
+ "end_card_still": {
+  "from_s": 16.06,
+  "hold_s": 1.94,
+  "max_pixel_diff": 55,
+  "mean_diff": 0.051
+ },
+ "end_card_qr": "https://boulangeries-arici.fr/app",
+ "voice": {
+  "provider": "piper (provisional)",
+  "voice": "Piper tom (fallback)",
+  "model": "fr_FR-tom-medium",
+  "lines": {
+   "v1": {
+    "scene": "accroche",
+    "start": 0.22,
+    "end": 2.04,
+    "inside_scene": true
+   },
+   "v2": {
+    "scene": "produits",
+    "start": 2.62,
+    "end": 3.92,
+    "inside_scene": true
+   },
+   "v3": {
+    "scene": "roulette",
+    "start": 6.12,
+    "end": 8.2,
+    "inside_scene": true
+   },
+   "v4": {
+    "scene": "points",
+    "start": 10.12,
+    "end": 11.27,
+    "inside_scene": true
+   },
+   "v5": {
+    "scene": "profitez",
+    "start": 13.08,
+    "end": 13.94,
+    "inside_scene": true
+   },
+   "v6": {
+    "scene": "derniere image",
+    "start": 14.95,
+    "end": 17.75,
+    "inside_scene": true
+   }
+  }
+ }
+}
